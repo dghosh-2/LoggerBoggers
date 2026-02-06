@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   Wallet,
@@ -22,6 +23,7 @@ import { FinancialGraph } from "@/components/graph/financial-graph";
 import { Modal } from "@/components/ui/modal";
 import { toast } from "@/components/ui/toast";
 import { useUserStore } from "@/stores/user-store";
+import { useInsightsStore } from "@/stores/insights-store";
 
 const cashflowData = [
   { month: "Jan", income: 8500, expenses: 6200, savings: 2300 },
@@ -42,7 +44,9 @@ const spendingData = [
 ];
 
 export default function DashboardPage() {
+  const router = useRouter();
   const { transactions } = useUserStore();
+  const { setCurrentView } = useInsightsStore();
   const [isGraphExpanded, setIsGraphExpanded] = useState(false);
   const [isTransactionsOpen, setIsTransactionsOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<typeof transactions[0] | null>(null);
@@ -52,7 +56,8 @@ export default function DashboardPage() {
   };
 
   const handleCalendar = () => {
-    toast.info("Calendar view coming soon!");
+    setCurrentView('calendar');
+    router.push('/insights');
   };
 
   return (
