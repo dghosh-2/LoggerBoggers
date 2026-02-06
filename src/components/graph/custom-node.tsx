@@ -40,42 +40,50 @@ const CustomNode = ({ data, isConnectable, selected }: NodeProps) => {
 
     return (
         <div className={cn(
-            "relative min-w-[140px] px-3 py-3 rounded-xl border-2 transition-all duration-300 shadow-xl backdrop-blur-md",
-            // Base styles
-            "bg-zinc-900/90 border-zinc-800",
+            "relative min-w-[140px] px-4 py-4 rounded-xl border-2 transition-all duration-300 shadow-lg backdrop-blur-md",
+            // Base styles - theme aware
+            "bg-card/95 dark:bg-card/90 border-border",
             // Selection Glow
-            selected ? "border-primary shadow-[0_0_20px_-5px_var(--primary)] text-white" : "text-zinc-400",
-            // Highlight override (passed via style prop in GraphViewer, but here we handle CSS classes if needed)
-            // Note: React Flow passes inline styles for dynamic highlighting, so we keep this clean.
+            selected ? "border-primary shadow-[0_0_20px_-5px_var(--primary)]" : "",
         )}>
             {isIncome ? null : (
-                <Handle type="target" position={Position.Top} className="!w-2 !h-2 !bg-zinc-600 !border-zinc-900" isConnectable={isConnectable} />
+                <Handle 
+                    type="target" 
+                    position={Position.Top} 
+                    className="!w-2.5 !h-2.5 !bg-border-strong dark:!bg-foreground-muted !border-card" 
+                    isConnectable={isConnectable} 
+                />
             )}
 
-            <div className="flex flex-col items-center text-center space-y-1">
+            <div className="flex flex-col items-center text-center space-y-1.5">
                 <div className={cn(
-                    "p-2 rounded-full mb-1",
-                    isIncome ? "bg-green-500/10 text-green-500" :
-                        isExpense ? "bg-red-500/10 text-red-500" :
-                            "bg-blue-500/10 text-blue-500"
+                    "p-2.5 rounded-full mb-1",
+                    isIncome ? "bg-success-soft text-success" :
+                        isExpense ? "bg-destructive-soft text-destructive" :
+                            "bg-primary-soft text-primary"
                 )}>
                     <Icon className="w-5 h-5" />
                 </div>
 
-                <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wide px-1">
+                <span className="text-xs font-semibold text-foreground-muted uppercase tracking-wide px-1">
                     {data.label}
                 </span>
 
                 <span className={cn(
-                    "text-base font-bold font-mono",
-                    isIncome ? "text-green-400" : "text-white"
+                    "text-base font-bold font-mono text-foreground",
+                    isIncome && "text-success"
                 )}>
                     {data.amount}
                 </span>
             </div>
 
             {!isExpense && (
-                <Handle type="source" position={Position.Bottom} className="!w-2 !h-2 !bg-zinc-600 !border-zinc-900" isConnectable={isConnectable} />
+                <Handle 
+                    type="source" 
+                    position={Position.Bottom} 
+                    className="!w-2.5 !h-2.5 !bg-border-strong dark:!bg-foreground-muted !border-card" 
+                    isConnectable={isConnectable} 
+                />
             )}
         </div>
     );
