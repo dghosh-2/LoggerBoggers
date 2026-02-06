@@ -4,17 +4,25 @@ import React, { useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { MOCK_TRANSACTIONS } from '@/lib/mock-data';
 import { useInsightsStore } from '@/stores/insights-store';
+import { useThemeStore } from '@/stores/theme-store';
 
-const COLORS = [
-    '#22c55e', // green
-    '#3b82f6', // blue
-    '#f59e0b', // amber
-    '#ef4444', // red
-    '#8b5cf6', // violet
-    '#ec4899', // pink
-    '#14b8a6', // teal
-    '#f97316', // orange
-    '#6366f1', // indigo
+// Minimalistic monochromatic palette based on primary gold
+const LIGHT_COLORS = [
+    '#b8860b', // primary gold
+    '#d4a017', // lighter gold
+    '#8b6914', // darker gold
+    '#c9a227', // warm gold
+    '#a67c00', // deep gold
+    '#e6be44', // pale gold
+];
+
+const DARK_COLORS = [
+    '#d4a017', // primary gold
+    '#e6be44', // lighter gold
+    '#b8860b', // medium gold
+    '#f0d060', // pale gold
+    '#a67c00', // deep gold
+    '#c9a227', // warm gold
 ];
 
 interface CategoryData {
@@ -25,7 +33,10 @@ interface CategoryData {
 
 export function ExpensesPieChart() {
     const { selectedRange, setSelectedCategory, selectedCategory } = useInsightsStore();
+    const { theme } = useThemeStore();
     const [mounted, setMounted] = React.useState(false);
+
+    const COLORS = theme === 'dark' ? DARK_COLORS : LIGHT_COLORS;
 
     React.useEffect(() => {
         setMounted(true);
@@ -56,16 +67,43 @@ export function ExpensesPieChart() {
             categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount;
         });
 
-        const data: CategoryData[] = Object.entries(categoryTotals)
-            .map(([name, value], index) => ({
+        // Sort by value and get total
+        let sortedData = Object.entries(categoryTotals)
+            .map(([name, value]) => ({
                 name,
                 value: Math.round(value * 100) / 100,
-                color: COLORS[index % COLORS.length]
             }))
             .sort((a, b) => b.value - a.value);
 
-        return data;
-    }, [selectedRange, mounted]);
+        const total = sortedData.reduce((sum, cat) => sum + cat.value, 0);
+
+        // Keep top 5 categories, group rest into "Other"
+        const MAX_CATEGORIES = 5;
+        let finalData: CategoryData[] = [];
+        let otherTotal = 0;
+
+        sortedData.forEach((item, index) => {
+            if (index < MAX_CATEGORIES) {
+                finalData.push({
+                    ...item,
+                    color: COLORS[index % COLORS.length]
+                });
+            } else {
+                otherTotal += item.value;
+            }
+        });
+
+        // Add "Other" category if there are more than MAX_CATEGORIES
+        if (otherTotal > 0) {
+            finalData.push({
+                name: 'Other',
+                value: Math.round(otherTotal * 100) / 100,
+                color: theme === 'dark' ? '#6b6860' : '#9ca3af'
+            });
+        }
+
+        return finalData;
+    }, [selectedRange, mounted, COLORS, theme]);
 
     const totalSpend = useMemo(() => {
         return categoryData.reduce((sum, cat) => sum + cat.value, 0);
@@ -98,18 +136,18 @@ export function ExpensesPieChart() {
     if (!mounted) return null;
 
     return (
-        <div className="h-full w-full flex flex-col items-center justify-center p-4 relative">
+        <div className="h-full w-full flex flex-col items-center justify-center p-4 pt-16 relative">
             {/* Header Overlay */}
-            <div className="absolute top-4 left-4 z-10 flex flex-col space-y-1">
-                <div className="px-3 py-1 rounded-full bg-background/80 border border-border text-xs font-medium text-foreground-muted backdrop-blur-md w-fit">
-                    Spending Breakdown
-                </div>
-                <div className="px-4 py-2 rounded-xl bg-background/80 border border-border backdrop-blur-md shadow-lg">
-                    <div className="text-[10px] uppercase tracking-wider font-bold text-foreground-muted mb-0.5">
-                        {selectedRange === 'MTD' ? 'This Month' : selectedRange === '3M' ? 'Last 3 Months' : 'Yearly Total'}
+            <div className="absolute top-16 left-6 z-10 flex flex-col space-y-2">
+                <div className="px-4 py-3 rounded-xl bg-card/95 dark:bg-card/90 border border-border backdrop-blur-md shadow-lg">
+                    <div className="text-[10px] uppercase tracking-wider font-semibold text-foreground-muted mb-1">
+                        Total Spending
                     </div>
-                    <div className="text-xl font-mono font-bold text-foreground">
+                    <div className="text-2xl font-mono font-bold text-foreground">
                         ${totalSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                    <div className="text-xs text-foreground-muted mt-1">
+                        {categoryData.length} categories
                     </div>
                 </div>
             </div>
@@ -120,9 +158,9 @@ export function ExpensesPieChart() {
                     <Pie
                         data={categoryData}
                         cx="50%"
-                        cy="50%"
-                        innerRadius={80}
-                        outerRadius={140}
+                        cy="42%"
+                        innerRadius={70}
+                        outerRadius={130}
                         paddingAngle={2}
                         dataKey="value"
                         onClick={(_, index) => handleClick(categoryData[index])}
@@ -133,8 +171,11 @@ export function ExpensesPieChart() {
                                 key={`cell-${index}`}
                                 fill={entry.color}
                                 stroke={selectedCategory === entry.name ? 'var(--background)' : 'transparent'}
-                                strokeWidth={selectedCategory === entry.name ? 5 : 0}
+                                strokeWidth={selectedCategory === entry.name ? 3 : 0}
                                 opacity={selectedCategory && selectedCategory !== entry.name ? 0.3 : 1}
+                                style={{ 
+                                    transition: 'opacity 0.3s ease, stroke-width 0.2s ease',
+                                }}
                             />
                         ))}
                     </Pie>
@@ -143,21 +184,20 @@ export function ExpensesPieChart() {
                         layout="horizontal"
                         align="center"
                         verticalAlign="bottom"
-                        wrapperStyle={{ paddingTop: '20px' }}
+                        wrapperStyle={{ paddingTop: '16px', paddingBottom: '8px' }}
                         formatter={(value) => <span className="text-xs text-foreground-muted">{value}</span>}
                     />
                 </PieChart>
             </ResponsiveContainer>
 
             {/* Center Label */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ marginTop: '-12%' }}>
                 <div className="text-center">
-                    <div className="text-2xl font-bold text-foreground">
-                        {categoryData.length}
-                    </div>
-                    <div className="text-xs text-foreground-muted uppercase tracking-wide">
-                        Categories
-                    </div>
+                    {selectedCategory ? (
+                        <div className="font-medium text-primary text-sm">{selectedCategory}</div>
+                    ) : (
+                        <div className="text-foreground-muted text-xs">Click to explore</div>
+                    )}
                 </div>
             </div>
         </div>
