@@ -59,12 +59,12 @@ const availableIntegrations = [
 ];
 
 const popularBanks = [
-  { id: "chase", name: "Chase", logo: "🏦" },
-  { id: "bofa", name: "Bank of America", logo: "🏛️" },
-  { id: "wells", name: "Wells Fargo", logo: "🏧" },
-  { id: "citi", name: "Citibank", logo: "💳" },
-  { id: "capital", name: "Capital One", logo: "💰" },
-  { id: "amex", name: "American Express", logo: "💎" },
+  { id: "chase", name: "Chase", logo: "C" },
+  { id: "bofa", name: "Bank of America", logo: "B" },
+  { id: "wells", name: "Wells Fargo", logo: "W" },
+  { id: "citi", name: "Citibank", logo: "Ci" },
+  { id: "capital", name: "Capital One", logo: "CO" },
+  { id: "amex", name: "American Express", logo: "AE" },
 ];
 
 export default function ImportsPage() {

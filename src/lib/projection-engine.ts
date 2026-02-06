@@ -88,7 +88,7 @@ export const calculateMonthlyProjection = (
         if (reductionGoals && reductionGoals[cat]) {
             const reduction = reductionGoals[cat];
             avg = avg * (1 - reduction / 100);
-            drivers.push(`✓ ${cat} reduced by ${reduction}%`);
+            drivers.push(`${cat} reduced by ${reduction}%`);
         }
 
         variableTotal += avg;
@@ -106,7 +106,7 @@ export const calculateMonthlyProjection = (
         if (isReduced) {
             const reduction = reductionGoals[item.cat];
             amount = amount * (1 - reduction / 100);
-            drivers.push(`✓ ${item.cat} reduced by ${reduction}%`);
+            drivers.push(`${item.cat} reduced by ${reduction}%`);
         }
 
         const type = (isFuture || (monthIdx === today.getMonth() && today.getDate() < 1)) ? 'projected' : 'actual';

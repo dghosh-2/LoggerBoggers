@@ -352,7 +352,7 @@ export function runSimulation(input: SimulationInput): SimulationOutput {
                 const impact = monthIncome * (news.impactPercent / 100);
                 monthIncome += impact;
                 if (m === news.effectiveMonth) {
-                    newsEffects.push(`📰 ${news.title}: ${impact > 0 ? '+' : ''}$${Math.round(impact)}/mo`);
+                    newsEffects.push(`${news.title}: ${impact > 0 ? '+' : ''}$${Math.round(impact)}/mo`);
                     timeline.push(`Month ${m}: ${news.title} takes effect`);
                 }
             }
@@ -370,7 +370,7 @@ export function runSimulation(input: SimulationInput): SimulationOutput {
                         const impact = cat.adjustedAmount * (news.impactPercent / 100);
                         catExpense += impact;
                         if (m === news.effectiveMonth) {
-                            newsEffects.push(`📰 ${news.title}: +$${Math.round(impact)}/mo on ${cat.category}`);
+                            newsEffects.push(`${news.title}: +$${Math.round(impact)}/mo on ${cat.category}`);
                             timeline.push(`Month ${m}: ${news.title} impacts ${cat.category}`);
                         }
                     }
@@ -430,7 +430,7 @@ export function runSimulation(input: SimulationInput): SimulationOutput {
     const insights: string[] = [];
 
     if (riskScore > 0) {
-        insights.push(`⚠️ Risk Alert: ${negativeMonths} month(s) may have negative balance`);
+        insights.push(`Risk Alert: ${negativeMonths} month(s) may have negative balance`);
     }
 
     // Historical comparison
@@ -438,9 +438,9 @@ export function runSimulation(input: SimulationInput): SimulationOutput {
     const expenseChange = ((avgExpensesAfter - historical.avgMonthlyExpenses) / historical.avgMonthlyExpenses) * 100;
 
     if (expenseChange > 10) {
-        insights.push(`📈 Expenses projected ${Math.round(expenseChange)}% higher than historical average`);
+        insights.push(`Expenses projected ${Math.round(expenseChange)}% higher than historical average`);
     } else if (expenseChange < -10) {
-        insights.push(`💰 Expenses projected ${Math.round(Math.abs(expenseChange))}% lower than historical average`);
+        insights.push(`Expenses projected ${Math.round(Math.abs(expenseChange))}% lower than historical average`);
     }
 
     // News impact summary
@@ -450,20 +450,20 @@ export function runSimulation(input: SimulationInput): SimulationOutput {
     }, 0);
 
     if (totalNewsImpact > 100) {
-        insights.push(`📰 News factors adding ~$${Math.round(totalNewsImpact)}/mo to expenses`);
+        insights.push(`News factors adding ~$${Math.round(totalNewsImpact)}/mo to expenses`);
     }
 
     // Savings rate insight
     const actualSavingsRate = (totalSavings / totalIncome) * 100;
     if (actualSavingsRate >= input.savingsRatePercent) {
-        insights.push(`✅ On track for ${Math.round(actualSavingsRate)}% savings rate`);
+        insights.push(`On track for ${Math.round(actualSavingsRate)}% savings rate`);
     } else {
-        insights.push(`⚠️ Actual savings rate: ${Math.round(actualSavingsRate)}% (target: ${input.savingsRatePercent}%)`);
+        insights.push(`Actual savings rate: ${Math.round(actualSavingsRate)}% (target: ${input.savingsRatePercent}%)`);
     }
 
     // End balance insight
     if (projections[projections.length - 1].balance > 20000) {
-        insights.push(`✅ Strong ending balance: $${projections[projections.length - 1].balance.toLocaleString()}`);
+        insights.push(`Strong ending balance: $${projections[projections.length - 1].balance.toLocaleString()}`);
     }
 
     return {
