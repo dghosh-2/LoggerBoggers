@@ -10,6 +10,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import { INITIAL_NODES, INITIAL_EDGES, MOCK_INSIGHTS, MOCK_TRANSACTIONS } from '@/lib/mock-data';
 import { useInsightsStore } from '@/stores/insights-store';
+import { useThemeStore } from '@/stores/theme-store';
 import CustomNode from './custom-node';
 
 export function FinancialGraph() {
@@ -17,6 +18,8 @@ export function FinancialGraph() {
   const [nodes, setNodes, onNodesChange] = useNodesState(INITIAL_NODES);
   const [edges, setEdges, onEdgesChange] = useEdgesState(INITIAL_EDGES);
   const { selectedInsightId, selectedCategory, setSelectedCategory, selectedRange } = useInsightsStore();
+  const { theme } = useThemeStore();
+  const isDark = theme === 'dark';
 
   // Calculate node amounts based on selected range
   const filteredNodes = useMemo(() => {
@@ -108,6 +111,8 @@ export function FinancialGraph() {
   }, [nodes]);
 
   useEffect(() => {
+    const edgeColor = isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.15)';
+    
     if (!selectedInsightId && !selectedCategory) {
       // Reset styles if nothing selected
       setNodes((nds) =>
@@ -118,7 +123,7 @@ export function FinancialGraph() {
         }))
       );
       setEdges((eds) =>
-        eds.map((edge) => ({ ...edge, animated: true, style: { stroke: '#3f3f46', opacity: 1 } }))
+        eds.map((edge) => ({ ...edge, animated: true, style: { stroke: edgeColor, opacity: 1 } }))
       );
       return;
     }
@@ -166,7 +171,7 @@ export function FinancialGraph() {
           ...edge,
           animated: isHighlighted,
           style: {
-            stroke: isHighlighted ? '#22c55e' : '#3f3f46',
+            stroke: isHighlighted ? (isDark ? '#34d399' : '#059669') : edgeColor,
             opacity: isHighlighted ? 1 : 0.1,
             strokeWidth: isHighlighted ? 2 : 1
           }
@@ -174,21 +179,21 @@ export function FinancialGraph() {
       })
     );
 
-  }, [selectedInsightId, selectedCategory, setNodes, setEdges]);
+  }, [selectedInsightId, selectedCategory, setNodes, setEdges, isDark]);
 
   return (
-    <div className="h-full w-full rounded-xl overflow-hidden relative">
-      <div className="absolute top-4 left-4 z-10 flex flex-col space-y-1">
-        <div className="px-3 py-1 rounded-full bg-zinc-900/80 border border-zinc-800 text-xs font-medium text-zinc-400 backdrop-blur-md w-fit">
+    <div className="h-full w-full rounded-xl overflow-hidden relative bg-background-secondary dark:bg-background-secondary">
+      <div className="absolute top-4 left-4 z-10 flex flex-col space-y-2">
+        <div className="px-3 py-1.5 rounded-full bg-card/90 dark:bg-card/80 border border-border text-xs font-medium text-foreground-muted backdrop-blur-md w-fit shadow-sm">
           Live Graph
         </div>
 
         {/* Total Overlay */}
-        <div className="px-4 py-2 rounded-xl bg-zinc-900/80 border border-zinc-800 backdrop-blur-md shadow-2xl">
-          <div className="text-[10px] uppercase tracking-wider font-bold text-zinc-500 mb-0.5">
+        <div className="px-4 py-3 rounded-xl bg-card/95 dark:bg-card/90 border border-border backdrop-blur-md shadow-lg">
+          <div className="text-[10px] uppercase tracking-wider font-bold text-foreground-muted mb-1">
             {selectedRange === 'MTD' ? 'This Month' : selectedRange === '3M' ? 'Last 3 Months' : 'Yearly Total'}
           </div>
-          <div className="text-xl font-mono font-bold text-white">
+          <div className="text-xl font-mono font-bold text-foreground">
             ${totalDisplayedSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
         </div>
@@ -207,9 +212,13 @@ export function FinancialGraph() {
         defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
         proOptions={{ hideAttribution: true }}
       >
-        <Background gap={20} size={1} color="#333" className="opacity-20" />
+        <Background 
+          gap={20} 
+          size={1} 
+          color={isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'} 
+        />
         <Controls
-          className="bg-zinc-900 border-zinc-800 text-zinc-400 fill-current"
+          className="!bg-card !border-border !rounded-lg !shadow-md [&>button]:!bg-card [&>button]:!border-border [&>button]:!text-foreground-muted [&>button:hover]:!bg-secondary"
           showInteractive={false}
         />
       </ReactFlow>
