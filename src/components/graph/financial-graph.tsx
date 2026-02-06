@@ -220,6 +220,8 @@ export function FinancialGraph() {
         <Controls
           className="!bg-card !border-border !rounded-lg !shadow-md [&>button]:!bg-card [&>button]:!border-border [&>button]:!text-foreground-muted [&>button:hover]:!bg-secondary"
           showInteractive={false}
+          style={{ left: 10, bottom: 10 }}
+          position="bottom-left"
         />
       </ReactFlow>
     </div>
