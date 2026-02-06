@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { 
-  Wallet, 
-  TrendingUp, 
-  CreditCard, 
+import {
+  Wallet,
+  TrendingUp,
+  CreditCard,
   PiggyBank,
   ArrowUpRight,
   Bell,
@@ -150,7 +150,7 @@ export default function DashboardPage() {
           <GlassCard delay={500} className="h-[500px]">
             <h2 className="text-lg font-semibold mb-4">Quick Stats</h2>
             <div className="space-y-4">
-              <motion.div 
+              <motion.div
                 className="p-4 rounded-xl bg-secondary"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -160,7 +160,7 @@ export default function DashboardPage() {
                 <p className="text-2xl font-semibold">$127,340</p>
                 <p className="text-sm text-success">+2.34% this month</p>
               </motion.div>
-              <motion.div 
+              <motion.div
                 className="p-4 rounded-xl bg-secondary"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -170,7 +170,7 @@ export default function DashboardPage() {
                 <p className="text-2xl font-semibold">$63,450</p>
                 <p className="text-sm text-success">+5.2% this month</p>
               </motion.div>
-              <motion.div 
+              <motion.div
                 className="p-4 rounded-xl bg-secondary"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -179,7 +179,7 @@ export default function DashboardPage() {
                 <p className="text-sm text-foreground-muted mb-1">Savings Goal</p>
                 <p className="text-2xl font-semibold">68%</p>
                 <div className="mt-2 h-2 bg-background rounded-full overflow-hidden">
-                  <motion.div 
+                  <motion.div
                     className="h-full bg-primary rounded-full"
                     initial={{ width: 0 }}
                     animate={{ width: "68%" }}
@@ -220,9 +220,8 @@ export default function DashboardPage() {
                 onClick={() => setSelectedTransaction(tx)}
               >
                 <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                    tx.amount > 0 ? "bg-success/10" : "bg-destructive/10"
-                  }`}>
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${tx.amount > 0 ? "bg-success/10" : "bg-destructive/10"
+                    }`}>
                     {tx.amount > 0 ? (
                       <TrendingUp className="w-5 h-5 text-success" />
                     ) : (
@@ -282,9 +281,8 @@ export default function DashboardPage() {
               }}
             >
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                  tx.amount > 0 ? "bg-success/10" : "bg-destructive/10"
-                }`}>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${tx.amount > 0 ? "bg-success/10" : "bg-destructive/10"
+                  }`}>
                   {tx.amount > 0 ? (
                     <TrendingUp className="w-5 h-5 text-success" />
                   ) : (
@@ -317,9 +315,8 @@ export default function DashboardPage() {
         {selectedTransaction && (
           <div className="p-6 space-y-6">
             <div className="flex items-center gap-4">
-              <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${
-                selectedTransaction.amount > 0 ? "bg-success/10" : "bg-destructive/10"
-              }`}>
+              <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${selectedTransaction.amount > 0 ? "bg-success/10" : "bg-destructive/10"
+                }`}>
                 {selectedTransaction.amount > 0 ? (
                   <TrendingUp className="w-7 h-7 text-success" />
                 ) : (
