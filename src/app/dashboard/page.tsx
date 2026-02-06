@@ -124,8 +124,8 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Financial Graph */}
           <div className="lg:col-span-2">
-            <GlassCard delay={400} className="h-[500px]">
-              <div className="flex items-center justify-between mb-4">
+            <GlassCard delay={400} className="h-[520px] flex flex-col">
+              <div className="flex items-center justify-between mb-4 flex-shrink-0">
                 <div>
                   <h2 className="text-lg font-semibold">Money Flow</h2>
                   <p className="text-sm text-foreground-muted">
@@ -142,7 +142,9 @@ export default function DashboardPage() {
                   <ArrowUpRight className="w-4 h-4" />
                 </motion.button>
               </div>
-              <FinancialGraph />
+              <div className="flex-1 min-h-0 -mx-2 -mb-2">
+                <FinancialGraph />
+              </div>
             </GlassCard>
           </div>
 
@@ -257,7 +259,7 @@ export default function DashboardPage() {
         subtitle="Drag to pan, hover for details"
         size="full"
       >
-        <div className="p-6 h-[70vh]">
+        <div className="p-4 h-[75vh]">
           <FinancialGraph />
         </div>
       </Modal>
