@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { plaidClient } from '@/lib/plaid-client';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getUserIdFromRequest } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Check if user is connected
-        const { data: connectionData } = await supabase
+        const { data: connectionData } = await supabaseAdmin
             .from('user_plaid_connections')
             .select('is_connected')
             .eq('uuid_user_id', userId)
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Get all stored Plaid items for this user
-        const { data: plaidItems, error: itemsError } = await supabase
+        const { data: plaidItems, error: itemsError } = await supabaseAdmin
             .from('plaid_items')
             .select('*')
             .eq('uuid_user_id', userId)
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
 
                 // Update accounts in Supabase with fresh balances
                 for (const account of accountsResponse.data.accounts) {
-                    await supabase.from('accounts').upsert({
+                    await supabaseAdmin.from('accounts').upsert({
                         user_id: userId,
                         uuid_user_id: userId,
                         plaid_account_id: account.account_id,
@@ -144,7 +144,7 @@ export async function GET(request: NextRequest) {
                 
                 // If token is invalid, mark item as inactive
                 if (accountError.response?.data?.error_code === 'ITEM_LOGIN_REQUIRED') {
-                    await supabase
+                    await supabaseAdmin
                         .from('plaid_items')
                         .update({ status: 'login_required' })
                         .eq('item_id', item.item_id);
@@ -153,7 +153,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Update last sync time
-        await supabase
+        await supabaseAdmin
             .from('user_plaid_connections')
             .update({ last_sync_at: new Date().toISOString() })
             .eq('uuid_user_id', userId);
