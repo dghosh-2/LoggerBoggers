@@ -23,6 +23,7 @@ import { SimulationChart } from "@/components/charts/simulation-chart";
 import { cn } from "@/lib/utils";
 import { useFinancialData } from "@/hooks/useFinancialData";
 import { GlassButton } from "@/components/ui/glass-button";
+import { DogLoadingAnimation } from "@/components/ui/DogLoadingAnimation";
 
 export default function StudioPage() {
   const router = useRouter();
@@ -110,8 +111,30 @@ export default function StudioPage() {
   const monthlyGoal = 3500;
   const goalProgress = isConnected ? Math.min((projectedSavings / monthlyGoal) * 100, 100) : 0;
 
+  // Show loading state
+  if (loading) {
+    return (
+      <PageTransition>
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Studio</h1>
+            <p className="text-foreground-muted text-sm mt-1">
+              Simulate financial scenarios and explore possibilities
+            </p>
+          </div>
+          <div className="flex flex-col items-center justify-center py-16">
+            <DogLoadingAnimation 
+              message="Loading simulation data..."
+              size="lg"
+            />
+          </div>
+        </div>
+      </PageTransition>
+    );
+  }
+
   // Show connect prompt if not connected
-  if (!loading && !isConnected) {
+  if (!isConnected) {
     return (
       <PageTransition>
         <div className="space-y-6">

@@ -22,6 +22,7 @@ import { UploadCard } from "@/components/cards/upload-card";
 import { Modal } from "@/components/ui/modal";
 import { toast } from "@/components/ui/toast";
 import { PlaidLinkButton } from "@/components/PlaidLink";
+import { DogLoadingAnimation } from "@/components/ui/DogLoadingAnimation";
 
 interface PlaidAccount {
   id: string;
@@ -223,9 +224,11 @@ export default function ImportsPage() {
         {/* Connected Accounts */}
         {loading ? (
           <GlassCard>
-            <div className="flex items-center justify-center py-8">
-              <RefreshCw className="w-5 h-5 animate-spin text-primary" />
-              <span className="ml-2 text-sm text-foreground-muted">Loading accounts...</span>
+            <div className="py-4">
+              <DogLoadingAnimation 
+                message="Loading accounts..."
+                size="md"
+              />
             </div>
           </GlassCard>
         ) : institutions.length > 0 ? (

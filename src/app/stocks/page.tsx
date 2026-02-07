@@ -14,6 +14,7 @@ import { AISidebar } from '@/components/stocks/AISidebar';
 import DeepDiveModal from '@/components/DeepDiveModal';
 import { toast } from '@/components/ui/toast';
 import { StockData } from '@/lib/schemas';
+import { DogLoadingAnimation } from '@/components/ui/DogLoadingAnimation';
 
 interface OrchestratorOutput {
     intent: string;
@@ -38,9 +39,11 @@ interface OrchestratorOutput {
 export default function StocksPage() {
     // State
     const [loading, setLoading] = useState(false);
+    const [loadingStage, setLoadingStage] = useState(0);
     const [stocksData, setStocksData] = useState<StockData[] | null>(null);
     const [orchestratorOutput, setOrchestratorOutput] = useState<OrchestratorOutput | null>(null);
     const [recommendations, setRecommendations] = useState<any>(null);
+    const [dedalusResearch, setDedalusResearch] = useState<any>(null);
     const [riskData, setRiskData] = useState<any[]>([]);
     const [deepDiveData, setDeepDiveData] = useState<any>(null);
     const [deepDiveLoading, setDeepDiveLoading] = useState(false);
@@ -51,13 +54,16 @@ export default function StocksPage() {
     // Handle search
     const handleSearch = async (query: string) => {
         setLoading(true);
+        setLoadingStage(0);
         setCurrentQuery(query);
         setStocksData(null);
         setOrchestratorOutput(null);
         setRecommendations(null);
+        setDedalusResearch(null);
         setRiskData([]);
 
         try {
+            // Stage 0: Parsing query
             const orchestratorResponse = await fetch('/api/stocks/orchestrator', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -72,6 +78,7 @@ export default function StocksPage() {
             const orchestratorData: OrchestratorOutput = await orchestratorResponse.json();
             console.log('Orchestrator output:', orchestratorData);
             setOrchestratorOutput(orchestratorData);
+            setLoadingStage(1); // Stage 1: Fetching market data
 
             const dataResponse = await fetch('/api/stocks/data-fetcher', {
                 method: 'POST',
@@ -88,9 +95,37 @@ export default function StocksPage() {
 
             const dataResult = await dataResponse.json();
             setStocksData(dataResult.stocks);
+            setLoadingStage(2); // Stage 2: Analyzing with AI (Dedalus)
 
+            // Fetch Dedalus research in parallel with recommendations
+            let dedalusContext = '';
             if (orchestratorData.features.showRecommendations || orchestratorData.features.showAISidebar) {
-                fetchRecommendations(query, dataResult.stocks, orchestratorData.extractedQuestions || []);
+                // Call Dedalus for enhanced research
+                try {
+                    const dedalusResponse = await fetch('/api/stocks/dedalus-research', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            query,
+                            symbols: orchestratorData.symbols,
+                            extractedQuestions: orchestratorData.extractedQuestions || [],
+                        }),
+                    });
+                    
+                    if (dedalusResponse.ok) {
+                        const dedalusResult = await dedalusResponse.json();
+                        setDedalusResearch(dedalusResult);
+                        dedalusContext = dedalusResult.formattedContext || '';
+                        console.log('Dedalus research:', dedalusResult);
+                    }
+                } catch (dedalusError) {
+                    console.warn('Dedalus research failed, continuing without:', dedalusError);
+                }
+                
+                setLoadingStage(3); // Stage 3: Generating insights
+                
+                // Pass Dedalus context to recommendations
+                fetchRecommendations(query, dataResult.stocks, orchestratorData.extractedQuestions || [], dedalusContext);
             }
 
             if (orchestratorData.features.showRiskMetrics) {
@@ -103,15 +138,16 @@ export default function StocksPage() {
             toast.error(error.message || 'Failed to process your query. Please try again.');
         } finally {
             setLoading(false);
+            setLoadingStage(0);
         }
     };
 
-    const fetchRecommendations = async (query: string, stocks: StockData[], extractedQuestions: string[]) => {
+    const fetchRecommendations = async (query: string, stocks: StockData[], extractedQuestions: string[], dedalusContext: string = '') => {
         try {
             const response = await fetch('/api/stocks/recommendations', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query, stocks, extractedQuestions }),
+                body: JSON.stringify({ query, stocks, extractedQuestions, dedalusContext }),
             });
             if (response.ok) {
                 const result = await response.json();
@@ -211,9 +247,9 @@ export default function StocksPage() {
         };
 
         return (
-            <div className="flex gap-6">
-                {/* Left Panel: Visuals */}
-                <div className="flex-1 space-y-4 min-w-0">
+            <div className="flex gap-6 h-[calc(100vh-12rem)]">
+                {/* Left Panel: Visuals - Scrollable */}
+                <div className="flex-1 overflow-y-auto space-y-4 min-w-0 pr-2">
                     {/* Query Summary */}
                     <motion.div 
                         className="bg-card border border-border rounded-xl py-3.5 px-4"
@@ -291,9 +327,9 @@ export default function StocksPage() {
                     )}
                 </div>
 
-                {/* Right Panel: AI Sidebar */}
+                {/* Right Panel: AI Sidebar - Boxed and Scrollable */}
                 {showSidebar && (
-                    <div className="w-80 flex-shrink-0 sticky top-24 h-fit">
+                    <div className="w-96 flex-shrink-0 border border-border rounded-xl bg-card/50 backdrop-blur-sm overflow-y-auto">
                         <AISidebar
                             recommendations={recommendations}
                             stocksData={stocksData}
@@ -331,15 +367,11 @@ export default function StocksPage() {
 
                 {/* Loading State */}
                 {loading && (
-                    <GlassCard delay={100} className="py-14">
-                        <div className="flex flex-col items-center justify-center">
-                            <div className="relative w-12 h-12 mb-4">
-                                <div className="absolute inset-0 rounded-full border-2 border-primary/20 animate-ping" />
-                                <div className="absolute inset-0 rounded-full border-2 border-t-primary border-r-transparent border-b-transparent border-l-transparent animate-spin" />
-                            </div>
-                            <p className="text-sm font-medium">Processing your request...</p>
-                            <p className="text-xs text-foreground-muted mt-1">Analyzing markets with AI</p>
-                        </div>
+                    <GlassCard delay={100} className="py-8 px-8">
+                        <DogLoadingAnimation 
+                            message="Analyzing markets with AI..."
+                            size="lg"
+                        />
                     </GlassCard>
                 )}
 

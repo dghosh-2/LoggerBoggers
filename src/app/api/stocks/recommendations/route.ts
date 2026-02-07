@@ -4,7 +4,7 @@ import { getUserContext } from '@/lib/user-profile';
 
 export async function POST(request: NextRequest) {
     try {
-        const { query, stocks, extractedQuestions = [] } = await request.json();
+        const { query, stocks, extractedQuestions = [], dedalusContext = '' } = await request.json();
 
         if (!query || !stocks) {
             return NextResponse.json(
@@ -30,6 +30,11 @@ export async function POST(request: NextRequest) {
             ? `\n\nUser's Specific Questions to Answer:\n${extractedQuestions.map((q: string, i: number) => `${i + 1}. ${q}`).join('\n')}\n\nPlease provide direct answers to each question above.`
             : '';
 
+        // Build Dedalus research context section
+        const dedalusSection = dedalusContext 
+            ? `\n\n=== Real-Time Research from Dedalus ===\n${dedalusContext}\n=== End Research ===\n\nUse the above real-time research to enhance your recommendations with current news, analyst opinions, and market sentiment.`
+            : '';
+
         // Generate personalized recommendations
         const recommendationPrompt = `
 ${userContext}
@@ -38,14 +43,16 @@ Query: ${query}
 
 Stock Performance Summary:
 ${stockSummary}
+${dedalusSection}
 ${questionsSection}
 
-Based on the user's profile (age, risk tolerance, financial situation) and the stocks they're viewing, provide:
+Based on the user's profile (age, risk tolerance, financial situation), the stocks they're viewing, and any real-time research provided, provide:
 1. A clear summary recommendation (2-3 sentences)
 2. 3-4 specific insights about these stocks relevant to this user
 3. Contextual advice tailored to their risk tolerance and life stage
 4. How this aligns with their stated risk tolerance
 ${extractedQuestions.length > 0 ? '5. Direct answers to each of the user\'s specific questions' : ''}
+${dedalusContext ? '6. Incorporate any relevant news or analyst opinions from the research' : ''}
 
 Be specific, actionable, and personalized. Consider their age, risk tolerance, debt, and income status.
 `;
