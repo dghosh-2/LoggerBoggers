@@ -19,6 +19,7 @@ export interface Transaction {
     account_id?: string;
     source: 'plaid' | 'manual' | 'receipt_scan' | 'generated';
     merchant_name?: string;
+    location?: string;
     pending?: boolean;
     created_at?: string;
     updated_at?: string;
@@ -33,6 +34,7 @@ export interface Income {
     date: string;
     recurring?: boolean;
     frequency?: string;
+    location?: string;
     created_at?: string;
 }
 
