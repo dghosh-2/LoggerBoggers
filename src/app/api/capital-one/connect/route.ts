@@ -249,6 +249,7 @@ export async function POST(request: NextRequest) {
             console.log(`Generated ${fakeIncome.length} income records`);
 
             // Transform transactions to match actual database schema
+            // Schema: user_id, uuid_user_id, date, category, name, merchant_name, amount, tip, tax, location, source, pending
             allTransactionsWithUser = fakeTransactions.map((tx) => {
                 return {
                     user_id: userId,
@@ -256,24 +257,28 @@ export async function POST(request: NextRequest) {
                     merchant_name: tx.merchant_name || tx.name,
                     name: tx.name || tx.merchant_name,
                     amount: tx.amount,
-                    date: tx.date,           // Schema uses 'date' not 'transaction_date'
-                    category: tx.category,   // Schema uses 'category' (text) not 'category_id'
+                    date: tx.date,
+                    category: tx.category || 'Other',
                     source: 'capital_one',
                     location: tx.location || null,
                     pending: false,
+                    tip: tx.tip || null,
+                    tax: tx.tax || null,
                 };
             });
 
             // Transform income to match actual database schema
+            // Schema: user_id, uuid_user_id, amount, source, name, date, recurring, frequency, location
             const fakeIncomeWithUser = fakeIncome.map(inc => ({
                 user_id: userId,
                 uuid_user_id: userId,
                 amount: inc.amount,
                 source: inc.source || 'Salary',
-                name: inc.source || 'Salary',
+                name: inc.name || inc.source || 'Salary',
                 date: inc.date,
-                recurring: true,
-                frequency: 'monthly',
+                recurring: inc.recurring ?? true,
+                frequency: inc.frequency || 'monthly',
+                location: inc.location || null,
             }));
 
             // Insert transactions in batches

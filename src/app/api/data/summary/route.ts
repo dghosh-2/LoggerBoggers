@@ -7,10 +7,6 @@ export async function GET(request: NextRequest) {
         // Get authenticated user ID
         const userId = await getUserIdFromRequest(request);
         
-        // #region agent log
-        fetch('http://127.0.0.1:7245/ingest/2d405ccf-cb3f-4611-bc27-f95a616c15c9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'summary/route.ts:12',message:'Summary API called',data:{userId:userId||'null'},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
-        
         if (!userId) {
             // Return zeros if not authenticated - include is_authenticated flag
             return NextResponse.json({
@@ -63,17 +59,13 @@ export async function GET(request: NextRequest) {
         const twelveMonthsAgoStr = twelveMonthsAgo.toISOString().split('T')[0];
         
         // Fetch all transactions for calculations
-        // Actual schema: id, user_id, amount, category, name, date, merchant_name, uuid_user_id, location
+        // Schema: id, user_id, uuid_user_id, amount, date, category, name, merchant_name, tip, tax, location, source
         const { data: allTransactions, error: txError } = await supabaseAdmin
             .from('transactions')
-            .select('amount, category, date, merchant_name, name')
+            .select('amount, date, category, merchant_name, name, tip, tax, location')
             .eq('uuid_user_id', userId)
             .gte('date', twelveMonthsAgoStr)
             .order('date', { ascending: false });
-        
-        // #region agent log
-        fetch('http://127.0.0.1:7245/ingest/2d405ccf-cb3f-4611-bc27-f95a616c15c9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'summary/route.ts:70',message:'Transaction fetch result',data:{count:allTransactions?.length||0,error:txError,userId,sample:allTransactions?.[0]},timestamp:Date.now(),hypothesisId:'A,D'})}).catch(()=>{});
-        // #endregion
         
         // Fetch all income
         const { data: allIncome } = await supabaseAdmin
@@ -126,7 +118,7 @@ export async function GET(request: NextRequest) {
         
         // Helper to get transaction date (schema uses 'date')
         const getTxDate = (tx: any) => tx.date;
-        // Helper to get category name (schema uses 'category' as text)
+        // Helper to get category name (schema has 'category' text column)
         const getTxCategory = (tx: any) => tx.category || 'Other';
         // Helper to get transaction name
         const getTxName = (tx: any) => tx.merchant_name || tx.name || 'Unknown';
