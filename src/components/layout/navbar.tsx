@@ -21,7 +21,6 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Studio", href: "/studio", icon: Sparkles },
-  { name: "Time Machine", href: "/timemachine", icon: Clock },
   { name: "Insights", href: "/insights", icon: TrendingUp },
   { name: "Stocks", href: "/stocks", icon: LineChart },
   { name: "Imports", href: "/imports", icon: Upload },
