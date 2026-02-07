@@ -13,6 +13,7 @@ export interface Transaction {
     tax?: number | null;
     source: string;
     merchant_name?: string;
+    location?: string;
 }
 
 export interface FinancialSummary {
