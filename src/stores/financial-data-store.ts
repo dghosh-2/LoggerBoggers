@@ -18,6 +18,7 @@ export interface Transaction {
 
 export interface FinancialSummary {
     is_connected: boolean;
+    is_authenticated?: boolean;
     total_spending: number;
     total_income: number;
     net_worth: number;
@@ -33,6 +34,7 @@ interface FinancialDataState {
     transactions: Transaction[];
     summary: FinancialSummary | null;
     isConnected: boolean;
+    isAuthenticated: boolean; // Track if user is authenticated
     
     // Cache metadata
     lastFetchedAt: number | null;
@@ -44,11 +46,13 @@ interface FinancialDataState {
         transactions: Transaction[];
         summary: FinancialSummary | null;
         isConnected: boolean;
+        isAuthenticated?: boolean;
     }) => void;
     setLoading: (loading: boolean) => void;
     setError: (error: string | null) => void;
     invalidateCache: () => void;
     shouldRefetch: () => boolean;
+    clearData: () => void;
 }
 
 // Cache duration: 2 minutes for financial data (more frequently updated)
@@ -61,13 +65,18 @@ export const useFinancialDataStore = create<FinancialDataState>()(
             transactions: [],
             summary: null,
             isConnected: false,
+            isAuthenticated: false,
             lastFetchedAt: null,
             isLoading: false,
             error: null,
 
             setData: (data) => set({
-                ...data,
-                lastFetchedAt: Date.now(),
+                transactions: data.transactions,
+                summary: data.summary,
+                isConnected: data.isConnected,
+                isAuthenticated: data.isAuthenticated ?? data.isConnected,
+                // Only set lastFetchedAt if authenticated - don't cache unauthenticated state
+                lastFetchedAt: (data.isAuthenticated ?? data.isConnected) ? Date.now() : null,
                 isLoading: false,
                 error: null,
             }),
@@ -78,14 +87,30 @@ export const useFinancialDataStore = create<FinancialDataState>()(
 
             invalidateCache: () => set({ lastFetchedAt: null }),
 
+            clearData: () => set({
+                transactions: [],
+                summary: null,
+                isConnected: false,
+                isAuthenticated: false,
+                lastFetchedAt: null,
+                error: null,
+            }),
+
             shouldRefetch: () => {
-                const { lastFetchedAt, isLoading } = get();
+                const { lastFetchedAt, isLoading, isAuthenticated, transactions } = get();
                 
                 // Don't refetch if already loading
                 if (isLoading) return false;
                 
+                // Always refetch if not authenticated (don't use cached unauthenticated state)
+                if (!isAuthenticated) return true;
+                
                 // Refetch if never fetched
                 if (!lastFetchedAt) return true;
+                
+                // Refetch if we have no transactions but claim to be connected
+                // This handles the case where cache has stale "connected" state but no data
+                if (transactions.length === 0) return true;
                 
                 // Refetch if cache is stale
                 const now = Date.now();
@@ -99,6 +124,7 @@ export const useFinancialDataStore = create<FinancialDataState>()(
                 transactions: state.transactions,
                 summary: state.summary,
                 isConnected: state.isConnected,
+                isAuthenticated: state.isAuthenticated,
                 lastFetchedAt: state.lastFetchedAt,
             }),
         }

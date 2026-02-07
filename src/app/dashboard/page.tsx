@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -36,18 +36,7 @@ import { toast } from "@/components/ui/toast";
 import { useInsightsStore } from "@/stores/insights-store";
 import { GlassButton } from "@/components/ui/glass-button";
 import { DogLoadingAnimation } from "@/components/ui/DogLoadingAnimation";
-
-interface FinancialSummary {
-  is_connected: boolean;
-  total_spending: number;
-  total_income: number;
-  net_worth: number;
-  monthly_spending: number;
-  monthly_income: number;
-  spending_by_category: Record<string, number>;
-  recent_transactions: Array<{ name: string; amount: number; category: string; date: string }>;
-  monthly_trend: Array<{ month: string; spending: number; income: number }>;
-}
+import { useFinancialData } from "@/hooks/useFinancialData";
 
 interface DisplayTransaction {
   id: string;
@@ -74,8 +63,9 @@ export default function DashboardPage() {
   const router = useRouter();
   const { setCurrentView } = useInsightsStore();
   const [selectedTransaction, setSelectedTransaction] = useState<DisplayTransaction | null>(null);
-  const [summary, setSummary] = useState<FinancialSummary | null>(null);
-  const [loading, setLoading] = useState(true);
+  
+  // Use the financial data hook for consistent data fetching and caching
+  const { summary, loading, refetch } = useFinancialData();
 
   const transactions: DisplayTransaction[] = (summary?.recent_transactions || []).map((tx, index) => ({
     id: `tx-${index}`,
@@ -84,23 +74,6 @@ export default function DashboardPage() {
     category: tx.category,
     date: new Date(tx.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
   }));
-
-  useEffect(() => {
-    fetchSummary();
-  }, []);
-
-  const fetchSummary = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch('/api/data/summary');
-      const data = await response.json();
-      setSummary(data);
-    } catch (error) {
-      console.error('Error fetching summary:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleNotifications = () => {
     toast.info("No new notifications");

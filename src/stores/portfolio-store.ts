@@ -18,6 +18,7 @@ interface PortfolioState {
   holdings: PlaidInvestmentHolding[];
   loans: PlaidLoan[];
   summary: FinancialSummary | null;
+  isAuthenticated: boolean;
   
   // Cache metadata
   lastFetchedAt: number | null;
@@ -32,11 +33,13 @@ interface PortfolioState {
     holdings: PlaidInvestmentHolding[];
     loans: PlaidLoan[];
     summary: FinancialSummary | null;
+    isAuthenticated?: boolean;
   }) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   invalidateCache: () => void;
   shouldRefetch: () => boolean;
+  clearData: () => void;
 }
 
 // Cache duration: 5 minutes (data doesn't change that often)
@@ -52,16 +55,27 @@ export const usePortfolioStore = create<PortfolioState>()(
       holdings: [],
       loans: [],
       summary: null,
+      isAuthenticated: false,
       lastFetchedAt: null,
       isLoading: false,
       error: null,
 
-      setData: (data) => set({
-        ...data,
-        lastFetchedAt: Date.now(),
-        isLoading: false,
-        error: null,
-      }),
+      setData: (data) => {
+        const isAuth = data.isAuthenticated ?? (data.institutions.length > 0 || data.bankAccounts.length > 0);
+        set({
+          institutions: data.institutions,
+          bankAccounts: data.bankAccounts,
+          investmentAccounts: data.investmentAccounts,
+          holdings: data.holdings,
+          loans: data.loans,
+          summary: data.summary,
+          isAuthenticated: isAuth,
+          // Only cache if authenticated
+          lastFetchedAt: isAuth ? Date.now() : null,
+          isLoading: false,
+          error: null,
+        });
+      },
 
       setLoading: (loading) => set({ isLoading: loading }),
       
@@ -69,11 +83,26 @@ export const usePortfolioStore = create<PortfolioState>()(
 
       invalidateCache: () => set({ lastFetchedAt: null }),
 
+      clearData: () => set({
+        institutions: [],
+        bankAccounts: [],
+        investmentAccounts: [],
+        holdings: [],
+        loans: [],
+        summary: null,
+        isAuthenticated: false,
+        lastFetchedAt: null,
+        error: null,
+      }),
+
       shouldRefetch: () => {
-        const { lastFetchedAt, isLoading } = get();
+        const { lastFetchedAt, isLoading, isAuthenticated } = get();
         
         // Don't refetch if already loading
         if (isLoading) return false;
+        
+        // Always refetch if not authenticated
+        if (!isAuthenticated) return true;
         
         // Refetch if never fetched
         if (!lastFetchedAt) return true;
@@ -93,6 +122,7 @@ export const usePortfolioStore = create<PortfolioState>()(
         holdings: state.holdings,
         loans: state.loans,
         summary: state.summary,
+        isAuthenticated: state.isAuthenticated,
         lastFetchedAt: state.lastFetchedAt,
       }),
     }
@@ -112,6 +142,16 @@ export function usePortfolioData() {
     store.setLoading(true);
     
     try {
+      // First check if user is authenticated by calling summary API
+      const authCheckResponse = await fetch('/api/data/summary');
+      const authCheckData = await authCheckResponse.json();
+      
+      // If not authenticated, clear data and return
+      if (!authCheckData.is_authenticated) {
+        store.clearData();
+        return;
+      }
+
       const [
         { getConnectedInstitutions, getBankAccounts, getInvestmentAccounts, getInvestmentHoldings, getLoans, getFinancialSummary }
       ] = await Promise.all([
@@ -185,9 +225,11 @@ export function usePortfolioData() {
         holdings,
         loans,
         summary,
+        isAuthenticated: true,
       });
     } catch (error: any) {
       store.setError(error.message || 'Failed to load portfolio data');
+      store.clearData();
     }
   };
 
