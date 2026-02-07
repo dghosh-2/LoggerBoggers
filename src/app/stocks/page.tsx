@@ -95,37 +95,34 @@ export default function StocksPage() {
 
             const dataResult = await dataResponse.json();
             setStocksData(dataResult.stocks);
-            setLoadingStage(2); // Stage 2: Analyzing with AI (Dedalus)
+            setLoadingStage(2); // Stage 2: Generating insights
 
-            // Fetch Dedalus research in parallel with recommendations
-            let dedalusContext = '';
+            // Fetch recommendations immediately without waiting for Dedalus
             if (orchestratorData.features.showRecommendations || orchestratorData.features.showAISidebar) {
-                // Call Dedalus for enhanced research
-                try {
-                    const dedalusResponse = await fetch('/api/stocks/dedalus-research', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            query,
-                            symbols: orchestratorData.symbols,
-                            extractedQuestions: orchestratorData.extractedQuestions || [],
-                        }),
-                    });
-                    
+                setLoadingStage(3); // Stage 3: Generating insights
+                
+                // Start recommendations immediately (fast path)
+                fetchRecommendations(query, dataResult.stocks, orchestratorData.extractedQuestions || [], '');
+                
+                // Optionally fetch Dedalus research in background (non-blocking)
+                // This won't slow down the main flow
+                fetch('/api/stocks/dedalus-research', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        query,
+                        symbols: orchestratorData.symbols,
+                        extractedQuestions: orchestratorData.extractedQuestions || [],
+                    }),
+                }).then(async (dedalusResponse) => {
                     if (dedalusResponse.ok) {
                         const dedalusResult = await dedalusResponse.json();
                         setDedalusResearch(dedalusResult);
-                        dedalusContext = dedalusResult.formattedContext || '';
-                        console.log('Dedalus research:', dedalusResult);
+                        console.log('Dedalus research (background):', dedalusResult);
                     }
-                } catch (dedalusError) {
-                    console.warn('Dedalus research failed, continuing without:', dedalusError);
-                }
-                
-                setLoadingStage(3); // Stage 3: Generating insights
-                
-                // Pass Dedalus context to recommendations
-                fetchRecommendations(query, dataResult.stocks, orchestratorData.extractedQuestions || [], dedalusContext);
+                }).catch((dedalusError) => {
+                    console.warn('Dedalus research failed (background):', dedalusError);
+                });
             }
 
             if (orchestratorData.features.showRiskMetrics) {
@@ -280,28 +277,40 @@ export default function StocksPage() {
                         </div>
                     </motion.div>
 
-                    {/* Statistics Grid */}
+                    {/* Statistics - Horizontal scrollable row */}
                     {features.showStatistics && stats.length > 0 && (
-                        <Section columns={Math.min(stats.length * 2, 4) as 1 | 2 | 3 | 4} gap="md" delay={150}>
+                        <motion.div
+                            className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide"
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.3, delay: 0.15 }}
+                        >
                             {stats.map((stat, idx) => (
-                                <React.Fragment key={stat.symbol}>
-                                    <MetricCard
-                                        label={`${stat.symbol} Price`}
-                                        value={`$${stat.price.toFixed(2)}`}
-                                        change={stat.change}
-                                        changeLabel={orchestratorOutput.timeRange.period}
-                                        color={stat.change >= 0 ? 'success' : 'danger'}
-                                        delay={200 + idx * 50}
-                                    />
-                                    <MetricCard
-                                        label={`${stat.symbol} Range`}
-                                        value={`$${stat.low.toFixed(0)} - $${stat.high.toFixed(0)}`}
-                                        color="info"
-                                        delay={225 + idx * 50}
-                                    />
-                                </React.Fragment>
+                                <motion.div
+                                    key={stat.symbol}
+                                    className="flex-shrink-0 min-w-[160px] bg-card border border-border rounded-xl p-4"
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ duration: 0.3, delay: 0.2 + idx * 0.05 }}
+                                >
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <div className={`w-2 h-2 rounded-full ${stat.change >= 0 ? 'bg-success' : 'bg-destructive'}`} />
+                                        <span className="font-semibold text-sm">{stat.symbol}</span>
+                                    </div>
+                                    <p className={`text-xl font-bold ${stat.change >= 0 ? 'text-success' : 'text-destructive'}`}>
+                                        ${stat.price.toFixed(2)}
+                                    </p>
+                                    <div className="flex items-center justify-between mt-1">
+                                        <span className={`text-xs ${stat.change >= 0 ? 'text-success' : 'text-destructive'}`}>
+                                            {stat.change >= 0 ? '+' : ''}{stat.change.toFixed(2)}%
+                                        </span>
+                                        <span className="text-xs text-foreground-muted">
+                                            {orchestratorOutput.timeRange.period}
+                                        </span>
+                                    </div>
+                                </motion.div>
                             ))}
-                        </Section>
+                        </motion.div>
                     )}
 
                     {/* Charts Grid */}
