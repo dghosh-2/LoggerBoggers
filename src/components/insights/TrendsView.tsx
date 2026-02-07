@@ -1,28 +1,39 @@
 "use client";
 
 import React, { useMemo } from 'react';
-import { MOCK_INSIGHTS, MOCK_TRANSACTIONS } from '@/lib/mock-data';
-import { Sparkles, TrendingUp, Calendar, Repeat, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { MOCK_INSIGHTS } from '@/lib/mock-data';
+import { Sparkles, TrendingUp, Calendar, Repeat, ArrowUpRight, ArrowDownRight, Link2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useInsightsStore } from '@/stores/insights-store';
+import { useFinancialData } from '@/hooks/useFinancialData';
+import { useRouter } from 'next/navigation';
+import { GlassButton } from '@/components/ui/glass-button';
 
 export function TrendsView() {
+    const router = useRouter();
     const { setExplainingInsightId } = useInsightsStore();
+    const { transactions, isConnected, loading } = useFinancialData();
 
-    // SIMPLE CALCULATION ENGINE (No future projections)
-    // 1. Calculate Previous Month Total
-    // 2. Calculate Current Month Total
-
+    // Calculate stats from real transactions
     const stats = useMemo(() => {
-        const now = new Date('2026-02-15'); // Mock Current Date
+        if (!isConnected || transactions.length === 0) {
+            return {
+                current: { label: "This Month", amount: 0 },
+                previous: { label: "Last Month", amount: 0 }
+            };
+        }
+
+        const now = new Date();
         const currentMonth = now.getMonth();
         const currentYear = now.getFullYear();
 
         const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
         const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
 
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
         // Helper to sum transactions for a given month
-        const getSum = (m: number, y: number) => MOCK_TRANSACTIONS
+        const getSum = (m: number, y: number) => transactions
             .filter(t => {
                 const d = new Date(t.date);
                 return d.getMonth() === m && d.getFullYear() === y;
@@ -33,10 +44,10 @@ export function TrendsView() {
         const prevTotal = getSum(prevMonth, prevYear);
 
         return {
-            current: { label: "Feb '26", amount: currentTotal },
-            previous: { label: "Jan '26", amount: prevTotal }
+            current: { label: `${monthNames[currentMonth]} '${String(currentYear).slice(-2)}`, amount: currentTotal },
+            previous: { label: `${monthNames[prevMonth]} '${String(prevYear).slice(-2)}`, amount: prevTotal }
         };
-    }, []);
+    }, [transactions, isConnected]);
 
     const getIcon = (id: string, severity: string) => {
         if (severity === 'critical') return <TrendingUp className="w-5 h-5 text-red-500" />;
@@ -72,6 +83,39 @@ export function TrendsView() {
             </div>
         </div>
     );
+
+    // Show connect prompt if not connected
+    if (!loading && !isConnected) {
+        return (
+            <div className="min-h-full w-full pt-16 p-8 pb-24 space-y-8 animate-in fade-in duration-500">
+                <div className="flex items-center space-x-3 mb-6">
+                    <div className="p-3 bg-accent/10 rounded-xl">
+                        <Sparkles className="w-6 h-6 text-accent" />
+                    </div>
+                    <div>
+                        <h2 className="text-2xl font-bold text-foreground">Trend Intelligence</h2>
+                        <p className="text-foreground-muted text-sm">AI-detected patterns and insights</p>
+                    </div>
+                </div>
+                <div className="flex flex-col items-center justify-center py-16">
+                    <div className="p-4 rounded-full bg-secondary mb-4">
+                        <Link2 className="w-8 h-8 text-foreground-muted" />
+                    </div>
+                    <h3 className="text-lg font-semibold mb-2">Connect Your Accounts</h3>
+                    <p className="text-sm text-foreground-muted text-center mb-6 max-w-[400px]">
+                        Link your bank accounts via Plaid to see spending trends and AI-powered insights
+                    </p>
+                    <GlassButton 
+                        variant="primary" 
+                        size="md"
+                        onClick={() => router.push('/imports')}
+                    >
+                        Connect via Plaid
+                    </GlassButton>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-full w-full pt-16 p-8 pb-24 space-y-8 animate-in fade-in duration-500">

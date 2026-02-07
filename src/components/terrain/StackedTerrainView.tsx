@@ -13,10 +13,12 @@ import {
     CartesianGrid,
 } from "recharts";
 import { useTerrainStore } from "@/stores/terrain-store";
-import { MOCK_TRANSACTIONS } from "@/lib/mock-data";
+import { useFinancialData } from "@/hooks/useFinancialData";
 import { format, differenceInDays, addMonths, startOfMonth } from "date-fns";
-import { Play, Pause, RotateCcw, TrendingUp, TrendingDown, Zap, Trophy, AlertCircle, ArrowUp } from "lucide-react";
+import { Play, Pause, RotateCcw, TrendingUp, TrendingDown, Zap, Trophy, AlertCircle, ArrowUp, Link2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { GlassButton } from "@/components/ui/glass-button";
+import { useRouter } from "next/navigation";
 
 // Category configuration - PHASE 1: Vibrant colors for clear distinction
 const CATEGORIES = [
@@ -57,7 +59,9 @@ interface Landmark {
 }
 
 export function StackedTerrainView() {
+    const router = useRouter();
     const { activeCategories, startDate, endDate, currentDate, setCurrentDate, showSimulation, toggleSimulation } = useTerrainStore();
+    const { transactions, summary, isConnected, loading } = useFinancialData();
     const [isPlaying, setIsPlaying] = useState(false);
     const [playbackSpeed, setPlaybackSpeed] = useState(1);
     const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
@@ -65,11 +69,11 @@ export function StackedTerrainView() {
     const [displayIncome, setDisplayIncome] = useState(0);
     const [displayExpenses, setDisplayExpenses] = useState(0);
 
-    // Build MONTHLY data - reduced points for performance
+    // Build MONTHLY data from real transactions
     const fullData = useMemo(() => {
         const data: DataPoint[] = [];
         let runningBalance = 5000;
-        const monthlyIncome = 9500;
+        const monthlyIncome = isConnected ? (summary?.monthly_income || 0) : 0;
 
         const start = startOfMonth(startDate);
         const monthCount = Math.min(Math.ceil(differenceInDays(endDate, start) / 30) + 1, 50); // Cap at 50 points
@@ -78,7 +82,7 @@ export function StackedTerrainView() {
             const monthStart = addMonths(start, m);
             const monthEnd = addMonths(monthStart, 1);
 
-            const monthTransactions = MOCK_TRANSACTIONS.filter(t => {
+            const monthTransactions = (!isConnected || transactions.length === 0) ? [] : transactions.filter(t => {
                 const date = new Date(t.date);
                 return date >= monthStart && date < monthEnd;
             });
@@ -115,7 +119,7 @@ export function StackedTerrainView() {
         }
 
         return data;
-    }, [startDate, endDate]);
+    }, [startDate, endDate, transactions, isConnected, summary]);
 
     // Detect meaningful landmarks
     const landmarks = useMemo(() => {

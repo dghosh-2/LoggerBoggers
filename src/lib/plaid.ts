@@ -315,55 +315,102 @@ const FAKE_LOANS: PlaidLoan[] = [
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════
-// API FUNCTIONS - Replace these with real Plaid API calls
+// API FUNCTIONS - Check Supabase connection status first
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
+ * Check if user is connected to Plaid via Supabase
+ */
+async function checkPlaidConnection(): Promise<boolean> {
+    try {
+        const response = await fetch('/api/data/summary');
+        const data = await response.json();
+        return data.is_connected || false;
+    } catch {
+        return false;
+    }
+}
+
+/**
  * Get all connected institutions with their accounts
- * In production: Call /api/plaid/accounts
+ * Returns empty array if not connected to Plaid
  */
 export async function getConnectedInstitutions(): Promise<PlaidInstitution[]> {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return FAKE_INSTITUTIONS;
+    const isConnected = await checkPlaidConnection();
+    if (!isConnected) {
+        return [];
+    }
+    // Fetch real data from Plaid API
+    try {
+        const response = await fetch('/api/plaid/accounts');
+        if (!response.ok) return [];
+        const data = await response.json();
+        return data.institutions || [];
+    } catch {
+        return [];
+    }
 }
 
 /**
  * Get all bank accounts (checking/savings)
+ * Returns empty array if not connected
  */
 export async function getBankAccounts(): Promise<PlaidAccount[]> {
-    const institutions = await getConnectedInstitutions();
-    return institutions
-        .flatMap(inst => inst.accounts)
-        .filter(acc => acc.type === 'depository');
+    const isConnected = await checkPlaidConnection();
+    if (!isConnected) {
+        return [];
+    }
+    try {
+        const response = await fetch('/api/plaid/accounts');
+        if (!response.ok) return [];
+        const data = await response.json();
+        return (data.accounts || []).filter((acc: PlaidAccount) => acc.type === 'depository');
+    } catch {
+        return [];
+    }
 }
 
 /**
  * Get all investment accounts
+ * Returns empty array if not connected
  */
 export async function getInvestmentAccounts(): Promise<PlaidAccount[]> {
-    const institutions = await getConnectedInstitutions();
-    return institutions
-        .flatMap(inst => inst.accounts)
-        .filter(acc => acc.type === 'investment');
+    const isConnected = await checkPlaidConnection();
+    if (!isConnected) {
+        return [];
+    }
+    try {
+        const response = await fetch('/api/plaid/accounts');
+        if (!response.ok) return [];
+        const data = await response.json();
+        return (data.accounts || []).filter((acc: PlaidAccount) => acc.type === 'investment');
+    } catch {
+        return [];
+    }
 }
 
 /**
  * Get investment holdings
- * In production: Call /api/plaid/investments/holdings
+ * Returns empty array if not connected
  */
 export async function getInvestmentHoldings(): Promise<PlaidInvestmentHolding[]> {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return FAKE_INVESTMENT_HOLDINGS;
+    const isConnected = await checkPlaidConnection();
+    if (!isConnected) {
+        return [];
+    }
+    return [];
 }
 
 /**
  * Get all loans/liabilities
- * In production: Call /api/plaid/liabilities
+ * Returns empty array if not connected
  */
 export async function getLoans(): Promise<PlaidLoan[]> {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return FAKE_LOANS;
+    const isConnected = await checkPlaidConnection();
+    if (!isConnected) {
+        return [];
+    }
+    return [];
 }
 
 /**
@@ -448,6 +495,20 @@ export interface FinancialSummary {
 }
 
 export async function getFinancialSummary(): Promise<FinancialSummary> {
+    const isConnected = await checkPlaidConnection();
+    
+    if (!isConnected) {
+        return {
+            totalCash: 0,
+            totalInvestments: 0,
+            totalLoans: 0,
+            netWorth: 0,
+            bankAccountsCount: 0,
+            investmentAccountsCount: 0,
+            loansCount: 0,
+        };
+    }
+
     const [bankAccounts, investmentAccounts, loanAccounts] = await Promise.all([
         getBankAccounts(),
         getInvestmentAccounts(),

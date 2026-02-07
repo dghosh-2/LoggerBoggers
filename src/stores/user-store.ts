@@ -108,15 +108,16 @@ const sampleInsights: Insight[] = [
 ];
 
 export const useUserStore = create<UserState>((set) => ({
-  portfolioValue: 127340.52,
-  portfolioChange: 2.34,
-  holdings: sampleHoldings,
-  transactions: sampleTransactions,
-  insights: sampleInsights,
-  netCashflow: 2340,
-  netCashflowChange: 12,
-  totalSubscriptions: 47.99,
-  subscriptionCount: 3,
+  // Start with zeros - data loads after Plaid connection
+  portfolioValue: 0,
+  portfolioChange: 0,
+  holdings: [],
+  transactions: [],
+  insights: [],
+  netCashflow: 0,
+  netCashflowChange: 0,
+  totalSubscriptions: 0,
+  subscriptionCount: 0,
 
   setPortfolio: (value, change) =>
     set({ portfolioValue: value, portfolioChange: change }),

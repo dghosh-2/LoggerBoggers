@@ -1,33 +1,54 @@
 "use client";
 
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import ReactFlow, {
   Controls,
   useNodesState,
   useEdgesState,
-  Background
+  Background,
+  Node,
+  Edge
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { INITIAL_NODES, INITIAL_EDGES, MOCK_INSIGHTS, MOCK_TRANSACTIONS } from '@/lib/mock-data';
+import { MOCK_INSIGHTS } from '@/lib/mock-data';
 import { useInsightsStore } from '@/stores/insights-store';
 import { useThemeStore } from '@/stores/theme-store';
+import { useFinancialData } from '@/hooks/useFinancialData';
 import CustomNode from './custom-node';
+import { Link2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { GlassButton } from '@/components/ui/glass-button';
+
+// Category to icon mapping
+const CATEGORY_ICONS: Record<string, string> = {
+  'Shopping': 'ShoppingBag',
+  'Food & Drink': 'Utensils',
+  'Bills & Utilities': 'Zap',
+  'Transportation': 'Car',
+  'Health & Fitness': 'Heart',
+  'Entertainment': 'Tv',
+  'Personal Care': 'Sparkles',
+  'Travel': 'Plane',
+  'Education': 'GraduationCap',
+  'Other': 'MoreHorizontal',
+};
 
 export function FinancialGraph() {
-  // Note: Renamed from FinancialGraphViewer to FinancialGraph for compatibility with existing import
-  const [nodes, setNodes, onNodesChange] = useNodesState(INITIAL_NODES);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(INITIAL_EDGES);
+  const router = useRouter();
   const { selectedInsightId, selectedCategory, setSelectedCategory, selectedRange } = useInsightsStore();
   const { theme } = useThemeStore();
+  const { transactions, summary, isConnected, loading } = useFinancialData();
   const isDark = theme === 'dark';
 
-  // Calculate node amounts based on selected range
-  const filteredNodes = useMemo(() => {
-    const now = new Date('2026-02-01');
-    const rangeTransactions = MOCK_TRANSACTIONS.filter(t => {
+  // Generate dynamic nodes and edges based on real data
+  const { dynamicNodes, dynamicEdges, totalIncome, totalExpenses } = useMemo(() => {
+    const now = new Date();
+    
+    // Filter transactions by range
+    const rangeTransactions = transactions.filter(t => {
       const date = new Date(t.date);
       if (selectedRange === 'MTD') {
-        return date.getMonth() === 0 && date.getFullYear() === 2026;
+        return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
       } else if (selectedRange === '3M') {
         const threeMonthsAgo = new Date(now);
         threeMonthsAgo.setMonth(now.getMonth() - 3);
@@ -40,43 +61,132 @@ export function FinancialGraph() {
       return true;
     });
 
+    // Calculate category totals
     const categoryTotals: Record<string, number> = {};
     rangeTransactions.forEach(t => {
       categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount;
     });
 
-    const totalExpenses = Object.values(categoryTotals).reduce((a, b) => a + b, 0);
-    // Income is mocked as 1.2x expenses for simplicity in this dynamic view
-    const totalIncome = Math.round(totalExpenses * 1.2);
+    const totalExp = Object.values(categoryTotals).reduce((a, b) => a + b, 0);
+    // Use real income from summary if available
+    const totalInc = summary?.monthly_income 
+      ? (selectedRange === 'MTD' ? summary.monthly_income : summary.monthly_income * (selectedRange === '3M' ? 3 : 12))
+      : Math.round(totalExp * 1.2);
 
-    return INITIAL_NODES.map(node => {
-      let amount = node.data.amount; // Default static
+    // Sort categories by amount and take top 6
+    const sortedCategories = Object.entries(categoryTotals)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6);
 
-      if (node.id === 'root-income') {
-        amount = `$${totalIncome.toLocaleString()}`;
-      } else if (node.id === 'root-account') {
-        amount = `$${totalIncome.toLocaleString()}`; // Simplified flow
-      } else if (node.id === 'group-expenses') {
-        amount = `$${totalExpenses.toLocaleString()}`;
-      } else if (categoryTotals[node.data.label]) {
-        amount = `$${categoryTotals[node.data.label].toLocaleString()}`;
-      } else if (node.data.type === 'expense' && !categoryTotals[node.data.label]) {
-        // If filtering removes all txns for a category, set to 0
-        amount = '$0';
+    // Create nodes
+    const nodes: Node[] = [];
+    const edges: Edge[] = [];
+
+    // Income node
+    nodes.push({
+      id: 'income',
+      type: 'custom',
+      position: { x: 350, y: 0 },
+      data: { 
+        label: 'Income', 
+        amount: isConnected ? `$${Math.round(totalInc).toLocaleString()}` : '$0', 
+        type: 'income', 
+        icon: 'Wallet' 
       }
-
-      return {
-        ...node,
-        data: { ...node.data, amount: amount }
-      };
     });
 
-  }, [selectedRange]);
+    // Account node
+    nodes.push({
+      id: 'account',
+      type: 'custom',
+      position: { x: 350, y: 150 },
+      data: { 
+        label: 'Main Account', 
+        amount: isConnected ? `$${Math.round(totalInc - totalExp).toLocaleString()}` : '$0', 
+        type: 'account', 
+        icon: 'CreditCard' 
+      }
+    });
 
-  // Update nodes when logic changes
+    // Edge from income to account
+    edges.push({
+      id: 'e-income-account',
+      source: 'income',
+      target: 'account',
+      animated: true,
+      style: { stroke: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.15)' }
+    });
+
+    // Create expense category nodes
+    const startX = 0;
+    const spacing = 140;
+    
+    sortedCategories.forEach(([category, amount], index) => {
+      const nodeId = `cat-${index}`;
+      nodes.push({
+        id: nodeId,
+        type: 'custom',
+        position: { x: startX + (index * spacing), y: 320 },
+        data: {
+          label: category,
+          amount: isConnected ? `-$${Math.round(amount).toLocaleString()}` : '$0',
+          type: 'expense',
+          icon: CATEGORY_ICONS[category] || 'MoreHorizontal'
+        }
+      });
+
+      edges.push({
+        id: `e-account-${nodeId}`,
+        source: 'account',
+        target: nodeId,
+        animated: true,
+        style: { stroke: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.15)' }
+      });
+    });
+
+    // If no categories, show placeholder nodes
+    if (sortedCategories.length === 0) {
+      const defaultCategories = ['Shopping', 'Food & Drink', 'Bills & Utilities', 'Transportation', 'Entertainment', 'Other'];
+      defaultCategories.forEach((category, index) => {
+        const nodeId = `cat-${index}`;
+        nodes.push({
+          id: nodeId,
+          type: 'custom',
+          position: { x: startX + (index * spacing), y: 320 },
+          data: {
+            label: category,
+            amount: '$0',
+            type: 'expense',
+            icon: CATEGORY_ICONS[category] || 'MoreHorizontal'
+          }
+        });
+
+        edges.push({
+          id: `e-account-${nodeId}`,
+          source: 'account',
+          target: nodeId,
+          animated: true,
+          style: { stroke: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.15)' }
+        });
+      });
+    }
+
+    return { 
+      dynamicNodes: nodes, 
+      dynamicEdges: edges, 
+      totalIncome: totalInc, 
+      totalExpenses: totalExp 
+    };
+  }, [selectedRange, transactions, summary, isConnected, isDark]);
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(dynamicNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(dynamicEdges);
+
+  // Update nodes when data changes
   useEffect(() => {
-    setNodes(filteredNodes);
-  }, [filteredNodes, setNodes]);
+    setNodes(dynamicNodes);
+    setEdges(dynamicEdges);
+  }, [dynamicNodes, dynamicEdges, setNodes, setEdges]);
 
   const nodeTypes = useMemo(() => ({
     custom: CustomNode,
@@ -154,7 +264,7 @@ export function FinancialGraph() {
         let isHighlighted = false;
 
         if (selectedCategory) {
-          const targetNode = INITIAL_NODES.find(n => n.id === edge.target);
+          const targetNode = dynamicNodes.find(n => n.id === edge.target);
           if (targetNode && targetNode.data.label === selectedCategory) {
             isHighlighted = true;
           }

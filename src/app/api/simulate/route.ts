@@ -8,6 +8,57 @@ import {
     NewsImpact,
     ScenarioImpact
 } from '@/lib/simulation-engine';
+import { supabase } from '@/lib/supabase';
+
+// Fetch real transaction data from Supabase
+async function fetchRealData(): Promise<{
+    transactions: Array<{ date: string; amount: number; category: string }>;
+    monthlyIncome: number;
+    isConnected: boolean;
+}> {
+    try {
+        // Check if user is connected
+        const { data: connectionData } = await supabase
+            .from('user_plaid_connections')
+            .select('is_connected')
+            .eq('user_id', 'default_user')
+            .single();
+
+        if (!connectionData?.is_connected) {
+            return { transactions: [], monthlyIncome: 0, isConnected: false };
+        }
+
+        // Fetch transactions from last 6 months
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+        const { data: transactions } = await supabase
+            .from('transactions')
+            .select('date, amount, category')
+            .eq('user_id', 'default_user')
+            .gte('date', sixMonthsAgo.toISOString().split('T')[0])
+            .order('date', { ascending: false });
+
+        // Calculate monthly income from income table
+        const { data: incomeData } = await supabase
+            .from('income')
+            .select('amount')
+            .eq('user_id', 'default_user')
+            .gte('date', sixMonthsAgo.toISOString().split('T')[0]);
+
+        const totalIncome = incomeData?.reduce((sum, i) => sum + i.amount, 0) || 0;
+        const monthlyIncome = Math.round(totalIncome / 6);
+
+        return {
+            transactions: transactions || [],
+            monthlyIncome,
+            isConnected: true,
+        };
+    } catch (error) {
+        console.error('Error fetching real data:', error);
+        return { transactions: [], monthlyIncome: 0, isConnected: false };
+    }
+}
 
 // Fetch news for simulation context
 async function fetchNewsForSimulation(): Promise<any[]> {
@@ -115,8 +166,45 @@ export async function POST(request: NextRequest) {
             months = 12
         } = body;
 
-        // Get historical analysis
-        const historical = analyzeHistoricalData();
+        // Fetch real data from Supabase
+        const { transactions, monthlyIncome, isConnected } = await fetchRealData();
+
+        // If not connected, return empty simulation
+        if (!isConnected) {
+            return NextResponse.json({
+                success: true,
+                simulation: {
+                    projections: [],
+                    breakdown: [],
+                    totalIncome: 0,
+                    totalExpenses: 0,
+                    totalSavings: 0,
+                    endBalance: 0,
+                    goalProgress: 0,
+                    riskScore: 0,
+                    insights: ['Connect your accounts to run financial simulations'],
+                    timeline: [],
+                    historicalComparison: {
+                        avgMonthlyExpensesBefore: 0,
+                        avgMonthlyExpensesAfter: 0,
+                        savingsRateChange: 0,
+                    },
+                },
+                historical: {
+                    avgMonthlyExpenses: 0,
+                    avgMonthlySavings: 0,
+                    topCategories: [],
+                    categoryBreakdown: [],
+                    monthlyTrends: [],
+                },
+                newsImpacts: [],
+                aiResponse: 'Connect your bank accounts via Plaid to enable financial simulations.',
+                isConnected: false,
+            });
+        }
+
+        // Get historical analysis with real data
+        const historical = analyzeHistoricalData(transactions, monthlyIncome);
 
         // Fetch and parse news impacts
         let newsImpacts: NewsImpact[] = [];
@@ -154,8 +242,8 @@ export async function POST(request: NextRequest) {
             months,
         };
 
-        // Run the simulation
-        const simulationResult = runSimulation(simulationInput);
+        // Run the simulation with real data
+        const simulationResult = runSimulation(simulationInput, transactions, monthlyIncome);
 
         // If no user query, just return simulation results
         if (!userQuery) {

@@ -4,16 +4,18 @@ import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Receipt } from 'lucide-react';
 import { useInsightsStore } from '@/stores/insights-store';
-import { MOCK_TRANSACTIONS } from '@/lib/mock-data';
+import { useFinancialData } from '@/hooks/useFinancialData';
 
 export function CategoryDetails() {
     const { selectedCategory, setSelectedCategory, selectedRange } = useInsightsStore();
+    const { transactions: allTransactions, isConnected } = useFinancialData();
 
     const transactions = useMemo(() => {
-        return MOCK_TRANSACTIONS.filter(
+        if (!isConnected || allTransactions.length === 0) return [];
+        return allTransactions.filter(
             (t) => t.category === selectedCategory
         );
-    }, [selectedCategory]);
+    }, [selectedCategory, allTransactions, isConnected]);
 
     const totalAmount = useMemo(() => {
         return transactions.reduce((sum, t) => sum + t.amount, 0);

@@ -1,4 +1,4 @@
-import { MOCK_TRANSACTIONS } from './mock-data';
+// Simulation engine - uses real data when available
 
 // ============================================
 // TYPES
@@ -119,12 +119,18 @@ export interface SimulationOutput {
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-export function analyzeHistoricalData(): HistoricalAnalysis {
-    const now = new Date('2026-02-01');
-    const sixMonthsAgo = new Date('2025-08-01');
+// This function is called by the simulation API which fetches real data
+// The baseIncome parameter should come from actual user data
+export function analyzeHistoricalData(
+    transactions: Array<{ date: string; amount: number; category: string }> = [],
+    monthlyIncome: number = 0
+): HistoricalAnalysis {
+    const now = new Date();
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(now.getMonth() - 6);
 
     // Filter transactions within analysis window
-    const relevantTransactions = MOCK_TRANSACTIONS.filter(t => {
+    const relevantTransactions = transactions.filter(t => {
         const d = new Date(t.date);
         return d >= sixMonthsAgo && d <= now;
     });
@@ -203,9 +209,9 @@ export function analyzeHistoricalData(): HistoricalAnalysis {
         const [year, month] = key.split('-').map(Number);
         monthlyTrends.push({
             month: `${MONTH_NAMES[month]} ${year}`,
-            income: 9500, // Mock income
+            income: monthlyIncome,
             expenses: data.expenses,
-            savings: 9500 - data.expenses,
+            savings: monthlyIncome - data.expenses,
         });
     });
 
@@ -213,21 +219,14 @@ export function analyzeHistoricalData(): HistoricalAnalysis {
     const monthCount = Math.max(monthlyTrends.length, 1);
     const avgMonthlyExpenses = totalExpenses / monthCount;
 
-    // Identify recurring expenses from transaction patterns
-    const recurringExpenses: RecurringExpense[] = [
-        { name: 'Rent', amount: 2450, day: 1, category: 'Rent' },
-        { name: 'Netflix', amount: 15.99, day: 15, category: 'Subscriptions' },
-        { name: 'Spotify', amount: 10.99, day: 15, category: 'Subscriptions' },
-        { name: 'Internet', amount: 79.99, day: 20, category: 'Bills' },
-        { name: 'Phone', amount: 45, day: 25, category: 'Bills' },
-        { name: 'Gym', amount: 49.99, day: 1, category: 'Shopping' },
-    ];
+    // Empty recurring expenses - would need to be detected from real data
+    const recurringExpenses: RecurringExpense[] = [];
 
     return {
-        totalIncome: 9500 * monthCount,
+        totalIncome: monthlyIncome * monthCount,
         totalExpenses,
         avgMonthlyExpenses: Math.round(avgMonthlyExpenses),
-        avgMonthlySavings: Math.round(9500 - avgMonthlyExpenses),
+        avgMonthlySavings: Math.round(monthlyIncome - avgMonthlyExpenses),
         categoryBreakdown,
         topCategories: categoryBreakdown.slice(0, 5).map(c => c.category),
         recurringExpenses,
@@ -286,10 +285,14 @@ export function parseNewsToImpacts(news: any[]): NewsImpact[] {
 // SIMULATION ENGINE
 // ============================================
 
-export function runSimulation(input: SimulationInput): SimulationOutput {
-    const historical = analyzeHistoricalData();
+export function runSimulation(
+    input: SimulationInput,
+    transactions: Array<{ date: string; amount: number; category: string }> = [],
+    monthlyIncome: number = 0
+): SimulationOutput {
+    const historical = analyzeHistoricalData(transactions, monthlyIncome);
 
-    const baseIncome = 9500;
+    const baseIncome = monthlyIncome;
     const baseExpensesByCategory = new Map<string, number>();
 
     // Initialize category expenses from historical data
@@ -487,7 +490,9 @@ export function runSimulation(input: SimulationInput): SimulationOutput {
         historicalComparison: {
             avgMonthlyExpensesBefore: historical.avgMonthlyExpenses,
             avgMonthlyExpensesAfter: Math.round(avgExpensesAfter),
-            savingsRateChange: Math.round(actualSavingsRate - (historical.avgMonthlySavings / 9500 * 100)),
+            savingsRateChange: monthlyIncome > 0 
+                ? Math.round(actualSavingsRate - (historical.avgMonthlySavings / monthlyIncome * 100))
+                : 0,
         },
     };
 }
@@ -515,9 +520,9 @@ export function buildAIPrompt(
     return `You are a financial advisor AI. Analyze this simulation and answer the user's question with a well-structured response.
 
 HISTORICAL DATA (Past 6 months):
-- Avg Monthly Income: $9,500
-- Avg Monthly Expenses: $${historical.avgMonthlyExpenses}
-- Avg Monthly Savings: $${historical.avgMonthlySavings}
+- Avg Monthly Income: $${historical.totalIncome > 0 ? Math.round(historical.totalIncome / 6).toLocaleString() : '0'}
+- Avg Monthly Expenses: $${historical.avgMonthlyExpenses.toLocaleString()}
+- Avg Monthly Savings: $${historical.avgMonthlySavings.toLocaleString()}
 - Top Spending Categories:
   ${topSpending}
 

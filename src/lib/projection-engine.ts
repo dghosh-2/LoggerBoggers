@@ -1,5 +1,3 @@
-import { MOCK_TRANSACTIONS } from './mock-data';
-
 export interface ProjectionResult {
     total: number;
     breakdown: {
@@ -17,15 +15,20 @@ export interface ProjectionResult {
     }[];
 }
 
-// Fixed costs based on our mock data (Rent, Subs, Bills)
+interface Transaction {
+    date: string;
+    amount: number;
+    category: string;
+}
+
+// Fixed costs - estimated from typical spending patterns
 const FIXED_ITEMS = [
-    { cat: 'Rent', amount: 2450 },
-    { cat: 'Subscriptions', amount: 15.99 + 12 }, // Netflix + Spotify
-    { cat: 'Bills', amount: 80 + 45 }, // Internet + Phone
+    { cat: 'Bills & Utilities', amount: 200 },
+    { cat: 'Entertainment', amount: 50 }, // Subscriptions
 ];
 
 // Helper to get average spend for a category over last 3 months
-const getAvgCategorySpend = (category: string, refDate: Date): number => {
+const getAvgCategorySpend = (category: string, refDate: Date, transactions: Transaction[]): number => {
     let total = 0;
     let count = 0;
 
@@ -37,7 +40,7 @@ const getAvgCategorySpend = (category: string, refDate: Date): number => {
         const mm = String(d.getMonth() + 1).padStart(2, '0');
         const monthPrefix = `${yyyy}-${mm}`;
 
-        const monthTxns = MOCK_TRANSACTIONS.filter(t => t.date.startsWith(monthPrefix) && t.category === category);
+        const monthTxns = transactions.filter(t => t.date.startsWith(monthPrefix) && t.category === category);
         if (monthTxns.length > 0) {
             total += monthTxns.reduce((sum, t) => sum + t.amount, 0);
             count++;
@@ -50,9 +53,10 @@ const getAvgCategorySpend = (category: string, refDate: Date): number => {
 export const calculateMonthlyProjection = (
     year: number,
     monthIdx: number,
-    reductionGoals?: Record<string, number> // category -> reduction %
+    reductionGoals?: Record<string, number>, // category -> reduction %
+    transactions: Transaction[] = [] // Real transactions from Supabase
 ): ProjectionResult => {
-    const today = new Date('2026-02-01'); // Mock Today
+    const today = new Date();
     const targetDate = new Date(year, monthIdx, 1);
 
     // Check if Future
@@ -76,7 +80,7 @@ export const calculateMonthlyProjection = (
     const drivers: string[] = [];
 
     variableCats.forEach(cat => {
-        let avg = getAvgCategorySpend(cat, today);
+        let avg = getAvgCategorySpend(cat, today, transactions);
 
         // Seasonality Adjustments (Hardcoded for demo logic)
         if (monthIdx === 10 || monthIdx === 11) {

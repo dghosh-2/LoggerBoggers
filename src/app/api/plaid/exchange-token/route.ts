@@ -37,10 +37,23 @@ export async function POST(request: NextRequest) {
             (global as any).plaidAccessTokens.set(itemId, { accessToken, itemId, institution: institution?.name });
         }
 
+        // Automatically sync transactions after connecting
+        try {
+            const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+            await fetch(`${baseUrl}/api/plaid/sync-transactions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ item_id: itemId }),
+            });
+        } catch (syncError) {
+            console.error('Error auto-syncing transactions:', syncError);
+            // Don't fail the connection if sync fails
+        }
+
         return NextResponse.json({ 
             success: true,
             item_id: itemId,
-            message: 'Account connected successfully',
+            message: 'Account connected and data synced successfully',
         });
     } catch (error: any) {
         console.error('Error exchanging token:', error.response?.data || error.message);

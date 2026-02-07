@@ -1,4 +1,4 @@
-import { MOCK_TRANSACTIONS } from "./mock-data";
+// Terrain utilities - accepts transaction data as parameters
 
 // ============================================
 // TYPES
@@ -57,11 +57,20 @@ export const CATEGORY_COLORS: Record<string, [number, number, number]> = {
 // DATA AGGREGATION
 // ============================================
 
+// Transaction type for terrain utilities
+export interface TerrainTransaction {
+    date: string;
+    amount: number;
+    category: string;
+    description?: string;
+}
+
 export function aggregateTransactionsByWeek(
-    transactions: typeof MOCK_TRANSACTIONS,
+    transactions: TerrainTransaction[],
     startDate: Date,
     endDate: Date,
-    activeCategories: Set<string>
+    activeCategories: Set<string>,
+    monthlyIncome: number = 0 // Pass monthly income as parameter
 ): TerrainDataPoint[] {
     const dataPoints: TerrainDataPoint[] = [];
     let runningBalance = 5000; // Starting balance
@@ -71,7 +80,7 @@ export function aggregateTransactionsByWeek(
         income: number;
         expenses: number;
         categoryTotals: Map<string, number>;
-        transactions: typeof MOCK_TRANSACTIONS;
+        transactions: TerrainTransaction[];
     }>();
 
     // Filter and group transactions
@@ -107,7 +116,6 @@ export function aggregateTransactionsByWeek(
         });
 
     // Add income for each week (simplified - add monthly income distributed weekly)
-    const monthlyIncome = 9500;
     const weeklyIncome = monthlyIncome / 4;
 
     // Convert to sorted array

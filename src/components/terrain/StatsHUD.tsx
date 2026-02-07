@@ -4,14 +4,16 @@ import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { TrendingUp, TrendingDown, Wallet } from "lucide-react";
 import { useTerrainStore } from "@/stores/terrain-store";
-import { MOCK_TRANSACTIONS } from "@/lib/mock-data";
+import { useFinancialData } from "@/hooks/useFinancialData";
 
 export function StatsHUD() {
     const { currentDate, activeCategories } = useTerrainStore();
+    const { transactions, summary, isConnected } = useFinancialData();
+    const monthlyIncome = isConnected ? (summary?.monthly_income || 0) : 0;
 
     // Calculate stats based on current time position
     const stats = useMemo(() => {
-        const relevantTransactions = MOCK_TRANSACTIONS.filter(t => {
+        const relevantTransactions = (!isConnected || transactions.length === 0) ? [] : transactions.filter(t => {
             const date = new Date(t.date);
             return date <= currentDate && activeCategories.has(t.category);
         });
@@ -23,7 +25,7 @@ export function StatsHUD() {
             (currentDate.getTime() - new Date("2025-01-01").getTime()) /
             (30 * 24 * 60 * 60 * 1000)
         ));
-        const totalIncome = 9500 * monthsElapsed;
+        const totalIncome = monthlyIncome * monthsElapsed;
 
         const balance = 5000 + totalIncome - totalExpenses;
 
@@ -31,7 +33,7 @@ export function StatsHUD() {
         const lastMonth = new Date(currentDate);
         lastMonth.setMonth(lastMonth.getMonth() - 1);
 
-        const lastMonthExpenses = MOCK_TRANSACTIONS
+        const lastMonthExpenses = (!isConnected || transactions.length === 0) ? 0 : transactions
             .filter(t => {
                 const date = new Date(t.date);
                 return date <= lastMonth && activeCategories.has(t.category);
@@ -49,7 +51,7 @@ export function StatsHUD() {
             expenses: Math.round(totalExpenses),
             expensePercent,
         };
-    }, [currentDate, activeCategories]);
+    }, [currentDate, activeCategories, transactions, isConnected, monthlyIncome]);
 
     return (
         <motion.div

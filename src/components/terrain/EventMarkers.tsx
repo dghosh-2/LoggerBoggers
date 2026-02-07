@@ -4,8 +4,8 @@ import { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Billboard, Text } from "@react-three/drei";
 import * as THREE from "three";
-import { MOCK_TRANSACTIONS } from "@/lib/mock-data";
 import { useTerrainStore } from "@/stores/terrain-store";
+import { useFinancialData } from "@/hooks/useFinancialData";
 
 interface EventMarkersProps {
     terrainWidth?: number;
@@ -13,6 +13,7 @@ interface EventMarkersProps {
 
 export function EventMarkers({ terrainWidth = 20 }: EventMarkersProps) {
     const { currentDate, activeCategories } = useTerrainStore();
+    const { transactions, isConnected } = useFinancialData();
 
     // Find significant events
     const markers = useMemo(() => {
@@ -26,7 +27,7 @@ export function EventMarkers({ terrainWidth = 20 }: EventMarkersProps) {
         }> = [];
 
         // Filter transactions up to current date
-        const relevantTransactions = MOCK_TRANSACTIONS.filter(t => {
+        const relevantTransactions = (!isConnected || transactions.length === 0) ? [] : transactions.filter(t => {
             const date = new Date(t.date);
             return date <= currentDate && activeCategories.has(t.category);
         });
