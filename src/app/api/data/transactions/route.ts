@@ -17,21 +17,30 @@ export async function GET(request: NextRequest) {
         const category = searchParams.get('category');
         const limit = parseInt(searchParams.get('limit') || '1000');
         
+        // Actual schema: id, receipt_id, merchant_name, amount, transaction_date, category_id, notes, created_at, user_id
         let query = supabaseAdmin
             .from('transactions')
-            .select('*')
-            .eq('uuid_user_id', userId)
-            .order('date', { ascending: false })
+            .select('*, categories(name)')
+            .eq('user_id', userId)
+            .order('transaction_date', { ascending: false })
             .limit(limit);
         
         if (startDate) {
-            query = query.gte('date', startDate);
+            query = query.gte('transaction_date', startDate);
         }
         if (endDate) {
-            query = query.lte('date', endDate);
+            query = query.lte('transaction_date', endDate);
         }
         if (category) {
-            query = query.eq('category', category);
+            // Need to filter by category_id - get category id first
+            const { data: catData } = await supabaseAdmin
+                .from('categories')
+                .select('id')
+                .eq('name', category)
+                .single();
+            if (catData) {
+                query = query.eq('category_id', catData.id);
+            }
         }
         
         const { data, error } = await query;
@@ -40,13 +49,28 @@ export async function GET(request: NextRequest) {
             throw error;
         }
         
+        // Normalize transaction format for frontend compatibility
+        const normalizedTransactions = (data || []).map((tx: any) => ({
+            id: tx.id,
+            amount: tx.amount,
+            category: tx.categories?.name || 'Other',
+            name: tx.merchant_name || 'Unknown',
+            merchant_name: tx.merchant_name,
+            date: tx.transaction_date,
+            location: tx.notes,
+            created_at: tx.created_at,
+            // Keep original fields too
+            category_id: tx.category_id,
+            transaction_date: tx.transaction_date,
+        }));
+        
         // #region agent log
         const categoryCounts: Record<string, number> = {};
-        (data || []).forEach((tx: any) => { categoryCounts[tx.category] = (categoryCounts[tx.category] || 0) + 1; });
-        fetch('http://127.0.0.1:7245/ingest/2d405ccf-cb3f-4611-bc27-f95a616c15c9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'transactions/route.ts:42',message:'Transactions fetched',data:{count:data?.length||0,categoryCounts,sampleTx:(data||[]).slice(0,3).map((t:any)=>({name:t.name,category:t.category,amount:t.amount,source:t.source}))},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,E'})}).catch(()=>{});
+        normalizedTransactions.forEach((tx: any) => { categoryCounts[tx.category] = (categoryCounts[tx.category] || 0) + 1; });
+        fetch('http://127.0.0.1:7245/ingest/2d405ccf-cb3f-4611-bc27-f95a616c15c9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'transactions/route.ts:55',message:'Transactions fetched',data:{count:normalizedTransactions.length,categoryCounts,sampleTx:normalizedTransactions.slice(0,3)},timestamp:Date.now(),hypothesisId:'A,E'})}).catch(()=>{});
         // #endregion
         
-        return NextResponse.json({ transactions: data || [] });
+        return NextResponse.json({ transactions: normalizedTransactions });
     } catch (error: any) {
         console.error('Error fetching transactions:', error);
         return NextResponse.json(
