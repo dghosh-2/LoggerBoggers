@@ -29,13 +29,41 @@ export async function POST(request: NextRequest) {
         console.log('Attempting to exchange public token for user:', userId);
         console.log('Institution:', institution?.name || 'Unknown');
 
-        // Exchange public token for access token
-        const response = await plaidClient.itemPublicTokenExchange({
-            public_token,
-        });
-
-        const accessToken = response.data.access_token;
-        const itemId = response.data.item_id;
+        // Exchange public token for access token with retry logic
+        let response;
+        let accessToken: string;
+        let itemId: string;
+        let attempts = 0;
+        const MAX_ATTEMPTS = 3;
+        
+        while (attempts < MAX_ATTEMPTS) {
+            try {
+                response = await plaidClient.itemPublicTokenExchange({
+                    public_token,
+                });
+                
+                accessToken = response.data.access_token;
+                itemId = response.data.item_id;
+                break; // Success, exit loop
+            } catch (exchangeError: any) {
+                attempts++;
+                console.error(`Token exchange attempt ${attempts} failed:`, exchangeError);
+                
+                // Don't retry on client errors (4xx)
+                if (exchangeError.response?.status && exchangeError.response.status < 500) {
+                    throw exchangeError;
+                }
+                
+                // Retry on server errors (5xx) or network errors
+                if (attempts < MAX_ATTEMPTS) {
+                    const waitTime = Math.pow(2, attempts) * 1000; // Exponential backoff
+                    console.log(`Retrying token exchange in ${waitTime}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                } else {
+                    throw exchangeError;
+                }
+            }
+        }
 
         console.log('Successfully exchanged token. Item ID:', itemId);
 
@@ -287,6 +315,7 @@ export async function POST(request: NextRequest) {
         // Provide more specific error messages
         let errorMessage = 'Failed to exchange token';
         let errorDetails = error.message;
+        let statusCode = 500;
         
         if (error.response?.data) {
             errorDetails = JSON.stringify(error.response.data);
@@ -295,15 +324,35 @@ export async function POST(request: NextRequest) {
             if (error.response.data.error_code === 'INVALID_PUBLIC_TOKEN') {
                 errorMessage = 'Invalid or expired Plaid token';
                 errorDetails = 'Please try connecting your account again';
+                statusCode = 400;
             } else if (error.response.data.error_code === 'INVALID_CREDENTIALS') {
                 errorMessage = 'Invalid Plaid API credentials';
                 errorDetails = 'Please check your Plaid configuration';
+                statusCode = 500;
+            } else if (error.response.data.error_code === 'RATE_LIMIT_EXCEEDED') {
+                errorMessage = 'Too many requests. Please try again in a moment.';
+                errorDetails = 'Rate limit exceeded';
+                statusCode = 429;
+            } else if (error.response.data.error_code === 'ITEM_ERROR') {
+                errorMessage = 'Plaid service error. Please try again.';
+                errorDetails = error.response.data.error_message || errorDetails;
+                statusCode = 500;
+            } else if (error.response.data.error_message) {
+                errorMessage = error.response.data.error_message;
             }
+        } else if (error.message?.includes('timeout') || error.message?.includes('ETIMEDOUT')) {
+            errorMessage = 'Connection timeout. Please try again.';
+            errorDetails = 'The request took too long to complete';
+            statusCode = 504;
+        } else if (error.message?.includes('ECONNREFUSED') || error.message?.includes('network')) {
+            errorMessage = 'Network error. Please check your connection.';
+            errorDetails = 'Unable to reach Plaid service';
+            statusCode = 503;
         }
         
         return NextResponse.json(
             { error: errorMessage, details: errorDetails },
-            { status: 500 }
+            { status: statusCode }
         );
     }
 }

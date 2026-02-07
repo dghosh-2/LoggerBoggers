@@ -22,8 +22,8 @@ interface ErrorBoundaryState {
     error?: Error;
 }
 
-class PlaidErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, ErrorBoundaryState> {
-    constructor(props: { children: ReactNode; fallback: ReactNode }) {
+class PlaidErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode; onRetry?: () => void }, ErrorBoundaryState> {
+    constructor(props: { children: ReactNode; fallback: ReactNode; onRetry?: () => void }) {
         super(props);
         this.state = { hasError: false };
     }
@@ -34,10 +34,16 @@ class PlaidErrorBoundary extends Component<{ children: ReactNode; fallback: Reac
 
     componentDidCatch(error: Error, errorInfo: any) {
         console.error('Plaid Error Boundary caught error:', error, errorInfo);
+        // Log to error tracking service in production
     }
 
     render() {
         if (this.state.hasError) {
+            // Try to recover after a delay
+            setTimeout(() => {
+                this.setState({ hasError: false });
+                this.props.onRetry?.();
+            }, 3000);
             return this.props.fallback;
         }
         return this.props.children;
@@ -58,45 +64,85 @@ function PlaidLinkButtonInner({
 
     const handleOnSuccess = useCallback(async (public_token: string, metadata: any) => {
         setLoading(true);
-        try {
-            const response = await fetch('/api/plaid/exchange-token', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    public_token,
-                    institution: metadata.institution,
-                }),
-            });
+        let attempt = 0;
+        const MAX_EXCHANGE_RETRIES = 2;
+        
+        while (attempt <= MAX_EXCHANGE_RETRIES) {
+            try {
+                // Add timeout for exchange request
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+                
+                const response = await fetch('/api/plaid/exchange-token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        public_token,
+                        institution: metadata.institution,
+                    }),
+                    signal: controller.signal,
+                });
 
-            if (!response.ok) {
-                // Try to parse JSON error details, but don't assume it's always JSON.
-                let errorData: any = null;
-                try {
-                    errorData = await response.json();
-                } catch {
-                    // ignore
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    // Try to parse JSON error details, but don't assume it's always JSON.
+                    let errorData: any = null;
+                    try {
+                        errorData = await response.json();
+                    } catch {
+                        // ignore
+                    }
+                    console.error('Token exchange failed:', { status: response.status, errorData, attempt });
+                    
+                    // Retry on 5xx errors
+                    if (response.status >= 500 && attempt < MAX_EXCHANGE_RETRIES) {
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                        attempt++;
+                        continue;
+                    }
+                    
+                    const message =
+                        errorData?.details ||
+                        errorData?.error ||
+                        `Failed to exchange token (HTTP ${response.status})`;
+                    throw new Error(message);
                 }
-                console.error('Token exchange failed:', { status: response.status, errorData });
-                const message =
-                    errorData?.details ||
-                    errorData?.error ||
-                    `Failed to exchange token (HTTP ${response.status})`;
-                throw new Error(message);
+
+                // Success - invalidate caches and show success message
+                useFinancialDataStore.getState().invalidateCache();
+                usePortfolioStore.getState().invalidateCache();
+
+                toast.success(`${metadata.institution?.name || 'Account'} connected successfully!`);
+                onSuccess?.();
+                return; // Exit on success
+            } catch (error: any) {
+                console.error(`Error exchanging token (attempt ${attempt + 1}):`, error);
+                
+                // Handle timeout
+                if (error.name === 'AbortError') {
+                    if (attempt < MAX_EXCHANGE_RETRIES) {
+                        attempt++;
+                        continue;
+                    }
+                    toast.error('Connection timeout. Please try again.');
+                } else if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
+                    if (attempt < MAX_EXCHANGE_RETRIES) {
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                        attempt++;
+                        continue;
+                    }
+                    toast.error('Network error. Please check your connection and try again.');
+                } else {
+                    // Don't retry on client errors (4xx)
+                    const errorMessage = error.message || 'Failed to connect account. Please try again.';
+                    toast.error(errorMessage);
+                    break;
+                }
             }
-
-            // Invalidate all caches so fresh data is fetched
-            useFinancialDataStore.getState().invalidateCache();
-            usePortfolioStore.getState().invalidateCache();
-
-            toast.success(`${metadata.institution?.name || 'Account'} connected successfully!`);
-            onSuccess?.();
-        } catch (error: any) {
-            console.error('Error exchanging token:', error);
-            const errorMessage = error.message || 'Failed to connect account. Please try again.';
-            toast.error(errorMessage);
-        } finally {
-            setLoading(false);
         }
+        
+        setLoading(false);
     }, [onSuccess]);
 
     const handleOnExit = useCallback((err: any, metadata: any) => {
@@ -117,6 +163,24 @@ function PlaidLinkButtonInner({
     useEffect(() => {
         if (plaidError) {
             console.error('Plaid Link hook error:', plaidError);
+            // Log detailed error information for debugging
+            if (plaidError.error_code) {
+                console.error('Plaid error code:', plaidError.error_code);
+                console.error('Plaid error message:', plaidError.error_message);
+                console.error('Plaid error type:', plaidError.error_type);
+            }
+            
+            // Show user-friendly error based on error type
+            let userMessage = 'Plaid connection error';
+            if (plaidError.error_code === 'ITEM_LOGIN_REQUIRED') {
+                userMessage = 'Please log in to your bank account again.';
+            } else if (plaidError.error_code === 'RATE_LIMIT_EXCEEDED') {
+                userMessage = 'Too many requests. Please wait a moment and try again.';
+            } else if (plaidError.error_message) {
+                userMessage = plaidError.error_message;
+            }
+            
+            toast.error(userMessage);
         }
     }, [plaidError]);
 
@@ -144,40 +208,107 @@ export function PlaidLinkButton({
     const [linkToken, setLinkToken] = useState<string | null>(null);
     const [tokenLoading, setTokenLoading] = useState(true);
     const [tokenError, setTokenError] = useState<string | null>(null);
+    const [retryCount, setRetryCount] = useState(0);
+    const MAX_RETRIES = 3;
+
+    // Fetch link token with retry logic
+    const fetchLinkToken = useCallback(async (attempt: number = 0): Promise<void> => {
+        try {
+            setTokenLoading(true);
+            setTokenError(null);
+            
+            // Add timeout to prevent hanging requests
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+            
+            const response = await fetch('/api/plaid/create-link-token', {
+                method: 'POST',
+                signal: controller.signal,
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) {
+                let errorData: any = {};
+                try {
+                    errorData = await response.json();
+                } catch {
+                    // If JSON parsing fails, use status text
+                    errorData = { error: `HTTP ${response.status}: ${response.statusText}` };
+                }
+                
+                // Handle specific error codes
+                if (response.status === 429) {
+                    // Rate limited - wait and retry
+                    if (attempt < MAX_RETRIES) {
+                        const waitTime = Math.pow(2, attempt) * 1000; // Exponential backoff
+                        await new Promise(resolve => setTimeout(resolve, waitTime));
+                        return fetchLinkToken(attempt + 1);
+                    }
+                    throw new Error('Too many requests. Please wait a moment and try again.');
+                }
+                
+                if (response.status === 401) {
+                    throw new Error('Please log in to connect your account.');
+                }
+                
+                throw new Error(errorData.error || errorData.details || 'Failed to create link token');
+            }
+            
+            const data = await response.json();
+            if (data.link_token) {
+                setLinkToken(data.link_token);
+                setRetryCount(0); // Reset retry count on success
+            } else {
+                throw new Error('No link token received from server');
+            }
+        } catch (error: any) {
+            console.error(`Error fetching link token (attempt ${attempt + 1}):`, error);
+            
+            // Handle network errors
+            if (error.name === 'AbortError') {
+                if (attempt < MAX_RETRIES) {
+                    // Retry on timeout
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    return fetchLinkToken(attempt + 1);
+                }
+                setTokenError('Connection timeout. Please check your internet and try again.');
+            } else if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
+                if (attempt < MAX_RETRIES) {
+                    // Retry on network errors
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    return fetchLinkToken(attempt + 1);
+                }
+                setTokenError('Network error. Please check your connection and try again.');
+            } else {
+                setTokenError(error.message || 'Failed to initialize Plaid');
+            }
+            
+            // Show user-friendly error message
+            if (attempt === MAX_RETRIES - 1) {
+                const errorMsg = error.message || 'Failed to initialize Plaid';
+                if (errorMsg.includes('credentials') || errorMsg.includes('API')) {
+                    toast.error('Plaid configuration error. Please contact support.');
+                } else if (errorMsg.includes('timeout')) {
+                    toast.error('Connection timeout. Please try again.');
+                } else if (errorMsg.includes('Network')) {
+                    toast.error('Network error. Please check your connection.');
+                } else {
+                    toast.error('Failed to initialize Plaid. Please refresh the page and try again.');
+                }
+            }
+        } finally {
+            setTokenLoading(false);
+        }
+    }, []);
 
     // Fetch link token on mount
     useEffect(() => {
-        const fetchLinkToken = async () => {
-            try {
-                setTokenLoading(true);
-                setTokenError(null);
-                
-                const response = await fetch('/api/plaid/create-link-token', {
-                    method: 'POST',
-                });
-                
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({}));
-                    throw new Error(errorData.error || 'Failed to create link token');
-                }
-                
-                const data = await response.json();
-                if (data.link_token) {
-                    setLinkToken(data.link_token);
-                } else {
-                    throw new Error('No link token received');
-                }
-            } catch (error: any) {
-                console.error('Error fetching link token:', error);
-                setTokenError(error.message);
-                toast.error('Failed to initialize Plaid. Please refresh and try again.');
-            } finally {
-                setTokenLoading(false);
-            }
-        };
-
-        fetchLinkToken();
-    }, []);
+        fetchLinkToken(0);
+    }, [fetchLinkToken]);
 
     // Show loading state while fetching token
     if (tokenLoading) {
@@ -193,16 +324,20 @@ export function PlaidLinkButton({
         );
     }
 
-    // If token failed to load, show disabled button with retry option
+    // If token failed to load, show retry button
     if (!linkToken || tokenError) {
         return (
             <GlassButton
                 variant={buttonVariant}
                 size={buttonSize}
-                disabled
+                onClick={() => {
+                    setRetryCount(prev => prev + 1);
+                    fetchLinkToken(0);
+                }}
                 className={className}
+                title={tokenError ? `Error: ${tokenError}. Click to retry.` : 'Click to retry'}
             >
-                {buttonText}
+                {tokenError ? 'Retry Connection' : buttonText}
             </GlassButton>
         );
     }
@@ -214,12 +349,19 @@ export function PlaidLinkButton({
                 <GlassButton
                     variant={buttonVariant}
                     size={buttonSize}
-                    disabled
+                    onClick={() => {
+                        setRetryCount(prev => prev + 1);
+                        fetchLinkToken(0);
+                    }}
                     className={className}
                 >
-                    {buttonText}
+                    Retry Connection
                 </GlassButton>
             }
+            onRetry={() => {
+                // Retry fetching token when error boundary recovers
+                fetchLinkToken(0);
+            }}
         >
             <PlaidLinkButtonInner
                 linkToken={linkToken}
