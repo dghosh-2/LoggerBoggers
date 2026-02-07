@@ -259,57 +259,38 @@ export async function POST(request: NextRequest) {
 
             // Clear existing data and insert new
             console.log('=== CLEARING EXISTING DATA ===');
-            await supabaseAdmin.from('transactions').delete().eq('user_id', userId);
+            await supabaseAdmin.from('transactions').delete().eq('uuid_user_id', userId);
             await supabaseAdmin.from('income').delete().eq('uuid_user_id', userId);
             console.log('Cleared existing transactions and income');
 
-            // Ensure categories exist and build category map
-            const CATEGORY_NAMES = [
-                'Food & Drink', 'Shopping', 'Transportation', 'Bills & Utilities',
-                'Entertainment', 'Health & Fitness', 'Travel', 'Personal Care', 'Education', 'Other'
-            ];
-            const categoryMap: Record<string, string> = {};
-            for (const categoryName of CATEGORY_NAMES) {
-                const { data: existing } = await supabaseAdmin
-                    .from('categories')
-                    .select('id')
-                    .eq('name', categoryName)
-                    .single();
-                
-                if (existing) {
-                    categoryMap[categoryName] = existing.id;
-                } else {
-                    const { data: created } = await supabaseAdmin
-                        .from('categories')
-                        .insert({ name: categoryName })
-                        .select('id')
-                        .single();
-                    if (created) {
-                        categoryMap[categoryName] = created.id;
-                    }
-                }
-            }
-
             // Transform transactions to match actual database schema
-            // Fake generator produces: { category, date, merchant_name, amount, location, name }
-            // Database expects: { category_id, transaction_date, merchant_name, amount, notes, user_id }
+            // Actual schema: id, user_id, plaid_transaction_id, amount, category, name, date, account_id, source, merchant_name, pending, uuid_user_id, location
             const allTransactionsWithUser = allTransactions.map(tx => {
-                const categoryId = categoryMap[tx.category] || categoryMap['Other'];
                 return {
-                    merchant_name: tx.merchant_name || tx.name,
-                    amount: tx.amount,
-                    transaction_date: tx.date,
-                    category_id: categoryId,
                     user_id: userId,
-                    notes: tx.location || null,
+                    uuid_user_id: userId,
+                    merchant_name: tx.merchant_name || tx.name,
+                    name: tx.name || tx.merchant_name,
+                    amount: tx.amount,
+                    date: tx.date,           // Schema uses 'date' not 'transaction_date'
+                    category: tx.category,   // Schema uses 'category' (text) not 'category_id'
+                    source: 'plaid',
+                    location: tx.location || null,
+                    pending: false,
                 };
             });
 
+            // Transform income to match actual schema
+            // Actual schema: id, user_id, amount, source, name, date, recurring, frequency, uuid_user_id, location
             const fakeIncomeWithUser = fakeIncome.map(inc => ({
-                amount: inc.amount,
-                date: inc.date,
-                source: inc.source || 'Salary',
+                user_id: userId,
                 uuid_user_id: userId,
+                amount: inc.amount,
+                source: inc.source || 'Salary',
+                name: inc.source || 'Salary',
+                date: inc.date,
+                recurring: true,
+                frequency: 'monthly',
             }));
 
             // Insert transactions in batches
