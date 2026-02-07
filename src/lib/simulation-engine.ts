@@ -59,6 +59,13 @@ export interface SimulationEvent {
     month?: number; // Specific month for one-time events
 }
 
+export interface ScenarioImpact {
+    incomeChangePercent: number;
+    expenseChangePercent: number;
+    oneTimeEvents: SimulationEvent[];
+    riskFactors: string[];
+}
+
 export interface SimulationInput {
     incomeChangePercent: number;
     expenseChangePercent: number;
@@ -505,7 +512,7 @@ export function buildAIPrompt(
         .map(p => `${p.monthName}: Income $${p.income}, Expenses $${p.expenses}, Balance $${p.balance}`)
         .join('\n  ');
 
-    return `You are a financial advisor AI. Analyze this simulation and answer the user's question.
+    return `You are a financial advisor AI. Analyze this simulation and answer the user's question with a well-structured response.
 
 HISTORICAL DATA (Past 6 months):
 - Avg Monthly Income: $9,500
@@ -530,10 +537,16 @@ ${simulation.insights.join('\n')}
 
 USER QUESTION: ${userQuery}
 
-Provide:
-1. A direct, specific answer using the simulation data
-2. 2-3 actionable recommendations with dollar amounts
-3. Any risks or considerations based on news/trends
+Please structure your response with clear sections:
 
-Keep response under 250 words. Be specific with numbers from the simulation.`;
+1. HEADLINE: Start with a single sentence summarizing the main impact or answer
+
+2. RECOMMENDATIONS: List 2-3 specific, actionable recommendations with dollar amounts where applicable. Format as:
+   - Action to take: specific amount or change needed
+
+3. RISKS: List any potential risks or concerns the user should be aware of
+
+4. OPPORTUNITIES: Highlight any positive factors or opportunities
+
+Keep the response concise (under 300 words). Use specific numbers from the simulation data.`;
 }

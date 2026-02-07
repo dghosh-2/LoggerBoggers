@@ -5,7 +5,8 @@ import {
     runSimulation,
     parseNewsToImpacts,
     SimulationInput,
-    NewsImpact
+    NewsImpact,
+    ScenarioImpact
 } from '@/lib/simulation-engine';
 
 // Fetch news for simulation context
@@ -57,6 +58,50 @@ async function fetchNewsForSimulation(): Promise<any[]> {
     }
 }
 
+// Interpret user query into simulation parameters
+async function interpretScenario(query: string, apiKey: string): Promise<ScenarioImpact | null> {
+    try {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+                model: 'gpt-4o-mini',
+                messages: [
+                    {
+                        role: 'system',
+                        content: `You are a financial parameter extractor. Convert the user's scenario into numerical adjustments for a financial simulation.
+                        
+                        Return a valid JSON object with:
+                        - incomeChangePercent: number (e.g., 10 for +10% income, -5 for -5%)
+                        - expenseChangePercent: number (e.g., 20 for +20% expenses)
+                        - riskFactors: string[] (list of potential risks associated with this scenario)
+                        
+                        Example: "I'm moving to NYC" -> {"incomeChangePercent": 15, "expenseChangePercent": 40, "riskFactors": ["High cost of living", "Rent prices"]}
+                        Example: "I lost my job" -> {"incomeChangePercent": -100, "expenseChangePercent": -20, "riskFactors": ["Income loss", "Emergency fund depletion"]}
+                        
+                        Be realistic with estimates.`
+                    },
+                    { role: 'user', content: query },
+                ],
+                temperature: 0.3,
+                max_tokens: 150,
+                response_format: { type: "json_object" }
+            }),
+        });
+
+        if (!response.ok) return null;
+        const data = await response.json();
+        const content = data.choices[0].message.content;
+        return JSON.parse(content) as ScenarioImpact;
+    } catch (error) {
+        console.error('Error interpreting scenario:', error);
+        return null;
+    }
+}
+
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
@@ -83,10 +128,26 @@ export async function POST(request: NextRequest) {
             newsContext = news.map(n => `- ${n.title}: ${n.summary}`).join('\n');
         }
 
-        // Build simulation input
+        // Check for OpenAI API key
+        const apiKey = process.env.OPENAI_API_KEY;
+
+        // Interpret user scenario if provided
+        let scenarioImpact: ScenarioImpact | null = null;
+        let adjustedIncomeChange = incomeChangePercent;
+        let adjustedExpenseChange = expenseChangePercent;
+
+        if (userQuery && apiKey) {
+            scenarioImpact = await interpretScenario(userQuery, apiKey);
+            if (scenarioImpact) {
+                adjustedIncomeChange += scenarioImpact.incomeChangePercent;
+                adjustedExpenseChange += scenarioImpact.expenseChangePercent;
+            }
+        }
+
+        // Build simulation input with adjusted parameters
         const simulationInput: SimulationInput = {
-            incomeChangePercent,
-            expenseChangePercent,
+            incomeChangePercent: adjustedIncomeChange,
+            expenseChangePercent: adjustedExpenseChange,
             savingsRatePercent,
             customEvents,
             newsImpacts,
@@ -113,8 +174,6 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        // Check for OpenAI API key
-        const apiKey = process.env.OPENAI_API_KEY;
         if (!apiKey) {
             return NextResponse.json({
                 success: true,
@@ -129,8 +188,13 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        // Build the AI prompt with full context
-        const prompt = buildAIPrompt(historical, simulationResult, userQuery, newsContext);
+        // Build the AI prompt with full context and scenario info
+        let promptContext = newsContext;
+        if (scenarioImpact) {
+            promptContext += `\nSCENARIO APPLIED: User query "${userQuery}" interpreted as Income: ${scenarioImpact.incomeChangePercent > 0 ? '+' : ''}${scenarioImpact.incomeChangePercent}%, Expenses: ${scenarioImpact.expenseChangePercent > 0 ? '+' : ''}${scenarioImpact.expenseChangePercent}%.`;
+        }
+
+        const prompt = buildAIPrompt(historical, simulationResult, userQuery, promptContext);
 
         // Call OpenAI API
         const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
