@@ -76,11 +76,6 @@ function PlaidLinkButtonInner({
             disabled={!ready || loading}
             className={className}
         >
-            {loading ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-                <Link2 className="w-3.5 h-3.5" />
-            )}
             {loading ? 'Connecting...' : buttonText}
         </GlassButton>
     );
@@ -132,7 +127,6 @@ export function PlaidLinkButton({
                 disabled
                 className={className}
             >
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 {tokenLoading ? 'Loading...' : buttonText}
             </GlassButton>
         );
