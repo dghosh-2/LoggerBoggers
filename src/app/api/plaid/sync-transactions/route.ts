@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
         const allTransactions = [...filteredFakeTransactions, ...formattedPlaidTransactions];
         
         // Clear existing data for this user
-        await supabaseAdmin.from('financial_transactions').delete().eq('uuid_user_id', userId);
+        await supabaseAdmin.from('transactions').delete().eq('uuid_user_id', userId);
         await supabaseAdmin.from('income').delete().eq('uuid_user_id', userId);
 
         // Insert transactions in batches (Supabase has limits)
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
                 user_id: userId,
                 uuid_user_id: userId,
             }));
-            const { error } = await supabaseAdmin.from('financial_transactions').insert(batch);
+            const { error } = await supabaseAdmin.from('transactions').insert(batch);
             if (error) {
                 console.error('Error inserting transactions batch:', error);
             }

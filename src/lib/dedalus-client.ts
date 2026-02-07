@@ -109,7 +109,11 @@ export async function callDedalusResearch(
             { role: 'user', content: researchPrompt },
         ];
 
-        // Call Dedalus API
+        // Create abort controller for timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
+        // Call Dedalus API with timeout
         const response = await fetch(`${DEDALUS_API_URL}/v1/chat/completions`, {
             method: 'POST',
             headers: {
@@ -117,16 +121,19 @@ export async function callDedalusResearch(
                 'Authorization': `Bearer ${DEDALUS_API_KEY}`,
             },
             body: JSON.stringify({
-                model: 'openai/gpt-4o',
+                model: 'openai/gpt-4o-mini', // Use faster model
                 messages: [
                     { role: 'system', content: SYSTEM_PROMPT },
                     ...messages,
                 ],
                 mcp_servers: MCP_SERVERS,
-                max_tokens: 2000,
-                temperature: 0.7,
+                max_tokens: 1000, // Reduced for speed
+                temperature: 0.5,
             }),
+            signal: controller.signal,
         });
+        
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
             const errorText = await response.text();
@@ -153,6 +160,16 @@ export async function callDedalusResearch(
             ...parsedData,
         };
     } catch (error: any) {
+        // Handle timeout specifically
+        if (error.name === 'AbortError') {
+            console.warn('Dedalus research timed out');
+            return {
+                success: false,
+                response: '',
+                toolsUsed: [],
+                error: 'Research timed out',
+            };
+        }
         console.error('Dedalus research error:', error);
         return {
             success: false,

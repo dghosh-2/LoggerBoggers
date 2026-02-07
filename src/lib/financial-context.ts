@@ -46,7 +46,7 @@ async function fetchSupabaseData(userId?: string) {
         const sixMonthsAgoStr = sixMonthsAgo.toISOString().split('T')[0];
 
         const { data: transactions } = await supabaseAdmin
-            .from('financial_transactions')
+            .from('transactions')
             .select('amount, category, name, date, merchant_name')
             .eq('uuid_user_id', userId)
             .gte('date', sixMonthsAgoStr)

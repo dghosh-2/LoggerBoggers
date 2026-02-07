@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getUserIdFromRequest } from '@/lib/auth';
 import { generateFiveYearsOfTransactions, generateFiveYearsOfIncome } from '@/lib/fake-transaction-generator';
 
@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
         };
 
         // Store the Capital One item in Supabase (similar to plaid_items)
-        const { error: insertError } = await supabase.from('plaid_items').upsert({
+        const { error: insertError } = await supabaseAdmin.from('plaid_items').upsert({
             user_id: userId,
             uuid_user_id: userId,
             item_id: itemId,
@@ -207,7 +207,7 @@ export async function POST(request: NextRequest) {
         ];
 
         for (const account of accountsToStore) {
-            await supabase.from('accounts').upsert({
+            await supabaseAdmin.from('accounts').upsert({
                 user_id: userId,
                 uuid_user_id: userId,
                 plaid_account_id: account.plaid_account_id,
@@ -236,8 +236,8 @@ export async function POST(request: NextRequest) {
         const fakeIncome = generateFiveYearsOfIncome();
 
         // Clear existing data and insert new
-        await supabase.from('transactions').delete().eq('uuid_user_id', userId);
-        await supabase.from('income').delete().eq('uuid_user_id', userId);
+        await supabaseAdmin.from('transactions').delete().eq('uuid_user_id', userId);
+        await supabaseAdmin.from('income').delete().eq('uuid_user_id', userId);
 
         // Add user_id to fake transactions and income
         // Use 'capital_one' as source to distinguish from Plaid transactions
@@ -285,13 +285,19 @@ export async function POST(request: NextRequest) {
         const BATCH_SIZE = 500;
         for (let i = 0; i < allTransactionsWithUser.length; i += BATCH_SIZE) {
             const batch = allTransactionsWithUser.slice(i, i + BATCH_SIZE);
-            await supabase.from('transactions').insert(batch);
+            const { error: txError } = await supabaseAdmin.from('transactions').insert(batch);
+            if (txError) {
+                console.error('Error inserting transactions batch:', txError);
+            }
         }
 
         // Insert income
         for (let i = 0; i < fakeIncomeWithUser.length; i += BATCH_SIZE) {
             const batch = fakeIncomeWithUser.slice(i, i + BATCH_SIZE);
-            await supabase.from('income').insert(batch);
+            const { error: incError } = await supabaseAdmin.from('income').insert(batch);
+            if (incError) {
+                console.error('Error inserting income batch:', incError);
+            }
         }
 
         // Sync some transactions to Capital One API (for demo purposes)
@@ -306,17 +312,45 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // Update user connection status
-        await supabase.from('user_plaid_connections').upsert({
-            user_id: userId,
-            uuid_user_id: userId,
-            is_connected: true,
-            plaid_item_id: itemId,
-            connected_at: new Date().toISOString(),
-            last_sync_at: new Date().toISOString(),
-        }, {
-            onConflict: 'uuid_user_id',
-        });
+        // Update user connection status - use select then insert/update for reliability
+        const { data: existingConnection } = await supabaseAdmin
+            .from('user_plaid_connections')
+            .select('id')
+            .eq('uuid_user_id', userId)
+            .single();
+
+        let connectionError;
+        if (existingConnection) {
+            // Update existing record
+            const { error } = await supabaseAdmin
+                .from('user_plaid_connections')
+                .update({
+                    is_connected: true,
+                    plaid_item_id: itemId,
+                    last_sync_at: new Date().toISOString(),
+                })
+                .eq('uuid_user_id', userId);
+            connectionError = error;
+        } else {
+            // Insert new record
+            const { error } = await supabaseAdmin
+                .from('user_plaid_connections')
+                .insert({
+                    user_id: userId,
+                    uuid_user_id: userId,
+                    is_connected: true,
+                    plaid_item_id: itemId,
+                    connected_at: new Date().toISOString(),
+                    last_sync_at: new Date().toISOString(),
+                });
+            connectionError = error;
+        }
+
+        if (connectionError) {
+            console.error('Error updating user_plaid_connections:', connectionError);
+        } else {
+            console.log('Successfully updated user_plaid_connections for Capital One user:', userId);
+        }
 
         return NextResponse.json({ 
             success: true,
