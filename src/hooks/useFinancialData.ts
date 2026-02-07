@@ -15,7 +15,8 @@ export function useFinancialData() {
     const { 
         transactions, 
         summary, 
-        isConnected, 
+        isConnected,
+        isAuthenticated,
         isLoading: loading, 
         error,
         setData,
@@ -23,6 +24,7 @@ export function useFinancialData() {
         setError,
         invalidateCache,
         shouldRefetch,
+        clearData,
     } = store;
 
     const fetchData = useCallback(async (force = false) => {
@@ -38,10 +40,13 @@ export function useFinancialData() {
             const summaryResponse = await fetch('/api/data/summary');
             const summaryData = await summaryResponse.json();
 
+            // Check if user is authenticated
+            const isAuth = summaryData.is_authenticated === true;
+            
             let txData: Transaction[] = [];
             
-            // Only fetch transactions if connected
-            if (summaryData.is_connected) {
+            // Only fetch transactions if connected AND authenticated
+            if (summaryData.is_connected && isAuth) {
                 const txResponse = await fetch('/api/data/transactions?limit=5000');
                 const txResult = await txResponse.json();
                 txData = txResult.transactions || [];
@@ -51,12 +56,15 @@ export function useFinancialData() {
                 transactions: txData,
                 summary: summaryData,
                 isConnected: summaryData.is_connected,
+                isAuthenticated: isAuth,
             });
         } catch (err: any) {
             console.error('Error fetching financial data:', err);
             setError(err.message);
+            // Clear data on error to prevent stale cache issues
+            clearData();
         }
-    }, [shouldRefetch, setLoading, setData, setError]);
+    }, [shouldRefetch, setLoading, setData, setError, clearData]);
 
     useEffect(() => {
         fetchData();
@@ -100,6 +108,7 @@ export function useFinancialData() {
         transactions,
         summary,
         isConnected,
+        isAuthenticated,
         loading,
         error,
         refetch,
@@ -134,9 +143,10 @@ export async function refreshGlobalFinancialData() {
         const summaryResponse = await fetch('/api/data/summary');
         const summaryData = await summaryResponse.json();
 
+        const isAuth = summaryData.is_authenticated === true;
         let txData: Transaction[] = [];
         
-        if (summaryData.is_connected) {
+        if (summaryData.is_connected && isAuth) {
             const txResponse = await fetch('/api/data/transactions?limit=5000');
             const txResult = await txResponse.json();
             txData = txResult.transactions || [];
@@ -146,9 +156,11 @@ export async function refreshGlobalFinancialData() {
             transactions: txData,
             summary: summaryData,
             isConnected: summaryData.is_connected,
+            isAuthenticated: isAuth,
         });
     } catch (err) {
         console.error('Error refreshing global financial data:', err);
         store.setError('Failed to refresh financial data');
+        store.clearData();
     }
 }

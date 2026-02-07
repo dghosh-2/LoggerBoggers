@@ -12,9 +12,10 @@ export async function GET(request: NextRequest) {
         // #endregion
         
         if (!userId) {
-            // Return zeros if not authenticated
+            // Return zeros if not authenticated - include is_authenticated flag
             return NextResponse.json({
                 is_connected: false,
+                is_authenticated: false,
                 total_spending: 0,
                 total_income: 0,
                 net_worth: 0,
@@ -36,9 +37,10 @@ export async function GET(request: NextRequest) {
         const isConnected = connectionData?.is_connected || false;
         
         if (!isConnected) {
-            // Return zeros if not connected
+            // Return zeros if not connected (but user IS authenticated)
             return NextResponse.json({
                 is_connected: false,
+                is_authenticated: true,
                 total_spending: 0,
                 total_income: 0,
                 net_worth: 0,
@@ -200,6 +202,7 @@ export async function GET(request: NextRequest) {
         
         return NextResponse.json({
             is_connected: true,
+            is_authenticated: true,
             total_spending: Math.round(totalSpending * 100) / 100,
             total_income: Math.round(totalIncome * 100) / 100,
             net_worth: Math.round(netWorth * 100) / 100,
@@ -215,6 +218,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json(
             { 
                 is_connected: false,
+                is_authenticated: false,
                 error: 'Failed to fetch summary',
                 total_spending: 0,
                 total_income: 0,
