@@ -199,7 +199,7 @@
    ELEGANT COMPONENT STYLES
    ═══════════════════════════════════════════════════════════ */
 @layer components {
-  /* Card styles */
+  /* Card styles - original clean design */
   .card-elevated {
     background: var(--card);
     border: 1px solid var(--border);
@@ -230,6 +230,128 @@
   .dark .card-interactive:hover {
     background: rgba(255, 255, 255, 0.03);
     border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     LIQUID GLASS EFFECT - For Stocks Page Only
+     Enhanced warm gold/amber theme with stronger glass effect
+     ───────────────────────────────────────────────────────── */
+  .liquid-glass {
+    background: linear-gradient(
+      145deg,
+      rgba(184, 134, 11, 0.15) 0%,
+      rgba(255, 248, 230, 0.85) 25%,
+      rgba(217, 119, 6, 0.08) 50%,
+      rgba(255, 248, 230, 0.85) 75%,
+      rgba(184, 134, 11, 0.15) 100%
+    );
+    backdrop-filter: saturate(200%) blur(25px);
+    -webkit-backdrop-filter: saturate(200%) blur(25px);
+    border: 1.5px solid rgba(184, 134, 11, 0.25);
+    border-radius: 28px;
+    box-shadow: 
+      0 10px 40px rgba(184, 134, 11, 0.15),
+      0 2px 8px rgba(184, 134, 11, 0.1),
+      inset 0 2px 0 rgba(255, 255, 255, 0.7),
+      inset 0 -2px 0 rgba(184, 134, 11, 0.15),
+      inset 2px 0 0 rgba(255, 255, 255, 0.3),
+      inset -2px 0 0 rgba(184, 134, 11, 0.08);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .liquid-glass::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 55%;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.5) 0%,
+      rgba(255, 255, 255, 0.2) 40%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    pointer-events: none;
+    border-radius: 28px 28px 0 0;
+  }
+
+  .liquid-glass::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 10%;
+    right: 10%;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(184, 134, 11, 0.3) 50%,
+      transparent 100%
+    );
+    pointer-events: none;
+  }
+
+  .dark .liquid-glass {
+    background: linear-gradient(
+      145deg,
+      rgba(212, 160, 23, 0.2) 0%,
+      rgba(40, 36, 28, 0.9) 25%,
+      rgba(184, 134, 11, 0.12) 50%,
+      rgba(40, 36, 28, 0.9) 75%,
+      rgba(212, 160, 23, 0.2) 100%
+    );
+    border: 1.5px solid rgba(212, 160, 23, 0.35);
+    box-shadow: 
+      0 10px 50px rgba(0, 0, 0, 0.5),
+      0 0 60px rgba(212, 160, 23, 0.1),
+      inset 0 2px 0 rgba(212, 160, 23, 0.35),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.3),
+      inset 2px 0 0 rgba(212, 160, 23, 0.15),
+      inset -2px 0 0 rgba(0, 0, 0, 0.2);
+  }
+
+  .dark .liquid-glass::before {
+    background: linear-gradient(
+      180deg,
+      rgba(212, 160, 23, 0.25) 0%,
+      rgba(212, 160, 23, 0.1) 40%,
+      rgba(212, 160, 23, 0) 100%
+    );
+  }
+
+  .dark .liquid-glass::after {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(212, 160, 23, 0.4) 50%,
+      transparent 100%
+    );
+  }
+
+  /* Liquid glass hover effect */
+  .liquid-glass-interactive {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .liquid-glass-interactive:hover {
+    transform: translateY(-3px) scale(1.005);
+    border-color: rgba(184, 134, 11, 0.4);
+    box-shadow: 
+      0 15px 50px rgba(184, 134, 11, 0.2),
+      0 5px 15px rgba(184, 134, 11, 0.15),
+      inset 0 2px 0 rgba(255, 255, 255, 0.8),
+      inset 0 -2px 0 rgba(184, 134, 11, 0.2);
+  }
+
+  .dark .liquid-glass-interactive:hover {
+    border-color: rgba(212, 160, 23, 0.5);
+    box-shadow: 
+      0 15px 60px rgba(0, 0, 0, 0.6),
+      0 0 80px rgba(212, 160, 23, 0.15),
+      inset 0 2px 0 rgba(212, 160, 23, 0.4),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.4);
   }
 
   /* Button styles */
