@@ -25,6 +25,7 @@ import { Modal } from "@/components/ui/modal";
 import { toast } from "@/components/ui/toast";
 import { useInsightsStore } from "@/stores/insights-store";
 import { GlassButton } from "@/components/ui/glass-button";
+import { DogLoadingAnimation } from "@/components/ui/DogLoadingAnimation";
 
 interface FinancialSummary {
   is_connected: boolean;
@@ -103,6 +104,30 @@ export default function DashboardPage() {
     setCurrentView('calendar');
     router.push('/insights');
   };
+
+  // Show loading state
+  if (loading) {
+    return (
+      <PageTransition>
+        <div className="space-y-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+              <p className="text-foreground-muted text-sm mt-1">
+                Your financial overview
+              </p>
+            </div>
+          </div>
+          <GlassCard>
+            <DogLoadingAnimation 
+              message="Loading your financial dashboard..."
+              size="lg"
+            />
+          </GlassCard>
+        </div>
+      </PageTransition>
+    );
+  }
 
   return (
     <PageTransition>

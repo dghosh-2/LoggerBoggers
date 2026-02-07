@@ -28,6 +28,7 @@ import { RegretLeaderboard } from '@/components/timemachine/RegretLeaderboard';
 import { DeltaSummary } from '@/components/timemachine/DeltaSummary';
 import { EventList } from '@/components/timemachine/EventList';
 import { cn } from '@/lib/utils';
+import { DogLoadingAnimation } from '@/components/ui/DogLoadingAnimation';
 
 const TIME_RANGES = [
     { id: '3m', label: '3M', months: 3 },
@@ -297,12 +298,21 @@ export default function TimeMachinePage() {
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
-                            className="fixed inset-0 bg-background/50 backdrop-blur-sm flex items-center justify-center z-50"
+                            className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50"
                         >
-                            <div className="flex items-center gap-2.5 px-5 py-3 rounded-lg bg-card border border-border shadow-lg">
-                                <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                                <span className="text-xs font-medium">Computing timeline...</span>
-                            </div>
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                                transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                                className="w-full max-w-md px-8"
+                            >
+                                <DogLoadingAnimation 
+                                    message="Computing timeline..."
+                                    size="md"
+                                    showMessage={true}
+                                />
+                            </motion.div>
                         </motion.div>
                     )}
                 </AnimatePresence>
