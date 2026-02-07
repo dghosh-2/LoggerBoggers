@@ -435,6 +435,8 @@
 
 .react-flow__controls-button:last-child {
   border-bottom: none !important;
+  width: 28px !important;
+  height: 28px !important;
 }
 
 .react-flow__controls-button svg {
