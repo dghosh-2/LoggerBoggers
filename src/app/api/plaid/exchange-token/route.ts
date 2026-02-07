@@ -417,6 +417,9 @@ export async function POST(request: NextRequest) {
             console.log('=== GENERATING AGGREGATED STATISTICS ===');
             await generateAggregatedStatistics(userId);
 
+            // Trigger budget recalculation (client-side will pick this up)
+            console.log('=== DATA SYNC COMPLETE - Budget will auto-refresh on client ===');
+
         } catch (syncError: any) {
             console.error('Error syncing data:', syncError);
             console.error('Sync error details:', syncError.response?.data || syncError.message);

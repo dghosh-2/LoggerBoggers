@@ -24,6 +24,9 @@ import { toast } from "@/components/ui/toast";
 import { PlaidLinkButton } from "@/components/PlaidLink";
 import { CapitalOneConnectButton } from "@/components/CapitalOneConnect";
 import { DogLoadingAnimation } from "@/components/ui/DogLoadingAnimation";
+import { useBudgetStore } from "@/stores/budgetStore";
+import { useFinancialDataStore } from "@/stores/financial-data-store";
+import { usePortfolioStore } from "@/stores/portfolio-store";
 
 interface PlaidAccount {
   id: string;
@@ -70,6 +73,11 @@ export default function ImportsPage() {
   const [loading, setLoading] = useState(true);
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [syncingAccounts, setSyncingAccounts] = useState<Set<string>>(new Set());
+  
+  // Get store actions for refreshing data after connection
+  const budgetInitialize = useBudgetStore((state) => state.initialize);
+  const financialDataClear = useFinancialDataStore((state) => state.clearData);
+  const portfolioClear = usePortfolioStore((state) => state.clearData);
 
   const statusConfig = {
     connected: { 
@@ -110,14 +118,44 @@ export default function ImportsPage() {
     }
   };
 
-  const handlePlaidSuccess = () => {
+  const handlePlaidSuccess = async () => {
     setShowAddAccount(false);
-    fetchAccounts();
+    await fetchAccounts();
+    
+    // Clear cached data in stores to force refresh with new data
+    financialDataClear();
+    portfolioClear();
+    
+    // Clear budget localStorage cache and reinitialize
+    localStorage.removeItem('budget_config');
+    localStorage.removeItem('budget_summary');
+    localStorage.removeItem('budget_trendAnalytics');
+    localStorage.removeItem('budget_insights');
+    
+    // Reinitialize budget with new transaction data
+    budgetInitialize();
+    
+    toast.success("Account connected! Your data is being synced.");
   };
 
-  const handleCapitalOneSuccess = () => {
+  const handleCapitalOneSuccess = async () => {
     setShowAddAccount(false);
-    fetchAccounts();
+    await fetchAccounts();
+    
+    // Clear cached data in stores to force refresh with new data
+    financialDataClear();
+    portfolioClear();
+    
+    // Clear budget localStorage cache and reinitialize
+    localStorage.removeItem('budget_config');
+    localStorage.removeItem('budget_summary');
+    localStorage.removeItem('budget_trendAnalytics');
+    localStorage.removeItem('budget_insights');
+    
+    // Reinitialize budget with new transaction data
+    budgetInitialize();
+    
+    toast.success("Capital One connected! Your data is being synced.");
   };
 
   const handleSyncAll = async () => {
