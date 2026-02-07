@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import { generateFiveYearsOfTransactions, generateFiveYearsOfIncome } from '@/lib/fake-transaction-generator';
+import { getUserIdFromRequest } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
     try {
+        const userId = await getUserIdFromRequest(request);
+        if (!userId) {
+            return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+        }
+
         // Check if user is connected
-        const { data: connectionData } = await supabase
+        const { data: connectionData } = await supabaseAdmin
             .from('user_plaid_connections')
             .select('is_connected')
-            .eq('user_id', 'default_user')
+            .eq('uuid_user_id', userId)
             .single();
 
         if (!connectionData?.is_connected) {
@@ -23,14 +29,18 @@ export async function POST(request: NextRequest) {
         const fakeIncome = generateFiveYearsOfIncome();
 
         // Clear existing data
-        await supabase.from('transactions').delete().eq('user_id', 'default_user');
-        await supabase.from('income').delete().eq('user_id', 'default_user');
+        await supabaseAdmin.from('financial_transactions').delete().eq('uuid_user_id', userId);
+        await supabaseAdmin.from('income').delete().eq('uuid_user_id', userId);
 
         // Insert transactions in batches
         const BATCH_SIZE = 500;
         for (let i = 0; i < fakeTransactions.length; i += BATCH_SIZE) {
-            const batch = fakeTransactions.slice(i, i + BATCH_SIZE);
-            const { error } = await supabase.from('transactions').insert(batch);
+            const batch = fakeTransactions.slice(i, i + BATCH_SIZE).map(tx => ({
+                ...tx,
+                user_id: userId,
+                uuid_user_id: userId,
+            }));
+            const { error } = await supabaseAdmin.from('financial_transactions').insert(batch);
             if (error) {
                 console.error('Error inserting transactions batch:', error);
             }
@@ -38,18 +48,22 @@ export async function POST(request: NextRequest) {
 
         // Insert income
         for (let i = 0; i < fakeIncome.length; i += BATCH_SIZE) {
-            const batch = fakeIncome.slice(i, i + BATCH_SIZE);
-            const { error } = await supabase.from('income').insert(batch);
+            const batch = fakeIncome.slice(i, i + BATCH_SIZE).map(inc => ({
+                ...inc,
+                user_id: userId,
+                uuid_user_id: userId,
+            }));
+            const { error } = await supabaseAdmin.from('income').insert(batch);
             if (error) {
                 console.error('Error inserting income batch:', error);
             }
         }
 
         // Update last sync time
-        await supabase
+        await supabaseAdmin
             .from('user_plaid_connections')
             .update({ last_sync_at: new Date().toISOString() })
-            .eq('user_id', 'default_user');
+            .eq('uuid_user_id', userId);
 
         return NextResponse.json({
             success: true,

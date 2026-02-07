@@ -8,20 +8,21 @@ import {
     NewsImpact,
     ScenarioImpact
 } from '@/lib/simulation-engine';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getUserIdFromRequest } from '@/lib/auth';
 
 // Fetch real transaction data from Supabase
-async function fetchRealData(): Promise<{
+async function fetchRealData(userId: string): Promise<{
     transactions: Array<{ date: string; amount: number; category: string }>;
     monthlyIncome: number;
     isConnected: boolean;
 }> {
     try {
         // Check if user is connected
-        const { data: connectionData } = await supabase
+        const { data: connectionData } = await supabaseAdmin
             .from('user_plaid_connections')
             .select('is_connected')
-            .eq('user_id', 'default_user')
+            .eq('uuid_user_id', userId)
             .single();
 
         if (!connectionData?.is_connected) {
@@ -32,18 +33,18 @@ async function fetchRealData(): Promise<{
         const sixMonthsAgo = new Date();
         sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-        const { data: transactions } = await supabase
-            .from('transactions')
+        const { data: transactions } = await supabaseAdmin
+            .from('financial_transactions')
             .select('date, amount, category')
-            .eq('user_id', 'default_user')
+            .eq('uuid_user_id', userId)
             .gte('date', sixMonthsAgo.toISOString().split('T')[0])
             .order('date', { ascending: false });
 
         // Calculate monthly income from income table
-        const { data: incomeData } = await supabase
+        const { data: incomeData } = await supabaseAdmin
             .from('income')
             .select('amount')
-            .eq('user_id', 'default_user')
+            .eq('uuid_user_id', userId)
             .gte('date', sixMonthsAgo.toISOString().split('T')[0]);
 
         const totalIncome = incomeData?.reduce((sum, i) => sum + i.amount, 0) || 0;
@@ -155,6 +156,11 @@ async function interpretScenario(query: string, apiKey: string): Promise<Scenari
 
 export async function POST(request: NextRequest) {
     try {
+        const userId = await getUserIdFromRequest(request);
+        if (!userId) {
+            return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+        }
+
         const body = await request.json();
         const {
             userQuery,
@@ -167,7 +173,7 @@ export async function POST(request: NextRequest) {
         } = body;
 
         // Fetch real data from Supabase
-        const { transactions, monthlyIncome, isConnected } = await fetchRealData();
+        const { transactions, monthlyIncome, isConnected } = await fetchRealData(userId);
 
         // If not connected, return empty simulation
         if (!isConnected) {

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { plaidClient } from '@/lib/plaid-client';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import { generateFiveYearsOfTransactions, generateFiveYearsOfIncome } from '@/lib/fake-transaction-generator';
+import { getUserIdFromRequest } from '@/lib/auth';
 
 // Map Plaid categories to our simplified categories
 function mapPlaidCategory(plaidCategories: string[] | null | undefined): string {
@@ -42,10 +43,15 @@ function mapPlaidCategory(plaidCategories: string[] | null | undefined): string 
 
 export async function POST(request: NextRequest) {
     try {
+        const userId = await getUserIdFromRequest(request);
+        if (!userId) {
+            return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+        }
+
         const { item_id } = await request.json();
         
         // Get access token from Supabase
-        const { data: plaidItem, error: itemError } = await supabase
+        const { data: plaidItem, error: itemError } = await supabaseAdmin
             .from('plaid_items')
             .select('access_token, institution_name')
             .eq('item_id', item_id)
@@ -106,14 +112,18 @@ export async function POST(request: NextRequest) {
         const allTransactions = [...filteredFakeTransactions, ...formattedPlaidTransactions];
         
         // Clear existing data for this user
-        await supabase.from('transactions').delete().eq('user_id', 'default_user');
-        await supabase.from('income').delete().eq('user_id', 'default_user');
-        
+        await supabaseAdmin.from('financial_transactions').delete().eq('uuid_user_id', userId);
+        await supabaseAdmin.from('income').delete().eq('uuid_user_id', userId);
+
         // Insert transactions in batches (Supabase has limits)
         const BATCH_SIZE = 500;
         for (let i = 0; i < allTransactions.length; i += BATCH_SIZE) {
-            const batch = allTransactions.slice(i, i + BATCH_SIZE);
-            const { error } = await supabase.from('transactions').insert(batch);
+            const batch = allTransactions.slice(i, i + BATCH_SIZE).map(tx => ({
+                ...tx,
+                user_id: userId,
+                uuid_user_id: userId,
+            }));
+            const { error } = await supabaseAdmin.from('financial_transactions').insert(batch);
             if (error) {
                 console.error('Error inserting transactions batch:', error);
             }
@@ -121,22 +131,27 @@ export async function POST(request: NextRequest) {
         
         // Insert income
         for (let i = 0; i < fakeIncome.length; i += BATCH_SIZE) {
-            const batch = fakeIncome.slice(i, i + BATCH_SIZE);
-            const { error } = await supabase.from('income').insert(batch);
+            const batch = fakeIncome.slice(i, i + BATCH_SIZE).map(inc => ({
+                ...inc,
+                user_id: userId,
+                uuid_user_id: userId,
+            }));
+            const { error } = await supabaseAdmin.from('income').insert(batch);
             if (error) {
                 console.error('Error inserting income batch:', error);
             }
         }
         
         // Update user connection status
-        await supabase.from('user_plaid_connections').upsert({
-            user_id: 'default_user',
+        await supabaseAdmin.from('user_plaid_connections').upsert({
+            user_id: userId,
+            uuid_user_id: userId,
             is_connected: true,
             plaid_item_id: item_id,
             connected_at: new Date().toISOString(),
             last_sync_at: new Date().toISOString(),
         }, {
-            onConflict: 'user_id',
+            onConflict: 'uuid_user_id',
         });
         
         return NextResponse.json({

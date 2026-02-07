@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getUserIdFromRequest } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
@@ -17,8 +17,8 @@ export async function GET(request: NextRequest) {
         const category = searchParams.get('category');
         const limit = parseInt(searchParams.get('limit') || '1000');
         
-        let query = supabase
-            .from('transactions')
+        let query = supabaseAdmin
+            .from('financial_transactions')
             .select('*')
             .eq('uuid_user_id', userId)
             .order('date', { ascending: false })

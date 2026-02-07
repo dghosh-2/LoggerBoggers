@@ -9,6 +9,7 @@
     "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
+    "start:railway": "next start -p ${PORT:-3000}",
     "lint": "next lint",
     "dedalus": "node --env-file=${DEDALUS_ENV_FILE:-.env} scripts/dedalus.mjs",
     "dedalus:chat": "node --env-file=${DEDALUS_ENV_FILE:-.env} scripts/dedalus-chat.mjs",

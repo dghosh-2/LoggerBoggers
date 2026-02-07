@@ -22,6 +22,7 @@ import { UploadCard } from "@/components/cards/upload-card";
 import { Modal } from "@/components/ui/modal";
 import { toast } from "@/components/ui/toast";
 import { PlaidLinkButton } from "@/components/PlaidLink";
+import { CapitalOneConnectButton } from "@/components/CapitalOneConnect";
 import { DogLoadingAnimation } from "@/components/ui/DogLoadingAnimation";
 
 interface PlaidAccount {
@@ -50,6 +51,7 @@ interface PlaidInstitution {
 
 const availableIntegrations = [
   { id: "plaid", name: "Plaid", description: "Connect 10,000+ institutions", icon: Link2, image: "/banks/plaid3.png" },
+  { id: "capital_one", name: "Capital One", description: "Connect your Capital One accounts", icon: Building2, image: "/banks/capitalone.jpg" },
   { id: "manual", name: "Manual Import", description: "CSV, OFX, QFX files", icon: FileSpreadsheet, image: null },
 ];
 
@@ -113,6 +115,11 @@ export default function ImportsPage() {
     fetchAccounts();
   };
 
+  const handleCapitalOneSuccess = () => {
+    setShowAddAccount(false);
+    fetchAccounts();
+  };
+
   const handleSyncAll = async () => {
     const allIds = institutions.map(i => i.itemId);
     setSyncingAccounts(new Set(allIds));
@@ -127,6 +134,9 @@ export default function ImportsPage() {
   const handleConnect = (integrationId: string) => {
     if (integrationId === "plaid") {
       setShowAddAccount(true);
+    } else if (integrationId === "capital_one") {
+      // Capital One connection is handled by the button's onSuccess callback
+      // No modal needed - direct connection
     } else {
       toast.info("Manual import: Please upload your files below");
     }
@@ -159,10 +169,19 @@ export default function ImportsPage() {
               Connect accounts and import your financial data
             </p>
           </div>
-          <PlaidLinkButton 
-            onSuccess={handlePlaidSuccess}
-            buttonText="Add Account"
-          />
+          <div className="flex gap-2">
+            <PlaidLinkButton 
+              onSuccess={handlePlaidSuccess}
+              buttonText="Add Plaid"
+              buttonSize="sm"
+            />
+            <CapitalOneConnectButton 
+              onSuccess={handleCapitalOneSuccess}
+              buttonText="Add Capital One"
+              buttonSize="sm"
+              buttonVariant="secondary"
+            />
+          </div>
         </div>
 
         {/* Import Options */}
@@ -189,6 +208,12 @@ export default function ImportsPage() {
                       {integration.id === "plaid" ? (
                         <PlaidLinkButton 
                           onSuccess={handlePlaidSuccess}
+                          buttonText="Connect"
+                          buttonVariant="secondary"
+                        />
+                      ) : integration.id === "capital_one" ? (
+                        <CapitalOneConnectButton 
+                          onSuccess={handleCapitalOneSuccess}
                           buttonText="Connect"
                           buttonVariant="secondary"
                         />
@@ -303,10 +328,27 @@ export default function ImportsPage() {
               <p className="text-xs text-foreground-muted mb-4">
                 Connect your bank accounts to get started
               </p>
-              <PlaidLinkButton 
-                onSuccess={handlePlaidSuccess}
-                buttonText="Connect Your First Account"
-              />
+              <div className="flex flex-col gap-2 w-full max-w-xs">
+                <PlaidLinkButton 
+                  onSuccess={handlePlaidSuccess}
+                  buttonText="Connect with Plaid"
+                  buttonSize="md"
+                />
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-border" />
+                  </div>
+                  <div className="relative flex justify-center text-[10px] uppercase tracking-wider">
+                    <span className="bg-card px-2 text-foreground-muted">or</span>
+                  </div>
+                </div>
+                <CapitalOneConnectButton 
+                  onSuccess={handleCapitalOneSuccess}
+                  buttonText="Connect with Capital One"
+                  buttonSize="md"
+                  buttonVariant="secondary"
+                />
+              </div>
             </div>
           </GlassCard>
         )}
