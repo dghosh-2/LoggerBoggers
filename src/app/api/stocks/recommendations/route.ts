@@ -4,7 +4,7 @@ import { getUserContext } from '@/lib/user-profile';
 
 export async function POST(request: NextRequest) {
     try {
-        const { query, stocks } = await request.json();
+        const { query, stocks, extractedQuestions = [] } = await request.json();
 
         if (!query || !stocks) {
             return NextResponse.json(
@@ -25,6 +25,11 @@ export async function POST(request: NextRequest) {
             return `${stock.symbol} (${stock.name}): Current $${latestPrice.toFixed(2)}, ${change > 0 ? '+' : ''}${change.toFixed(2)}% over period`;
         }).join('\n');
 
+        // Build questions section if there are extracted questions
+        const questionsSection = extractedQuestions.length > 0 
+            ? `\n\nUser's Specific Questions to Answer:\n${extractedQuestions.map((q: string, i: number) => `${i + 1}. ${q}`).join('\n')}\n\nPlease provide direct answers to each question above.`
+            : '';
+
         // Generate personalized recommendations
         const recommendationPrompt = `
 ${userContext}
@@ -33,12 +38,14 @@ Query: ${query}
 
 Stock Performance Summary:
 ${stockSummary}
+${questionsSection}
 
 Based on the user's profile (age, risk tolerance, financial situation) and the stocks they're viewing, provide:
 1. A clear summary recommendation (2-3 sentences)
 2. 3-4 specific insights about these stocks relevant to this user
 3. Contextual advice tailored to their risk tolerance and life stage
 4. How this aligns with their stated risk tolerance
+${extractedQuestions.length > 0 ? '5. Direct answers to each of the user\'s specific questions' : ''}
 
 Be specific, actionable, and personalized. Consider their age, risk tolerance, debt, and income status.
 `;
@@ -79,11 +86,27 @@ Be specific, actionable, and personalized. Consider their age, risk tolerance, d
             });
         }
 
+        // Extract question answers if there were extracted questions
+        const questionAnswers: { question: string; answer: string }[] = [];
+        if (extractedQuestions.length > 0) {
+            for (const question of extractedQuestions) {
+                // Try to find an answer in the response
+                const answerMatch = response.match(new RegExp(`${question.replace(/[?]/g, '\\?')}[:\\s]*([^\\n]+)`, 'i'));
+                if (answerMatch) {
+                    questionAnswers.push({ question, answer: answerMatch[1].trim() });
+                } else {
+                    // Generate a generic answer based on the summary
+                    questionAnswers.push({ question, answer: summary || 'Based on the analysis, please see the insights above.' });
+                }
+            }
+        }
+
         const recommendation = {
             summary,
             insights: insights.slice(0, 4),
             contextualAdvice: sections.find(s => s.toLowerCase().includes('advice') || s.toLowerCase().includes('consider')) || sections[sections.length - 1] || '',
             riskAlignment: sections.find(s => s.toLowerCase().includes('risk')) || 'Recommendations align with your stated risk tolerance.',
+            questionAnswers,
         };
 
         return NextResponse.json(recommendation);
