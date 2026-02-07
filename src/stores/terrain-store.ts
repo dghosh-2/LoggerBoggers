@@ -36,17 +36,16 @@ export interface TerrainState {
 }
 
 const ALL_CATEGORIES = new Set([
-    "Rent",
-    "Bills",
-    "Groceries",
-    "Food",
-    "Dining",
+    "Bills & Utilities",
+    "Education",
     "Entertainment",
+    "Food & Drink",
+    "Health & Fitness",
+    "Personal Care",
     "Shopping",
-    "Subscriptions",
-    "Transport",
-    "Income",
-    "Savings",
+    "Transportation",
+    "Travel",
+    "Other",
 ]);
 
 export const useTerrainStore = create<TerrainState>((set, get) => ({

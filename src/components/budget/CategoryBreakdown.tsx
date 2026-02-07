@@ -19,17 +19,19 @@ import {
     MoreHorizontal,
 } from 'lucide-react';
 import type { CategoryBudget } from '@/types/budget';
+import { normalizeCategory } from '@/lib/categories';
 
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
-    'Rent': <Home className="w-4 h-4" />,
-    'Housing': <Home className="w-4 h-4" />,
-    'Groceries': <ShoppingBag className="w-4 h-4" />,
-    'Dining': <Utensils className="w-4 h-4" />,
-    'Transportation': <Car className="w-4 h-4" />,
+    'Bills & Utilities': <Zap className="w-4 h-4" />,
+    'Education': <Settings className="w-4 h-4" />,
     'Entertainment': <Film className="w-4 h-4" />,
-    'Utilities': <Zap className="w-4 h-4" />,
-    'Healthcare': <Heart className="w-4 h-4" />,
+    'Food & Drink': <Utensils className="w-4 h-4" />,
+    'Health & Fitness': <Heart className="w-4 h-4" />,
+    'Personal Care': <Settings className="w-4 h-4" />,
     'Shopping': <ShoppingBag className="w-4 h-4" />,
+    'Transportation': <Car className="w-4 h-4" />,
+    'Travel': <Car className="w-4 h-4" />,
+    'Other': <MoreHorizontal className="w-4 h-4" />,
 };
 
 interface CategoryBreakdownProps {
@@ -132,7 +134,7 @@ interface CategoryRowProps {
 }
 
 function CategoryRow({ category, index, isExpanded, onToggle }: CategoryRowProps) {
-    const icon = CATEGORY_ICONS[category.category] || <MoreHorizontal className="w-4 h-4" />;
+    const icon = CATEGORY_ICONS[normalizeCategory(category.category)] || <MoreHorizontal className="w-4 h-4" />;
 
     const statusColors = {
         healthy: 'bg-emerald-500',

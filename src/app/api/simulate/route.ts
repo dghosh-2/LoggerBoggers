@@ -34,7 +34,7 @@ async function fetchRealData(userId: string): Promise<{
         sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
         const { data: transactions } = await supabaseAdmin
-            .from('transactions')
+            .from('financial_transactions')
             .select('date, amount, category')
             .eq('uuid_user_id', userId)
             .gte('date', sixMonthsAgo.toISOString().split('T')[0])

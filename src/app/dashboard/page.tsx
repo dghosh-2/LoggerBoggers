@@ -172,12 +172,12 @@ export default function DashboardPage() {
 
   return (
     <PageTransition>
-      <div className="space-y-4">
-        {/* Header - Compact */}
+      <div className="flex flex-col gap-3 md:gap-4 h-full min-h-0">
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
-            <p className="text-foreground-muted text-xs">Your financial overview</p>
+            <h1 className="text-xl md:text-2xl font-semibold tracking-tight">Dashboard</h1>
+            <p className="text-foreground-muted text-xs md:text-sm mt-0.5 md:mt-1">Your financial overview</p>
           </div>
           <div className="flex items-center gap-1">
             <button
@@ -195,28 +195,28 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Main Charts Grid - 2x2 - Compact to fit without scrolling */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        {/* Main Charts Grid - 2x2 - Single-screen (no page scroll) */}
+        <div className="grid flex-1 min-h-0 grid-cols-2 grid-rows-2 gap-3 md:gap-5">
           
           {/* Income vs Spending Line Chart */}
-          <GlassCard delay={100} className="p-4">
-            <div className="flex items-center justify-between mb-2">
+          <GlassCard delay={100} className="p-3 md:p-6 h-full flex flex-col min-h-0">
+            <div className="flex items-center justify-between mb-2 md:mb-3">
               <div>
-                <h2 className="text-sm font-semibold">Income vs Spending</h2>
-                <p className="text-[10px] text-foreground-muted">12-month trend</p>
+                <h2 className="text-sm md:text-base font-semibold">Income vs Spending</h2>
+                <p className="text-[10px] md:text-xs text-foreground-muted mt-0.5">12-month trend</p>
               </div>
-              <div className="flex items-center gap-3 text-[10px]">
+              <div className="hidden md:flex items-center gap-3 text-xs">
                 <div className="flex items-center gap-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-success" />
+                  <div className="w-2 h-2 rounded-full bg-success" />
                   <span className="text-foreground-muted">Income</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-destructive" />
+                  <div className="w-2 h-2 rounded-full bg-destructive" />
                   <span className="text-foreground-muted">Spending</span>
                 </div>
               </div>
             </div>
-            <div className="h-[140px]">
+            <div className="flex-1 min-h-0">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={incomeVsSpendingData} margin={{ top: 5, right: 5, left: -15, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
@@ -252,22 +252,21 @@ export default function DashboardPage() {
                 </LineChart>
               </ResponsiveContainer>
             </div>
-            {/* Bottom stats - compact */}
-            <div className="flex gap-3 mt-2 pt-2 border-t border-border">
-              <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-secondary/50 flex-1">
-                <div className="w-1.5 h-1.5 rounded-full bg-success" />
+            <div className="flex gap-2 md:gap-3 mt-2 md:mt-4 pt-2 md:pt-4 border-t border-border">
+              <div className="flex items-center gap-2 px-2.5 py-2 rounded-md bg-secondary/50 flex-1">
+                <div className="w-2 h-2 rounded-full bg-success" />
                 <div>
-                  <p className="text-[9px] text-foreground-muted">Income</p>
-                  <p className="text-xs font-semibold font-mono text-success">
+                  <p className="text-[10px] md:text-xs text-foreground-muted">Income</p>
+                  <p className="text-xs md:text-sm font-semibold font-mono text-success">
                     ${summary.monthly_income.toLocaleString()}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-secondary/50 flex-1">
-                <div className="w-1.5 h-1.5 rounded-full bg-destructive" />
+              <div className="flex items-center gap-2 px-2.5 py-2 rounded-md bg-secondary/50 flex-1">
+                <div className="w-2 h-2 rounded-full bg-destructive" />
                 <div>
-                  <p className="text-[9px] text-foreground-muted">Spending</p>
-                  <p className="text-xs font-semibold font-mono text-destructive">
+                  <p className="text-[10px] md:text-xs text-foreground-muted">Spending</p>
+                  <p className="text-xs md:text-sm font-semibold font-mono text-destructive">
                     ${summary.monthly_spending.toLocaleString()}
                   </p>
                 </div>
@@ -276,20 +275,20 @@ export default function DashboardPage() {
           </GlassCard>
 
           {/* Savings Trend Area Chart */}
-          <GlassCard delay={150} className="p-4">
-            <div className="flex items-center justify-between mb-2">
+          <GlassCard delay={150} className="p-3 md:p-6 h-full flex flex-col min-h-0">
+            <div className="flex items-center justify-between mb-2 md:mb-3">
               <div>
-                <h2 className="text-sm font-semibold">Monthly Savings</h2>
-                <p className="text-[10px] text-foreground-muted">Net savings over time</p>
+                <h2 className="text-sm md:text-base font-semibold">Monthly Savings</h2>
+                <p className="text-[10px] md:text-xs text-foreground-muted mt-0.5">Net savings over time</p>
               </div>
               <div className="text-right">
-                <p className="text-[9px] text-foreground-muted">Net Worth</p>
-                <p className={`text-sm font-bold font-mono ${summary.net_worth >= 0 ? 'text-success' : 'text-destructive'}`}>
+                <p className="text-[10px] md:text-xs text-foreground-muted">Net Worth</p>
+                <p className={`text-sm md:text-base font-bold font-mono ${summary.net_worth >= 0 ? 'text-success' : 'text-destructive'}`}>
                   ${summary.net_worth.toLocaleString()}
                 </p>
               </div>
             </div>
-            <div className="h-[140px]">
+            <div className="flex-1 min-h-0">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={savingsData} margin={{ top: 5, right: 5, left: -15, bottom: 0 }}>
                   <defs>
@@ -323,17 +322,16 @@ export default function DashboardPage() {
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-            {/* Savings rate - compact */}
-            <div className="mt-2 pt-2 border-t border-border">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] text-foreground-muted">Savings Rate</span>
-                <span className="text-[10px] font-semibold">
+            <div className="mt-2 md:mt-4 pt-2 md:pt-4 border-t border-border">
+              <div className="flex items-center justify-between mb-1.5 md:mb-2">
+                <span className="text-[10px] md:text-xs text-foreground-muted">Savings Rate</span>
+                <span className="text-[10px] md:text-xs font-semibold">
                   {summary.monthly_income > 0 
                     ? Math.round(((summary.monthly_income - summary.monthly_spending) / summary.monthly_income) * 100)
                     : 0}%
                 </span>
               </div>
-              <div className="h-1 bg-secondary rounded-full overflow-hidden">
+              <div className="h-1.5 md:h-2 bg-secondary rounded-full overflow-hidden">
                 <motion.div
                   className="h-full bg-primary rounded-full"
                   initial={{ width: 0 }}
@@ -349,25 +347,24 @@ export default function DashboardPage() {
           </GlassCard>
 
           {/* Category Breakdown */}
-          <GlassCard delay={200} className="p-4">
-            <div className="flex items-center justify-between mb-2">
+          <GlassCard delay={200} className="p-3 md:p-6 h-full flex flex-col min-h-0">
+            <div className="flex items-center justify-between mb-2 md:mb-3">
               <div>
-                <h2 className="text-sm font-semibold">Spending by Category</h2>
-                <p className="text-[10px] text-foreground-muted">This month</p>
+                <h2 className="text-sm md:text-base font-semibold">Spending by Category</h2>
+                <p className="text-[10px] md:text-xs text-foreground-muted mt-0.5">This month</p>
               </div>
-              <span className="text-xs font-bold font-mono">${summary.monthly_spending.toLocaleString()}</span>
+              <span className="text-xs md:text-sm font-bold font-mono">${summary.monthly_spending.toLocaleString()}</span>
             </div>
-            <div className="flex items-center gap-4">
-              {/* Pie Chart - smaller */}
-              <div className="w-[120px] h-[120px] flex-shrink-0">
+            <div className="flex-1 min-h-0 flex items-center gap-3 md:gap-6">
+              <div className="w-[170px] h-[170px] md:w-[280px] md:h-[280px] flex-shrink-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={categoryData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={35}
-                      outerRadius={55}
+                      innerRadius="58%"
+                      outerRadius="88%"
                       paddingAngle={2}
                       dataKey="value"
                     >
@@ -381,8 +378,8 @@ export default function DashboardPage() {
                         const data = payload[0].payload;
                         return (
                           <div className="bg-card border border-border rounded-lg shadow-lg p-2">
-                            <p className="text-[10px] font-medium">{data.name}</p>
-                            <p className="text-[10px] font-mono">${data.value.toLocaleString()}</p>
+                            <p className="text-xs font-medium">{data.name}</p>
+                            <p className="text-xs font-mono">${data.value.toLocaleString()}</p>
                           </div>
                         );
                       }}
@@ -390,8 +387,8 @@ export default function DashboardPage() {
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              {/* Legend - compact */}
-              <div className="flex-1 space-y-1 max-h-[140px] overflow-y-auto">
+              <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+                <div className="space-y-1.5 md:space-y-2">
                 {categoryData.map((cat, index) => (
                   <motion.div
                     key={cat.name}
@@ -401,64 +398,65 @@ export default function DashboardPage() {
                     transition={{ delay: 0.3 + index * 0.03 }}
                   >
                     <div className="flex items-center gap-1.5">
-                      <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: cat.color }} />
-                      <span className="text-[10px] text-foreground-muted truncate max-w-[80px]">{cat.name}</span>
+                      <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: cat.color }} />
+                      <span className="text-[10px] md:text-xs text-foreground-muted truncate max-w-[140px] md:max-w-[180px]">{cat.name}</span>
                     </div>
-                    <span className="text-[10px] font-mono font-medium">${cat.value.toLocaleString()}</span>
+                    <span className="text-[10px] md:text-xs font-mono font-medium">${cat.value.toLocaleString()}</span>
                   </motion.div>
                 ))}
+                </div>
               </div>
             </div>
           </GlassCard>
 
           {/* Recent Transactions */}
-          <GlassCard delay={250} className="p-4">
-            <div className="flex items-center justify-between mb-2">
+          <GlassCard delay={250} className="p-3 md:p-6 h-full flex flex-col min-h-0">
+            <div className="flex items-center justify-between mb-2 md:mb-3">
               <div>
-                <h2 className="text-sm font-semibold">Recent Transactions</h2>
-                <p className="text-[10px] text-foreground-muted">{transactions.length} transactions</p>
+                <h2 className="text-sm md:text-base font-semibold">Recent Transactions</h2>
+                <p className="text-[10px] md:text-xs text-foreground-muted mt-0.5">{transactions.length} transactions</p>
               </div>
               <button
-                className="text-[10px] font-medium text-primary hover:text-primary/80 transition-colors cursor-pointer flex items-center gap-0.5"
+                className="text-[10px] md:text-xs font-medium text-primary hover:text-primary/80 transition-colors cursor-pointer flex items-center gap-1"
                 onClick={() => router.push('/receipts')}
               >
                 View all
-                <ArrowUpRight className="w-2.5 h-2.5" />
+                <ArrowUpRight className="w-3 h-3" />
               </button>
             </div>
-            <div className="space-y-0.5 max-h-[180px] overflow-y-auto">
-              {transactions.slice(0, 5).map((tx, index) => (
+            <div className="flex-1 min-h-0 overflow-y-auto space-y-1 pr-1">
+              {transactions.slice(0, 6).map((tx, index) => (
                 <motion.div
                   key={tx.id}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.3 + index * 0.03 }}
-                  className="flex items-center justify-between py-1.5 px-1.5 rounded-md hover:bg-secondary/50 transition-colors cursor-pointer group"
+                  className="flex items-center justify-between py-2 px-2 rounded-md hover:bg-secondary/50 transition-colors cursor-pointer group"
                   onClick={() => setSelectedTransaction(tx)}
                 >
                   <div className="flex items-center gap-2">
-                    <div className={`w-6 h-6 rounded-md flex items-center justify-center ${
+                    <div className={`w-8 h-8 rounded-md flex items-center justify-center ${
                       tx.amount > 0 ? "bg-success/20" : "bg-secondary"
                     }`}>
                       {tx.amount > 0 ? (
-                        <TrendingUp className="w-3 h-3 text-success" />
+                        <TrendingUp className="w-4 h-4 text-success" />
                       ) : (
-                        <TrendingDown className="w-3 h-3 text-foreground-muted" />
+                        <TrendingDown className="w-4 h-4 text-foreground-muted" />
                       )}
                     </div>
                     <div>
-                      <p className="text-xs font-medium truncate max-w-[120px]">{tx.description}</p>
-                      <p className="text-[9px] text-foreground-muted">{tx.category}</p>
+                      <p className="text-xs md:text-sm font-medium truncate max-w-[180px] md:max-w-[260px]">{tx.description}</p>
+                      <p className="text-[10px] md:text-xs text-foreground-muted">{tx.category}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
                     <div className="text-right">
-                      <p className={`text-xs font-mono font-medium ${tx.amount > 0 ? "text-success" : ""}`}>
+                      <p className={`text-xs md:text-sm font-mono font-medium ${tx.amount > 0 ? "text-success" : ""}`}>
                         {tx.amount > 0 ? "+" : ""}${Math.abs(tx.amount).toLocaleString()}
                       </p>
-                      <p className="text-[9px] text-foreground-muted">{tx.date}</p>
+                      <p className="text-[10px] md:text-xs text-foreground-muted">{tx.date}</p>
                     </div>
-                    <ChevronRight className="w-3 h-3 text-foreground-muted opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <ChevronRight className="w-4 h-4 text-foreground-muted opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                 </motion.div>
               ))}

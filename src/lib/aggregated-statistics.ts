@@ -63,7 +63,7 @@ async function calculatePeriodStats(
 }> {
     // Get transactions for period
     const { data: transactions } = await supabaseAdmin
-        .from('transactions')
+        .from('financial_transactions')
         .select('amount, category')
         .eq('uuid_user_id', userId)
         .gte('date', periodStart)

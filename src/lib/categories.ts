@@ -6,16 +6,19 @@
 
 // Standard categories used throughout the application
 // These must match the categories in fake-transaction-generator.ts and actual transaction data
+// Master categories (single source of truth).
+// Keep this list in sync with the `public.categories` seed and any UI color/icon maps.
 export const STANDARD_CATEGORIES = [
-    'Food & Drink',
-    'Transportation',
-    'Shopping',
-    'Entertainment',
     'Bills & Utilities',
+    'Education',
+    'Entertainment',
+    'Food & Drink',
     'Health & Fitness',
-    'Travel',
     'Personal Care',
-    'Education'
+    'Shopping',
+    'Transportation',
+    'Travel',
+    'Other',
 ] as const;
 
 export type Category = typeof STANDARD_CATEGORIES[number];
@@ -42,4 +45,25 @@ export function getTopCategories(
  */
 export function isOtherCategory(category: string, topCategories: string[]): boolean {
     return !topCategories.includes(category);
+}
+
+export function isStandardCategory(value: string): value is Category {
+    return (STANDARD_CATEGORIES as readonly string[]).includes(value);
+}
+
+// For legacy receipt item categories and other older values.
+export function normalizeCategory(value: unknown): Category {
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (isStandardCategory(trimmed)) return trimmed;
+
+        // Legacy receipt categories -> master list
+        const lower = trimmed.toLowerCase();
+        if (lower === 'groceries' || lower === 'dining') return 'Food & Drink';
+        if (lower === 'transport') return 'Transportation';
+        if (lower === 'household') return 'Bills & Utilities';
+        if (lower === 'health') return 'Health & Fitness';
+        if (lower === 'tech') return 'Shopping';
+    }
+    return 'Other';
 }

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@repo/core';
 import { getUserIdFromRequest } from '@/lib/auth';
+import { normalizeCategory } from '@/lib/categories';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 type CorrectedJson = {
     merchant?: unknown;
@@ -8,6 +10,7 @@ type CorrectedJson = {
     total?: unknown;
     subtotal?: unknown;
     tax?: unknown;
+    address?: unknown;
     [key: string]: unknown;
 };
 
@@ -58,6 +61,28 @@ function bboxOrNull(value: unknown): [number, number, number, number] | null {
     return bbox.every((n) => Number.isFinite(n)) ? bbox : null;
 }
 
+async function geocodeNominatim(query: string): Promise<{ lat: number; lng: number } | null> {
+    const q = query.trim();
+    if (!q) return null;
+
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`;
+    const res = await fetch(url, {
+        headers: {
+            'User-Agent': 'LoggerBoggers/1.0 (receipt confirm geocoding)',
+            'Accept': 'application/json',
+        },
+        cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    const data: any = await res.json();
+    const first = Array.isArray(data) ? data[0] : null;
+    if (!first?.lat || !first?.lon) return null;
+    const lat = Number(first.lat);
+    const lng = Number(first.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return { lat, lng };
+}
+
 export async function POST(
     req: Request,
     { params }: { params: Promise<{ id: string }> }
@@ -82,6 +107,43 @@ export async function POST(
         const corrected_json = body?.corrected_json ?? {};
         const corrected = (typeof corrected_json === 'object' && corrected_json !== null ? corrected_json : {}) as CorrectedJson;
         const items = body?.items;
+        const txDate = asISODateStringOrNull(corrected.date) ?? new Date().toISOString().slice(0, 10);
+        const merchantName = asNonEmptyString(corrected.merchant) ?? 'Receipt';
+        const totalAmount = asNumberOrNull(corrected.total);
+        const correctedAddress = asNonEmptyString(corrected.address);
+        const dominantCategory = Array.isArray(items)
+            ? (() => {
+                const sums = new Map<string, number>();
+                for (const it of items as IncomingItem[]) {
+                    const rawCat = (it?.category ?? '') as unknown;
+                    const cat = normalizeCategory(rawCat);
+                    const qty = asNumberOrNull(it?.quantity) ?? 0;
+                    const unit = asNumberOrNull(it?.unitPrice) ?? 0;
+                    const line = qty * unit;
+                    if (!Number.isFinite(line) || line <= 0) continue;
+                    sums.set(cat, (sums.get(cat) ?? 0) + line);
+                }
+                const best = Array.from(sums.entries()).sort((a, b) => b[1] - a[1])[0]?.[0];
+                return best ?? 'Other';
+            })()
+            : 'Other';
+
+        // Try to capture a merchant address/location for the globe feature.
+        // Prefer explicit correction, otherwise pull from latest extraction JSON.
+        let extractedAddress: string | null = null;
+        if (!correctedAddress) {
+            const { data: ext } = await supabase
+                .from('receipt_extractions')
+                .select('extracted_json')
+                .eq('receipt_id', id)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            const v = (ext as any)?.extracted_json?.extractions?.address?.value;
+            extractedAddress = asNonEmptyString(v);
+        }
+        const bestAddress = correctedAddress ?? extractedAddress;
 
         // 1. Store the corrections
         const { error: corError } = await supabase
@@ -135,57 +197,73 @@ export async function POST(
             .from('receipts')
             .update({
                 status: 'confirmed',
-                merchant_name: asNonEmptyString(corrected.merchant),
-                transaction_date: asNonEmptyString(corrected.date),
-                total_amount: asNumberOrNull(corrected.total),
+                merchant_name: merchantName,
+                transaction_date: txDate,
+                total_amount: totalAmount,
                 subtotal_amount: asNumberOrNull(corrected.subtotal),
                 tax_amount: asNumberOrNull(corrected.tax),
             })
             .eq('id', id)
             .eq('user_id', userId);
 
-        // 3. Create Transaction
-        const { data: category } = await supabase.from('categories').select('id').eq('name', 'Other').single();
-
-        const { data: tx, error: txError } = await supabase.from('transactions').insert({
-            user_id: userId,
-            receipt_id: id,
-            merchant_name: asNonEmptyString(corrected.merchant),
-            amount: asNumberOrNull(corrected.total),
-            transaction_date: asNonEmptyString(corrected.date),
-            category_id: category?.id,
-            notes: 'Confirmed via receipt scanning'
-        }).select().single();
-
-        if (txError) throw txError;
-
-        // Also store into the canonical financial transactions table used by the dashboard/graph.
-        // This is MVP glue while receipts have their own transaction linkage.
-        await supabase.from('financial_transactions').insert({
+        // 3. Create canonical transaction row (source of truth for the dashboard + graph).
+        const { data: ftx, error: ftxError } = await supabase
+            .from('financial_transactions')
+            .insert({
             user_id: userId,
             uuid_user_id: userId,
-            amount: asNumberOrNull(corrected.total),
-            category: 'Other',
-            name: asNonEmptyString(corrected.merchant) ?? 'Receipt',
-            merchant_name: asNonEmptyString(corrected.merchant),
-            date: asISODateStringOrNull(corrected.date),
+            amount: totalAmount ?? 0,
+            category: dominantCategory,
+            name: merchantName,
+            merchant_name: merchantName,
+            date: txDate,
+            location: bestAddress ?? null,
             source: 'receipt_scan',
             pending: false,
             tax: asNumberOrNull(corrected.tax),
-        });
+            })
+            .select('id')
+            .single();
+
+        if (ftxError) throw ftxError;
+
+        // Best-effort cache a globe point immediately if we have an address.
+        // This avoids waiting for the locations API to backfill.
+        if (bestAddress) {
+            try {
+                const geo = await geocodeNominatim(bestAddress);
+                if (geo) {
+                    await supabaseAdmin.from('purchase_locations').insert({
+                        user_id: userId,
+                        transaction_id: ftx?.id ?? null,
+                        address: bestAddress,
+                        merchant_name: merchantName,
+                        latitude: geo.lat,
+                        longitude: geo.lng,
+                        amount: totalAmount ?? 0,
+                        category: dominantCategory,
+                        date: txDate,
+                        source: 'receipt_scan',
+                    });
+                }
+            } catch (e) {
+                // Ignore: globe caching is non-critical.
+                console.error('Error caching purchase_location from receipt confirm:', e);
+            }
+        }
 
         // 4. Create Graph Edge (Expert requirement)
         // Edge from a generic 'Wallet' account to an 'Expense' bucket
         await supabase.from('graph_edges').insert({
             user_id: userId,
             source_node: 'Wallet',
-            target_node: asNonEmptyString(corrected.merchant),
+            target_node: merchantName,
             edge_type: 'expense',
-            amount: asNumberOrNull(corrected.total),
+            amount: totalAmount,
             metadata: {
                 receipt_id: id,
-                transaction_id: tx.id,
-                category: 'Other'
+                financial_transaction_id: ftx?.id,
+                category: dominantCategory
             }
         });
 

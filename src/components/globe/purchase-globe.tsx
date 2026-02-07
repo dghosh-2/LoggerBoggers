@@ -94,17 +94,20 @@ export function PurchaseGlobe({ locations, isLoading }: PurchaseGlobeProps) {
   const arcsData = useMemo(() => {
     if (locations.length < 2) return [];
 
+    // Arcs are much heavier than points; cap for performance (especially for "All Time").
+    const ARC_MAX_POINTS = 250;
     const sortedLocs = [...locations].sort((a, b) =>
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
+    const cappedLocs = sortedLocs.slice(Math.max(0, sortedLocs.length - ARC_MAX_POINTS));
 
     const arcs = [];
-    for (let i = 0; i < sortedLocs.length - 1; i++) {
+    for (let i = 0; i < cappedLocs.length - 1; i++) {
       arcs.push({
-        startLat: sortedLocs[i].lat,
-        startLng: sortedLocs[i].lng,
-        endLat: sortedLocs[i + 1].lat,
-        endLng: sortedLocs[i + 1].lng,
+        startLat: cappedLocs[i].lat,
+        startLng: cappedLocs[i].lng,
+        endLat: cappedLocs[i + 1].lat,
+        endLng: cappedLocs[i + 1].lng,
         color: ['rgba(200, 30, 60, 0.6)', 'rgba(200, 30, 60, 0.1)'],
       });
     }
@@ -202,6 +205,7 @@ function getCategoryColor(category: string): string {
     'Food': '#F97316',
     'Restaurants': '#F97316',
     'Groceries': '#F97316',
+    'Food & Drink': '#F97316',
     'Shopping': '#8B5CF6',
     'Retail': '#8B5CF6',
     'Transport': '#3B82F6',
@@ -209,6 +213,10 @@ function getCategoryColor(category: string): string {
     'Travel': '#3B82F6',
     'Entertainment': '#EC4899',
     'Recreation': '#EC4899',
+    'Bills & Utilities': '#10B981',
+    'Health & Fitness': '#22C55E',
+    'Personal Care': '#F59E0B',
+    'Education': '#06B6D4',
   };
   return colors[category] || '#6B7280';
 }

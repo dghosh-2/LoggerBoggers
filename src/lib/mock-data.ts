@@ -11,18 +11,18 @@ const generateTransactions = () => {
 
     // 1. Recurring Monthly Bills (Fixed dates)
     const recurring = [
-        { cat: 'Rent', merchant: 'Landlord', amount: 2450, day: 1, variance: 0 },
-        { cat: 'Subscriptions', merchant: 'Netflix', amount: 15.99, day: 15, variance: 0 },
-        { cat: 'Bills', merchant: 'Comcast Internet', amount: 79.99, day: 20, variance: 0 },
-        { cat: 'Bills', merchant: 'Verizon Phone', amount: 45.00, day: 25, variance: 5 }, // slight variance
+        { cat: 'Bills & Utilities', merchant: 'Landlord', amount: 2450, day: 1, variance: 0 },
+        { cat: 'Bills & Utilities', merchant: 'Netflix', amount: 15.99, day: 15, variance: 0 },
+        { cat: 'Bills & Utilities', merchant: 'Comcast Internet', amount: 79.99, day: 20, variance: 0 },
+        { cat: 'Bills & Utilities', merchant: 'Verizon Phone', amount: 45.00, day: 25, variance: 5 }, // slight variance
     ];
 
     // 2. Weekly/Frequent Habits (Random days in week)
     const habits = [
-        { cat: 'Groceries', min: 80, max: 200, freq: 0.2 }, // 20% daily chance
-        { cat: 'Food', min: 15, max: 60, freq: 0.4 }, // 40% daily chance
-        { cat: 'Coffee', min: 5, max: 12, freq: 0.6 },
-        { cat: 'Transport', min: 20, max: 50, freq: 0.3 },
+        { cat: 'Food & Drink', min: 80, max: 200, freq: 0.2 }, // 20% daily chance
+        { cat: 'Food & Drink', min: 15, max: 60, freq: 0.4 }, // 40% daily chance
+        { cat: 'Food & Drink', min: 5, max: 12, freq: 0.6 },
+        { cat: 'Transportation', min: 20, max: 50, freq: 0.3 },
     ];
 
     // 3. One-off Events / Anomalies (Hardcoded for detection)
@@ -56,7 +56,7 @@ const generateTransactions = () => {
             // Holiday Multiplier (Nov/Dec)
             let multiplier = 1;
             const month = d.getMonth(); // 0-11
-            if ((month === 10 || month === 11) && ['Shopping', 'Food', 'Groceries'].includes(h.cat)) {
+            if ((month === 10 || month === 11) && ['Shopping', 'Food & Drink'].includes(h.cat)) {
                 multiplier = 1.5 + Math.random(); // 1.5x to 2.5x normal spend
             }
 
@@ -122,12 +122,12 @@ export const INITIAL_NODES = [
     },
 
     // Level 3: Expenses (Categories)
-    { id: '4', type: 'custom', position: { x: 0, y: 400 }, data: { label: 'Rent', amount: '-$2,450', type: 'expense', icon: 'Home' } },
-    { id: '5', type: 'custom', position: { x: 150, y: 400 }, data: { label: 'Groceries', amount: '-$620', type: 'expense', icon: 'ShoppingCart' } },
-    { id: '6', type: 'custom', position: { x: 300, y: 400 }, data: { label: 'Food & Dining', amount: '-$450', type: 'expense', icon: 'Utensils' } },
-    { id: '7', type: 'custom', position: { x: 450, y: 400 }, data: { label: 'Subscriptions', amount: '-$120', type: 'expense', icon: 'Repeat' } },
+    { id: '4', type: 'custom', position: { x: 0, y: 400 }, data: { label: 'Bills & Utilities', amount: '-$2,450', type: 'expense', icon: 'Zap' } },
+    { id: '5', type: 'custom', position: { x: 150, y: 400 }, data: { label: 'Food & Drink', amount: '-$620', type: 'expense', icon: 'Utensils' } },
+    { id: '6', type: 'custom', position: { x: 300, y: 400 }, data: { label: 'Transportation', amount: '-$450', type: 'expense', icon: 'Car' } },
+    { id: '7', type: 'custom', position: { x: 450, y: 400 }, data: { label: 'Entertainment', amount: '-$120', type: 'expense', icon: 'Tv' } },
     { id: '8', type: 'custom', position: { x: 600, y: 400 }, data: { label: 'Shopping', amount: '-$340', type: 'expense', icon: 'ShoppingBag' } },
-    { id: '9', type: 'custom', position: { x: 750, y: 400 }, data: { label: 'Bills', amount: '-$280', type: 'expense', icon: 'Zap' } },
+    { id: '9', type: 'custom', position: { x: 750, y: 400 }, data: { label: 'Other', amount: '-$280', type: 'expense', icon: 'MoreHorizontal' } },
 ];
 
 export const INITIAL_EDGES = [
@@ -163,7 +163,7 @@ export interface InsightItem {
 export const MOCK_INSIGHTS: InsightItem[] = [
     {
         id: 'i1',
-        title: 'Groceries +18% MoM',
+        title: 'Food & Drink +18% MoM',
         drivers: ['Whole Foods (+$120)', 'Trader Joes (+$45)'],
         confidence: 'High',
         severity: 'warning',
@@ -219,10 +219,10 @@ export const MOCK_BURN_RATE = [
 ];
 
 export const MOCK_TREEMAP_DATA = [
-    { name: 'Rent', size: 2450, fill: '#22c55e' },
-    { name: 'Groceries', size: 620, fill: '#16a34a' },
-    { name: 'Food', size: 450, fill: '#15803d' },
-    { name: 'Shop', size: 340, fill: '#166534' },
-    { name: 'Bills', size: 280, fill: '#14532d' },
-    { name: 'Subs', size: 120, fill: '#3f3f46' },
+    { name: 'Bills & Utilities', size: 2450, fill: '#22c55e' },
+    { name: 'Food & Drink', size: 620, fill: '#16a34a' },
+    { name: 'Transportation', size: 450, fill: '#15803d' },
+    { name: 'Shopping', size: 340, fill: '#166534' },
+    { name: 'Other', size: 280, fill: '#14532d' },
+    { name: 'Entertainment', size: 120, fill: '#3f3f46' },
 ];
