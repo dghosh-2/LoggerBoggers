@@ -55,6 +55,7 @@ import {
   type PlaidLoan,
   type FinancialSummary
 } from "@/lib/plaid";
+import { PlaidLinkButton } from "@/components/PlaidLink";
 
 const portfolioHistory = [
   { date: "Jan", value: 95000 },
@@ -154,7 +155,70 @@ export default function PortfolioPage() {
 
   useEffect(() => {
     loadData();
+    fetchRealAccounts();
   }, []);
+
+  // Fetch real accounts from Plaid API
+  const fetchRealAccounts = async () => {
+    try {
+      const response = await fetch('/api/plaid/accounts');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.institutions && data.institutions.length > 0) {
+          // Merge real Plaid accounts with fake data
+          const realInstitutions: PlaidInstitution[] = data.institutions.map((inst: any) => ({
+            id: inst.itemId || inst.id,
+            name: inst.name,
+            logo: inst.logo,
+            primaryColor: inst.primaryColor,
+            lastSync: inst.lastSync || 'Just now',
+            status: inst.status || 'connected',
+            accounts: inst.accounts.map((acc: any) => ({
+              id: acc.id,
+              name: acc.name,
+              officialName: acc.officialName,
+              type: acc.type,
+              subtype: acc.subtype,
+              institution: inst.name,
+              institutionId: inst.id,
+              mask: acc.mask || '****',
+              currentBalance: acc.currentBalance || 0,
+              availableBalance: acc.availableBalance,
+              limit: acc.limit,
+              isoCurrencyCode: acc.isoCurrencyCode || 'USD',
+              lastUpdated: new Date().toISOString(),
+              status: 'connected',
+            })),
+          }));
+          
+          // Add real institutions to the list (avoiding duplicates)
+          setInstitutions(prev => {
+            const existingIds = new Set(prev.map(i => i.id));
+            const newInstitutions = realInstitutions.filter(i => !existingIds.has(i.id));
+            return [...prev, ...newInstitutions];
+          });
+
+          // Update bank accounts
+          const realBankAccounts = data.accounts.filter((acc: any) => acc.type === 'depository');
+          setBankAccounts(prev => {
+            const existingIds = new Set(prev.map(a => a.id));
+            const newAccounts = realBankAccounts.filter((a: any) => !existingIds.has(a.id));
+            return [...prev, ...newAccounts];
+          });
+
+          // Update investment accounts
+          const realInvestmentAccounts = data.accounts.filter((acc: any) => acc.type === 'investment');
+          setInvestmentAccounts(prev => {
+            const existingIds = new Set(prev.map(a => a.id));
+            const newAccounts = realInvestmentAccounts.filter((a: any) => !existingIds.has(a.id));
+            return [...prev, ...newAccounts];
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching real accounts:', error);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -270,10 +334,13 @@ export default function PortfolioPage() {
                 <RefreshCw className={`w-3.5 h-3.5 ${syncingInstitutions.size > 0 ? "animate-spin" : ""}`} />
                 Sync All
               </GlassButton>
-              <GlassButton variant="primary" size="sm" onClick={() => setShowAddAccount(true)}>
-                <Plus className="w-3.5 h-3.5" />
-                Add Account
-              </GlassButton>
+              <PlaidLinkButton 
+                onSuccess={() => {
+                  loadData();
+                  fetchRealAccounts();
+                }}
+                buttonText="Add Account"
+              />
             </div>
           </div>
 
@@ -844,20 +911,24 @@ export default function PortfolioPage() {
             </p>
           </div>
 
-          <div>
-            <h4 className="text-xs font-medium mb-2.5">Popular Institutions</h4>
-            <div className="grid grid-cols-2 gap-2">
-              {popularBanks.map((bank) => (
-                <button
-                  key={bank.id}
-                  onClick={() => handleBankConnect(bank.name)}
-                  className="flex items-center gap-2.5 p-2.5 rounded-lg bg-secondary hover:bg-background-tertiary transition-colors duration-150 text-left cursor-pointer"
-                >
-                  <Image src={bank.image} alt={bank.name} width={32} height={32} className="rounded-md object-contain shrink-0" />
-                  <span className="font-medium text-xs">{bank.name}</span>
-                </button>
-              ))}
+          <div className="flex flex-col items-center gap-4 py-4">
+            <div className="text-center">
+              <h4 className="text-sm font-medium mb-1">Connect Your Accounts</h4>
+              <p className="text-xs text-foreground-muted">
+                Click below to securely link your bank, investment, or loan accounts
+              </p>
             </div>
+            
+            <PlaidLinkButton 
+              onSuccess={() => {
+                setShowAddAccount(false);
+                loadData();
+                fetchRealAccounts();
+              }}
+              onExit={() => {}}
+              buttonText="Connect with Plaid"
+              buttonSize="md"
+            />
           </div>
 
           <div className="relative">
@@ -865,21 +936,20 @@ export default function PortfolioPage() {
               <div className="w-full border-t border-border" />
             </div>
             <div className="relative flex justify-center text-[10px] uppercase tracking-wider">
-              <span className="bg-card px-2 text-foreground-muted">or search</span>
+              <span className="bg-card px-2 text-foreground-muted">supported institutions</span>
             </div>
           </div>
 
-          <div>
-            <input
-              type="text"
-              placeholder="Search for your institution..."
-              className="w-full px-3.5 py-2.5 rounded-lg bg-secondary border border-border focus:border-primary focus:outline-none transition-colors text-sm"
-              onChange={(e) => {
-                if (e.target.value.length > 2) {
-                  toast.info(`Searching for "${e.target.value}"...`);
-                }
-              }}
-            />
+          <div className="grid grid-cols-3 gap-2">
+            {popularBanks.map((bank) => (
+              <div
+                key={bank.id}
+                className="flex items-center gap-2 p-2 rounded-lg bg-secondary/50"
+              >
+                <Image src={bank.image} alt={bank.name} width={24} height={24} className="rounded-md object-contain shrink-0" />
+                <span className="font-medium text-[10px] truncate">{bank.name}</span>
+              </div>
+            ))}
           </div>
 
           <p className="text-[10px] text-foreground-muted text-center">
