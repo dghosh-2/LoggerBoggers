@@ -241,11 +241,13 @@ export function AISidebar({
                 <Section id="summary" title="Summary" icon={Sparkles}>
                     {recommendations?.summary ? (
                         <p className="text-sm text-foreground-secondary leading-relaxed">
-                            {recommendations.summary}
+                            {recommendations.summary.length > 400 
+                                ? recommendations.summary.substring(0, 397) + '...'
+                                : recommendations.summary}
                         </p>
                     ) : (
                         <p className="text-sm text-foreground-secondary leading-relaxed">
-                            Analyzing {stocksData.map(s => s.symbol).join(', ')} performance.
+                            Analyzing {stocksData?.map(s => s.symbol).join(', ') || 'stocks'} performance.
                         </p>
                     )}
                     
@@ -301,8 +303,8 @@ export function AISidebar({
                             </p>
                         )}
 
-                        {/* AI Recommendations */}
-                        {recommendations?.insights?.slice(0, 2).map((insight: any, idx: number) => (
+                        {/* AI Recommendations - only show if no personalized insights */}
+                        {personalizedInsights.length === 0 && recommendations?.insights?.slice(0, 3).map((insight: any, idx: number) => (
                             <motion.div
                                 key={`rec-${idx}`}
                                 className="glass-insight flex items-start gap-2"
@@ -388,14 +390,6 @@ export function AISidebar({
                     </Section>
                 )}
 
-                {/* Recommendations Section */}
-                {recommendations?.riskAlignment && (
-                    <Section id="recommendations" title="Recommendations" icon={Shield}>
-                        <p className="text-xs text-foreground-muted leading-relaxed">
-                            {recommendations.riskAlignment}
-                        </p>
-                    </Section>
-                )}
             </div>
 
             {/* User Preference Badge */}
