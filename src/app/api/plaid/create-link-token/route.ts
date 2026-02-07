@@ -4,13 +4,14 @@ import { Products, CountryCode } from 'plaid';
 
 export async function POST(request: NextRequest) {
     try {
-        // Create a link token for the user
+        // Create a link token - bare minimum, only transactions
+        // No auth, identity, investments, liabilities, payment, transfer, wallet, phone, or email
         const response = await plaidClient.linkTokenCreate({
             user: {
-                client_user_id: 'user-' + Date.now(), // In production, use actual user ID
+                client_user_id: 'user-' + Date.now(),
             },
             client_name: "Scotty's Ledger",
-            products: [Products.Transactions, Products.Auth, Products.Investments, Products.Liabilities],
+            products: [Products.Transactions], // Only transactions - no verification needed
             country_codes: [CountryCode.Us],
             language: 'en',
         });
