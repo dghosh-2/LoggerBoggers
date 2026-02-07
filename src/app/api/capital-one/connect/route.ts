@@ -256,7 +256,7 @@ export async function POST(request: NextRequest) {
         const creditAccountId = accountsToStore[2].plaid_account_id;
         
         // Transform transactions to match actual database schema
-        // Actual schema: id, user_id, plaid_transaction_id, amount, category, name, date, account_id, source, merchant_name, pending, uuid_user_id, location
+        // Schema: user_id, uuid_user_id, date, category, name, merchant_name, amount, tip, tax, location, source, pending
         const allTransactionsWithUser = fakeTransactions.map((tx) => {
             return {
                 user_id: userId,
@@ -264,25 +264,28 @@ export async function POST(request: NextRequest) {
                 merchant_name: tx.merchant_name || tx.name,
                 name: tx.name || tx.merchant_name,
                 amount: tx.amount,
-                date: tx.date,           // Schema uses 'date' not 'transaction_date'
-                category: tx.category,   // Schema uses 'category' (text) not 'category_id'
+                date: tx.date,
+                category: tx.category || 'Other',
                 source: 'capital_one',
                 location: tx.location || null,
                 pending: false,
+                tip: tx.tip || null,
+                tax: tx.tax || null,
             };
         });
 
         // Transform income to match actual database schema
-        // Actual schema: id, user_id, amount, source, name, date, recurring, frequency, uuid_user_id, location
+        // Schema: user_id, uuid_user_id, amount, source, name, date, recurring, frequency, location
         const fakeIncomeWithUser = fakeIncome.map(inc => ({
             user_id: userId,
             uuid_user_id: userId,
             amount: inc.amount,
             source: inc.source || 'Salary',
-            name: inc.source || 'Salary',
+            name: inc.name || inc.source || 'Salary',
             date: inc.date,
-            recurring: true,
-            frequency: 'monthly',
+            recurring: inc.recurring ?? true,
+            frequency: inc.frequency || 'monthly',
+            location: inc.location || null,
         }));
 
         // Insert transactions in batches
@@ -290,19 +293,11 @@ export async function POST(request: NextRequest) {
         const BATCH_SIZE = 500;
         let insertedTx = 0;
         
-        // #region agent log
-        const sampleTx = allTransactionsWithUser[0];
-        fetch('http://127.0.0.1:7245/ingest/2d405ccf-cb3f-4611-bc27-f95a616c15c9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'capital-one/connect/route.ts:295',message:'Sample transaction object keys',data:{keys:Object.keys(sampleTx||{}),sample:sampleTx},timestamp:Date.now(),hypothesisId:'A,B'})}).catch(()=>{});
-        // #endregion
-        
         for (let i = 0; i < allTransactionsWithUser.length; i += BATCH_SIZE) {
             const batch = allTransactionsWithUser.slice(i, i + BATCH_SIZE);
             const { error: txError } = await supabaseAdmin.from('transactions').insert(batch);
             if (txError) {
-                console.error('Error inserting transactions batch:', txError);
-                // #region agent log
-                fetch('http://127.0.0.1:7245/ingest/2d405ccf-cb3f-4611-bc27-f95a616c15c9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'capital-one/connect/route.ts:305',message:'Transaction insert error details',data:{error:txError,batchIndex:i,firstItemKeys:Object.keys(batch[0]||{})},timestamp:Date.now(),hypothesisId:'A,B'})}).catch(()=>{});
-                // #endregion
+                console.error('Transaction insert error:', txError.message);
             } else {
                 insertedTx += batch.length;
             }
@@ -313,19 +308,11 @@ export async function POST(request: NextRequest) {
         console.log('=== CAPITAL ONE: INSERTING INCOME ===');
         let insertedIncome = 0;
         
-        // #region agent log
-        const sampleIncome = fakeIncomeWithUser[0];
-        fetch('http://127.0.0.1:7245/ingest/2d405ccf-cb3f-4611-bc27-f95a616c15c9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'capital-one/connect/route.ts:320',message:'Sample income object keys',data:{keys:Object.keys(sampleIncome||{}),sample:sampleIncome},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
-        
         for (let i = 0; i < fakeIncomeWithUser.length; i += BATCH_SIZE) {
             const batch = fakeIncomeWithUser.slice(i, i + BATCH_SIZE);
             const { error: incError } = await supabaseAdmin.from('income').insert(batch);
             if (incError) {
-                console.error('Error inserting income batch:', incError);
-                // #region agent log
-                fetch('http://127.0.0.1:7245/ingest/2d405ccf-cb3f-4611-bc27-f95a616c15c9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'capital-one/connect/route.ts:330',message:'Income insert error',data:{error:incError},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
-                // #endregion
+                console.error('Income insert error:', incError.message);
             } else {
                 insertedIncome += batch.length;
             }

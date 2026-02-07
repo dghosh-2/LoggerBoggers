@@ -226,22 +226,20 @@ export async function POST(request: NextRequest) {
             // Note: We'll skip Plaid sandbox transactions as they have unrealistic amounts ($500 for everything)
             // and use our generated data instead for a better demo experience
             const formattedPlaidTransactions = plaidTransactions.map(tx => {
-                const category = mapPlaidCategory(tx.category, tx.merchant_name || tx.name);
-                const isFoodRelated = category === 'Food & Drink';
+                const isFoodRelated = (tx.category?.[0] || '').toLowerCase().includes('food');
                 return {
                     user_id: userId,
                     uuid_user_id: userId,
                     plaid_transaction_id: tx.transaction_id,
-                    amount: Math.abs(tx.amount),
-                    category,
+                    merchant_name: tx.merchant_name || tx.name,
                     name: tx.name,
+                    amount: Math.abs(tx.amount),
+                    date: tx.date,
+                    category: tx.category?.[0] || 'Other',
+                    source: 'plaid',
+                    pending: tx.pending,
                     tip: isFoodRelated ? Math.round(Math.abs(tx.amount) * 0.15 * 100) / 100 : null,
                     tax: isFoodRelated ? Math.round(Math.abs(tx.amount) * 0.08 * 100) / 100 : null,
-                    date: tx.date,
-                    account_id: tx.account_id,
-                    source: 'plaid' as const,
-                    merchant_name: tx.merchant_name || tx.name,
-                    pending: tx.pending,
                 };
             });
 
@@ -264,7 +262,7 @@ export async function POST(request: NextRequest) {
             console.log('Cleared existing transactions and income');
 
             // Transform transactions to match actual database schema
-            // Actual schema: id, user_id, plaid_transaction_id, amount, category, name, date, account_id, source, merchant_name, pending, uuid_user_id, location
+            // Schema: user_id, uuid_user_id, date, category, name, merchant_name, amount, tip, tax, location, source, pending
             const allTransactionsWithUser = allTransactions.map(tx => {
                 return {
                     user_id: userId,
@@ -272,25 +270,28 @@ export async function POST(request: NextRequest) {
                     merchant_name: tx.merchant_name || tx.name,
                     name: tx.name || tx.merchant_name,
                     amount: tx.amount,
-                    date: tx.date,           // Schema uses 'date' not 'transaction_date'
-                    category: tx.category,   // Schema uses 'category' (text) not 'category_id'
+                    date: tx.date,
+                    category: tx.category || 'Other',
                     source: 'plaid',
                     location: tx.location || null,
                     pending: false,
+                    tip: tx.tip || null,
+                    tax: tx.tax || null,
                 };
             });
 
             // Transform income to match actual schema
-            // Actual schema: id, user_id, amount, source, name, date, recurring, frequency, uuid_user_id, location
+            // Schema: user_id, uuid_user_id, amount, source, name, date, recurring, frequency, location
             const fakeIncomeWithUser = fakeIncome.map(inc => ({
                 user_id: userId,
                 uuid_user_id: userId,
                 amount: inc.amount,
                 source: inc.source || 'Salary',
-                name: inc.source || 'Salary',
+                name: inc.name || inc.source || 'Salary',
                 date: inc.date,
-                recurring: true,
-                frequency: 'monthly',
+                recurring: inc.recurring ?? true,
+                frequency: inc.frequency || 'monthly',
+                location: inc.location || null,
             }));
 
             // Insert transactions in batches
@@ -331,7 +332,6 @@ export async function POST(request: NextRequest) {
             const holdingsWithUser = fakeHoldings.map(holding => ({
                 user_id: userId,
                 uuid_user_id: userId,
-                // Note: account_id column may not exist in holdings table
                 plaid_security_id: `sec_${holding.symbol.toLowerCase()}_${Date.now()}`,
                 symbol: holding.symbol,
                 name: holding.name,

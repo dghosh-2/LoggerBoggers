@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
         await supabaseAdmin.from('income').delete().eq('uuid_user_id', userId);
 
         // Transform transactions to match actual database schema
-        // Actual schema: id, user_id, plaid_transaction_id, amount, category, name, date, account_id, source, merchant_name, pending, uuid_user_id, location
+        // Schema: user_id, uuid_user_id, date, category, name, merchant_name, amount, tip, tax, location, source, pending
         const transformedTransactions = fakeTransactions.map(tx => {
             return {
                 user_id: userId,
@@ -41,11 +41,13 @@ export async function POST(request: NextRequest) {
                 merchant_name: tx.merchant_name || tx.name,
                 name: tx.name || tx.merchant_name,
                 amount: tx.amount,
-                date: tx.date,           // Schema uses 'date' not 'transaction_date'
-                category: tx.category,   // Schema uses 'category' (text) not 'category_id'
+                date: tx.date,
+                category: tx.category || 'Other',
                 source: 'regenerated',
                 location: tx.location || null,
                 pending: false,
+                tip: tx.tip || null,
+                tax: tx.tax || null,
             };
         });
 
@@ -63,7 +65,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Insert income - match actual schema
-        // Actual schema: id, user_id, amount, source, name, date, recurring, frequency, uuid_user_id, location
+        // Schema: user_id, uuid_user_id, amount, source, name, date, recurring, frequency, location
         let insertedIncome = 0;
         for (let i = 0; i < fakeIncome.length; i += BATCH_SIZE) {
             const batch = fakeIncome.slice(i, i + BATCH_SIZE).map(inc => ({
@@ -71,10 +73,11 @@ export async function POST(request: NextRequest) {
                 uuid_user_id: userId,
                 amount: inc.amount,
                 source: inc.source || 'Salary',
-                name: inc.source || 'Salary',
+                name: inc.name || inc.source || 'Salary',
                 date: inc.date,
-                recurring: true,
-                frequency: 'monthly',
+                recurring: inc.recurring ?? true,
+                frequency: inc.frequency || 'monthly',
+                location: inc.location || null,
             }));
             const { error } = await supabaseAdmin.from('income').insert(batch);
             if (error) {
