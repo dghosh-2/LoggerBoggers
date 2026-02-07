@@ -10,7 +10,6 @@ import {
     type NormalizedQuad,
     type NormalizedPoint,
 } from '@/lib/receiptAutoCrop';
-import { DogLoadingAnimation } from '@/components/ui/DogLoadingAnimation';
 import { PageTransition } from "@/components/layout/page-transition";
 import { GlassCard } from "@/components/ui/glass-card";
 import { GlassButton } from "@/components/ui/glass-button";
@@ -168,62 +167,6 @@ function orderNormalizedQuad(points: NormalizedPoint[]): NormalizedQuad {
 
 function clamp01(n: number) {
     return Math.max(0, Math.min(1, n));
-}
-
-function SkeletonLine({ className }: { className?: string }) {
-    return (
-        <div
-            className={cn(
-                "h-3 w-full rounded bg-foreground/10 dark:bg-foreground/15",
-                "animate-pulse-soft",
-                className
-            )}
-        />
-    );
-}
-
-function Stepper({ active }: { active: 1 | 2 | 3 }) {
-    const steps: Array<{ label: string }> = [
-        { label: "Upload" },
-        { label: "Extract" },
-        { label: "Review" },
-    ];
-
-    return (
-        <div className="mt-4 rounded-lg border border-border bg-background-secondary px-3 py-2">
-            <div className="flex items-center justify-between gap-3">
-                {steps.map((s, idx) => {
-                    const step = (idx + 1) as 1 | 2 | 3;
-                    const isActive = step === active;
-                    const isDone = step < active;
-                    return (
-                        <div key={s.label} className="flex items-center gap-2 min-w-0">
-                            <div
-                                className={cn(
-                                    "h-6 w-6 rounded-full border flex items-center justify-center text-[11px] font-semibold",
-                                    isDone && "border-success/30 bg-success-soft text-success",
-                                    isActive && "border-accent/30 bg-accent/10 text-foreground",
-                                    !isDone && !isActive && "border-border bg-background text-foreground-muted"
-                                )}
-                            >
-                                {isDone ? <CheckCircle2 className="h-4 w-4" /> : step}
-                            </div>
-                            <div className="min-w-0">
-                                <div
-                                    className={cn(
-                                        "text-[11px] font-semibold uppercase tracking-wide",
-                                        isActive ? "text-foreground" : "text-foreground-muted"
-                                    )}
-                                >
-                                    {s.label}
-                                </div>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
-    );
 }
 
 function AnimatedNumber({
@@ -830,37 +773,33 @@ export default function ReceiptReviewPage() {
                         </div>
                     </div>
 
-                    <Stepper active={waitingForResult || loading ? 2 : 3} />
-
                     {receiptDisplaySrc ? (
-                        <div className="mt-4 rounded-lg border border-border bg-background-secondary p-2">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                                src={receiptDisplaySrc}
-                                alt="Receipt preview"
-                                className="w-full max-h-64 object-contain rounded-md bg-background"
-                            />
+                        <div className="mt-5 rounded-lg border border-border bg-background-secondary p-2 overflow-hidden">
+                            <div className="relative rounded-md bg-background overflow-hidden">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                    src={receiptDisplaySrc}
+                                    alt="Receipt preview"
+                                    className="w-full max-h-72 object-contain"
+                                />
+                                <motion.div
+                                    className="pointer-events-none absolute left-0 right-0 top-0 h-14"
+                                    initial={{ y: 0 }}
+                                    animate={{ y: ["0%", "calc(100% - 3.5rem)"] }}
+                                    transition={{
+                                        duration: 2.0,
+                                        ease: "easeInOut",
+                                        repeat: Infinity,
+                                        repeatType: "mirror",
+                                    }}
+                                >
+                                    <div className="absolute inset-0 bg-gradient-to-b from-transparent via-emerald-400/15 to-transparent" />
+                                    <div className="absolute left-0 right-0 top-1/2 h-px bg-emerald-400 shadow-[0_0_18px_rgba(52,211,153,0.55)]" />
+                                </motion.div>
+                            </div>
                         </div>
                     ) : null}
 
-                    <div className="mt-5">
-                        <DogLoadingAnimation size="md" showMessage={false} className="opacity-90" />
-                        <div className="mt-3 flex items-center justify-between text-[11px] text-foreground-muted">
-                            <span className="animate-pulse-soft">Working…</span>
-                            <span>Keep this tab open</span>
-                        </div>
-                    </div>
-
-                    <div className="mt-5 rounded-lg border border-border bg-background-secondary p-3">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted">
-                            Preparing items
-                        </div>
-                        <div className="mt-3 space-y-2">
-                            <SkeletonLine className="w-2/3" />
-                            <SkeletonLine className="w-5/6" />
-                            <SkeletonLine className="w-3/5" />
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>

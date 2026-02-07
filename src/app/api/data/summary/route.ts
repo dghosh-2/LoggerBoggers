@@ -99,6 +99,48 @@ export async function GET(request: NextRequest) {
         totalAssets += holdingsValue;
         
         const netWorth = totalAssets - totalLiabilities;
+
+        // Persist snapshots only when the user has accounts/holdings (i.e. after connecting).
+        try {
+            if (accounts.length > 0 || holdings.length > 0) {
+                const asOfDate = new Date().toISOString().split('T')[0];
+                const monthStart = new Date();
+                monthStart.setDate(1);
+                const monthStartStr = monthStart.toISOString().split('T')[0];
+                await supabaseAdmin
+                    .from('net_worth_snapshots')
+                    .upsert(
+                        {
+                            uuid_user_id: userId,
+                            as_of_date: asOfDate,
+                            assets_accounts: Math.round((totalAssets - holdingsValue) * 100) / 100,
+                            holdings_value: Math.round(holdingsValue * 100) / 100,
+                            total_assets: Math.round(totalAssets * 100) / 100,
+                            liabilities: Math.round(totalLiabilities * 100) / 100,
+                            net_worth: Math.round(netWorth * 100) / 100,
+                        },
+                        { onConflict: 'uuid_user_id,as_of_date' }
+                    );
+
+                await supabaseAdmin
+                    .from('net_worth')
+                    .upsert(
+                        {
+                            uuid_user_id: userId,
+                            month: monthStartStr,
+                            as_of_date: asOfDate,
+                            assets_accounts: Math.round((totalAssets - holdingsValue) * 100) / 100,
+                            holdings_value: Math.round(holdingsValue * 100) / 100,
+                            total_assets: Math.round(totalAssets * 100) / 100,
+                            liabilities: Math.round(totalLiabilities * 100) / 100,
+                            net_worth: Math.round(netWorth * 100) / 100,
+                        },
+                        { onConflict: 'uuid_user_id,month' }
+                    );
+            }
+        } catch (e) {
+            console.warn('Failed to upsert net worth snapshot:', e);
+        }
         
         // Helper to get transaction date (schema uses 'date')
         const getTxDate = (tx: any) => tx.date;

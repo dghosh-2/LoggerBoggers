@@ -6,11 +6,14 @@ import { useBudgetStore } from '@/stores/budgetStore';
 import { PlaidGate } from '@/components/budget/PlaidGate';
 import { BudgetOverview } from '@/components/budget/BudgetOverview';
 import { SavingsGoalsGrid } from '@/components/budget/SavingsGoalsGrid';
-import { BudgetFlowChart } from '@/components/budget/BudgetFlowChart';
+import { CategoryBreakdown } from '@/components/budget/CategoryBreakdown';
+import { UpcomingEvents } from '@/components/budget/UpcomingEvents';
+import { BudgetInsights } from '@/components/budget/BudgetInsights';
+import { QuickInsights } from '@/components/budget/QuickInsights';
+import { TrendsAnalytics } from '@/components/budget/TrendsAnalytics';
 import { CreateGoalModal } from '@/components/budget/CreateGoalModal';
 import { AdjustBudgetModal } from '@/components/budget/AdjustBudgetModal';
 import { PageTransition } from '@/components/layout/page-transition';
-import { GlassCard } from '@/components/ui/glass-card';
 import { Loader2 } from 'lucide-react';
 
 export default function BudgetPage() {
@@ -28,74 +31,123 @@ function BudgetPageContent() {
         isLoading,
         isInitialized,
         initialize,
+        trendAnalytics,
     } = useBudgetStore();
 
     const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
     const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
 
+    // Initialize budget data on mount
     useEffect(() => {
         initialize();
     }, [initialize]);
 
+    // Show loading state
     if (isLoading && !isInitialized) {
         return (
-            <div className="space-y-6">
-                <div>
-                    <h1 className="text-xl md:text-2xl font-semibold tracking-tight">Budget</h1>
-                    <p className="text-foreground-muted text-xs md:text-sm mt-0.5 md:mt-1">Loading your budget...</p>
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="text-center">
+                    <Loader2 className="w-8 h-8 animate-spin text-emerald-400 mx-auto mb-3" />
+                    <p className="text-gray-400">Loading your budget...</p>
                 </div>
-                <GlassCard className="py-14">
-                    <div className="text-center">
-                        <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-3" />
-                        <p className="text-foreground-muted">One moment</p>
-                    </div>
-                </GlassCard>
             </div>
         );
     }
 
     return (
         <>
+            {/* Create Goal Modal */}
             <CreateGoalModal
                 isOpen={isGoalModalOpen}
                 onClose={() => setIsGoalModalOpen(false)}
             />
 
+            {/* Adjust Budget Modal */}
             <AdjustBudgetModal
                 isOpen={isAdjustModalOpen}
                 onClose={() => setIsAdjustModalOpen(false)}
             />
 
-            <div className="flex flex-col gap-6 md:gap-8 pb-12">
-                <div>
-                    <h1 className="text-xl md:text-2xl font-semibold tracking-tight">Budget</h1>
-                    <p className="text-foreground-muted text-xs md:text-sm mt-0.5 md:mt-1">
-                        Simple overview of your money this month
+            {/* Main Content */}
+            <div className="min-h-screen pb-20">
+                {/* Header */}
+                <motion.div
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="pt-6 pb-8 px-4 md:px-6"
+                >
+                    <h1 className="text-3xl font-bold text-white mb-2">Budget</h1>
+                    <p className="text-gray-400">
+                        Your AI-powered financial autopilot
                     </p>
-                </div>
+                </motion.div>
 
-                <div className="space-y-8">
+                {/* Sections */}
+                <div className="px-4 md:px-6 space-y-8">
+                    {/* Section 1: Overview */}
                     <motion.div
-                        initial={{ opacity: 0, y: 12 }}
+                        initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.1 }}
                     >
-                        <BudgetOverview onOpenAdjust={() => setIsAdjustModalOpen(true)} />
+                        <BudgetOverview />
                     </motion.div>
 
+                    {/* Section 1.5: Quick Insights (compact actionable cards) */}
                     <motion.div
-                        initial={{ opacity: 0, y: 12 }}
+                        initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.05 }}
+                        transition={{ delay: 0.15 }}
+                    >
+                        <QuickInsights maxItems={3} />
+                    </motion.div>
+
+                    {/* Section 2: Savings Goals */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 }}
                     >
                         <SavingsGoalsGrid onCreateGoal={() => setIsGoalModalOpen(true)} />
                     </motion.div>
 
+                    {/* Section 3: Category Breakdown */}
                     <motion.div
-                        initial={{ opacity: 0, y: 12 }}
+                        initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.15 }}
+                        transition={{ delay: 0.3 }}
                     >
-                        <BudgetFlowChart />
+                        <CategoryBreakdown onAdjustBudgets={() => setIsAdjustModalOpen(true)} />
+                    </motion.div>
+
+                    {/* Section 4: Upcoming Events */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.4 }}
+                    >
+                        <UpcomingEvents />
+                    </motion.div>
+
+                    {/* Section 5: AI Insights (full detail with reasoning) */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.5 }}
+                    >
+                        <BudgetInsights />
+                    </motion.div>
+
+                    {/* Section 6: Trends & Analytics (charts & data) */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.6 }}
+                    >
+                        <TrendsAnalytics
+                            analytics={trendAnalytics}
+                            onEditCategory={() => setIsAdjustModalOpen(true)}
+                        />
                     </motion.div>
                 </div>
             </div>

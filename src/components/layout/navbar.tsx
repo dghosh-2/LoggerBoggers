@@ -49,6 +49,37 @@ export function Navbar() {
     }
   }, [checkSession, isInitialized]);
 
+  // Prefetch primary routes so nav clicks feel instant (especially in dev where routes compile on-demand).
+  useEffect(() => {
+    let cancelled = false;
+
+    const prefetchAll = () => {
+      if (cancelled) return;
+      for (const item of navItems) {
+        try {
+          router.prefetch(item.href);
+        } catch {
+          // Ignore: prefetch is best-effort.
+        }
+      }
+    };
+
+    const w = globalThis as any;
+    if (typeof w.requestIdleCallback === "function") {
+      const id = w.requestIdleCallback(prefetchAll, { timeout: 1500 });
+      return () => {
+        cancelled = true;
+        if (typeof w.cancelIdleCallback === "function") w.cancelIdleCallback(id);
+      };
+    }
+
+    const t = setTimeout(prefetchAll, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [router]);
+
   // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -105,6 +136,7 @@ export function Navbar() {
               <motion.button
                 key={item.href}
                 onClick={() => handleNavClick(item.href)}
+                onMouseEnter={() => router.prefetch(item.href)}
                 initial={{ opacity: 0, x: -12 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.05, duration: 0.3 }}
@@ -220,6 +252,7 @@ export function Navbar() {
             <button
               key={item.href}
               onClick={() => handleNavClick(item.href)}
+              onMouseEnter={() => router.prefetch(item.href)}
               className={cn(
                 "flex flex-col items-center gap-0.5 py-1 px-2 cursor-pointer transition-colors",
                 isActive ? "text-foreground" : "text-foreground-muted"
@@ -232,6 +265,7 @@ export function Navbar() {
         })}
         <button
           onClick={() => handleNavClick("/portfolio")}
+          onMouseEnter={() => router.prefetch("/portfolio")}
           className={cn(
             "flex flex-col items-center gap-0.5 py-1 px-2 cursor-pointer transition-colors",
             pathname === "/portfolio" ? "text-foreground" : "text-foreground-muted"

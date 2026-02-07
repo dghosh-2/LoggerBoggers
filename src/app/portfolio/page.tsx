@@ -21,6 +21,7 @@ import {
   DollarSign,
   Percent,
   Calendar,
+  Sparkles,
   ArrowUpRight,
   Shield,
   Target,
@@ -133,7 +134,7 @@ export default function PortfolioPage() {
 
   // Fetch data on mount
   useEffect(() => {
-    fetchData(false, { silent: true });
+    fetchData();
   }, []);
 
   // Update stock prices periodically
@@ -289,6 +290,7 @@ export default function PortfolioPage() {
     toast.info(`Removed ${symbol} from portfolio`);
   };
 
+  const loading = isLoading;
   const totalStockValue = getTotalValue();
 
   // Combine all accounts for the balance bar
@@ -296,38 +298,7 @@ export default function PortfolioPage() {
     ...bankAccounts.map(a => ({ ...a, color: 'cash' })),
     ...investmentAccounts.map(a => ({ ...a, color: 'investment' })),
   ];
-
-  const accountBalanceGroups = Array.from(
-    allAccounts.reduce((map, account) => {
-      const name = account.institution || account.name || 'Account';
-      const key = name.toLowerCase();
-      const existing = map.get(key);
-      if (existing) {
-        existing.totalBalance += account.currentBalance;
-        existing.count += 1;
-      } else {
-        map.set(key, {
-          id: key,
-          name,
-          totalBalance: account.currentBalance,
-          count: 1,
-        });
-      }
-      return map;
-    }, new Map<string, { id: string; name: string; totalBalance: number; count: number }>())
-  ).sort((a, b) => b.totalBalance - a.totalBalance);
-
-  const totalAccountBalance = accountBalanceGroups.reduce((sum, g) => sum + g.totalBalance, 0);
-  const visibleAccountGroups = accountBalanceGroups.filter(g => g.totalBalance > 0);
-
-  const hasCachedData =
-    institutions.length > 0 ||
-    bankAccounts.length > 0 ||
-    investmentAccounts.length > 0 ||
-    loans.length > 0 ||
-    plaidHoldings.length > 0 ||
-    summary !== null;
-  const loading = isLoading && !hasCachedData;
+  const totalAccountBalance = allAccounts.reduce((sum, a) => sum + a.currentBalance, 0);
 
   // Deduplicate institutions by name
   const uniqueInstitutions = institutions.reduce((acc, inst) => {
@@ -387,7 +358,7 @@ export default function PortfolioPage() {
         {/* ═══════════════════════════════════════════════════════════════════
             SECTION 2: ACCOUNT BALANCE BAR (Flattened Pie Chart)
         ═══════════════════════════════════════════════════════════════════ */}
-        {visibleAccountGroups.length > 0 && totalAccountBalance > 0 && (
+        {allAccounts.length > 0 && (
           <GlassCard>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -401,23 +372,23 @@ export default function PortfolioPage() {
 
               {/* Horizontal Balance Bar */}
               <div className="h-8 rounded-lg overflow-hidden flex">
-                {visibleAccountGroups.map((group, index) => {
-                  const percentage = (group.totalBalance / totalAccountBalance) * 100;
+                {allAccounts.map((account, index) => {
+                  const percentage = (account.currentBalance / totalAccountBalance) * 100;
                   if (percentage < 0.5) return null; // Skip tiny amounts
                   
                   return (
                     <motion.div
-                      key={group.id}
+                      key={account.id}
                       initial={{ width: 0 }}
                       animate={{ width: `${percentage}%` }}
                       transition={{ duration: 0.5, delay: index * 0.05 }}
                       className="h-full relative group cursor-pointer"
                       style={{ backgroundColor: ACCOUNT_COLORS[index % ACCOUNT_COLORS.length] }}
-                      title={`${group.name}: $${group.totalBalance.toLocaleString()}`}
+                      title={`${account.name}: $${account.currentBalance.toLocaleString()}`}
                     >
                       {percentage > 8 && (
                         <span className="absolute inset-0 flex items-center justify-center text-white text-[10px] font-medium truncate px-1">
-                          {group.name.split(' ')[0]}
+                          {account.name.split(' ')[0]}
                         </span>
                       )}
                     </motion.div>
@@ -427,17 +398,15 @@ export default function PortfolioPage() {
 
               {/* Legend */}
               <div className="flex flex-wrap gap-3">
-                {visibleAccountGroups.map((group, index) => (
-                  <div key={group.id} className="flex items-center gap-1.5">
+                {allAccounts.map((account, index) => (
+                  <div key={account.id} className="flex items-center gap-1.5">
                     <div 
                       className="w-2.5 h-2.5 rounded-sm"
                       style={{ backgroundColor: ACCOUNT_COLORS[index % ACCOUNT_COLORS.length] }}
                     />
-                    <span className="text-[11px] text-foreground-muted">
-                      {group.name}{group.count > 1 ? ` (${group.count})` : ''}
-                    </span>
+                    <span className="text-[11px] text-foreground-muted">{account.name}</span>
                     <span className="text-[11px] font-medium tabular-nums">
-                      ${group.totalBalance.toLocaleString()}
+                      ${account.currentBalance.toLocaleString()}
                     </span>
                   </div>
                 ))}
@@ -488,40 +457,94 @@ export default function PortfolioPage() {
         <PortfolioChart data={summary?.netWorth ? generatePortfolioHistory(summary.netWorth) : []} />
 
         {/* ═══════════════════════════════════════════════════════════════════
-            SECTION 4: ACCOUNTS SUMMARY
+            SECTION 4: AI INSIGHT + ACCOUNTS SUMMARY
         ═══════════════════════════════════════════════════════════════════ */}
-        <GlassCard>
-          <div className="flex items-center gap-2 mb-3">
-            <Wallet className="w-4 h-4 text-success" />
-            <h3 className="text-sm font-semibold">Bank Accounts</h3>
-          </div>
-          <div className="space-y-2 max-h-[180px] overflow-y-auto">
-            {bankAccounts.length === 0 ? (
-              <p className="text-xs text-foreground-muted">No bank accounts connected</p>
-            ) : (
-              bankAccounts.map((account) => (
-                <div key={account.id} className="flex items-center justify-between py-1.5">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-md bg-success/10 flex items-center justify-center">
-                      {account.subtype === 'checking' ? (
-                        <Wallet className="w-3.5 h-3.5 text-success" />
-                      ) : (
-                        <PiggyBank className="w-3.5 h-3.5 text-success" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium">{account.name}</p>
-                      <p className="text-[10px] text-foreground-muted">{account.institution}</p>
-                    </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* AI Insight */}
+          <GlassCard>
+            <div className="flex items-start gap-2.5 mb-3">
+              <div className="p-1.5 rounded-md bg-secondary">
+                <Sparkles className="w-4 h-4 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold">AI Insight</h3>
+                <p className="text-[11px] text-foreground-muted">Portfolio analysis</p>
+              </div>
+            </div>
+
+            {summary && (summary.netWorth ?? 0) > 0 ? (
+              <>
+                <p className="text-xs text-foreground-muted leading-relaxed mb-4">
+                  {(summary.totalCash ?? 0) > 0 
+                    ? `You have $${summary.totalCash.toLocaleString()} in cash across ${summary.bankAccountsCount} account${summary.bankAccountsCount !== 1 ? 's' : ''}. `
+                    : ''}
+                  {(summary.totalInvestments ?? 0) > 0
+                    ? `Your investments total $${summary.totalInvestments.toLocaleString()}. `
+                    : ''}
+                  {(summary.totalLoans ?? 0) > 0
+                    ? `You have $${summary.totalLoans.toLocaleString()} in outstanding loans.`
+                    : 'You have no outstanding loans - great job!'}
+                  {totalStockValue > 0 && ` Your manual stock portfolio is worth $${totalStockValue.toLocaleString()}.`}
+                </p>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-foreground-muted">Risk Level</span>
+                    <span className={`font-medium ${(summary.totalLoans ?? 0) > (summary.totalCash ?? 0) ? 'text-destructive' : 'text-success'}`}>
+                      {(summary.totalLoans ?? 0) > (summary.totalCash ?? 0) ? 'High' : 'Low'}
+                    </span>
                   </div>
-                  <p className="text-xs font-semibold tabular-nums">
-                    ${account.currentBalance.toLocaleString()}
-                  </p>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-foreground-muted">Debt-to-Asset</span>
+                    <span className="font-medium tabular-nums">
+                      {(summary.totalCash ?? 0) + (summary.totalInvestments ?? 0) > 0
+                        ? `${(((summary.totalLoans ?? 0) / ((summary.totalCash ?? 0) + (summary.totalInvestments ?? 0))) * 100).toFixed(1)}%`
+                        : 'N/A'}
+                    </span>
+                  </div>
                 </div>
-              ))
+              </>
+            ) : (
+              <p className="text-xs text-foreground-muted">
+                Connect your accounts to see AI-powered insights.
+              </p>
             )}
-          </div>
-        </GlassCard>
+          </GlassCard>
+
+          {/* Bank Accounts Summary */}
+          <GlassCard>
+            <div className="flex items-center gap-2 mb-3">
+              <Wallet className="w-4 h-4 text-success" />
+              <h3 className="text-sm font-semibold">Bank Accounts</h3>
+            </div>
+            <div className="space-y-2 max-h-[180px] overflow-y-auto">
+              {bankAccounts.length === 0 ? (
+                <p className="text-xs text-foreground-muted">No bank accounts connected</p>
+              ) : (
+                bankAccounts.map((account) => (
+                  <div key={account.id} className="flex items-center justify-between py-1.5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-md bg-success/10 flex items-center justify-center">
+                        {account.subtype === 'checking' ? (
+                          <Wallet className="w-3.5 h-3.5 text-success" />
+                        ) : (
+                          <PiggyBank className="w-3.5 h-3.5 text-success" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium">{account.name}</p>
+                        <p className="text-[10px] text-foreground-muted">{account.institution}</p>
+                      </div>
+                    </div>
+                    <p className="text-xs font-semibold tabular-nums">
+                      ${account.currentBalance.toLocaleString()}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          </GlassCard>
+        </div>
 
         {/* ═══════════════════════════════════════════════════════════════════
             SECTION 5: LOANS

@@ -26,10 +26,10 @@ const QUICK_INSIGHT_ICONS: Record<InsightType, React.ReactNode> = {
 };
 
 const QUICK_INSIGHT_COLORS: Record<InsightType, { text: string; bg: string; border: string }> = {
-    optimization: { text: 'text-foreground', bg: 'bg-secondary', border: 'border-border' },
-    warning: { text: 'text-foreground', bg: 'bg-secondary', border: 'border-border' },
-    achievement: { text: 'text-foreground', bg: 'bg-secondary', border: 'border-border' },
-    pattern: { text: 'text-foreground', bg: 'bg-secondary', border: 'border-border' },
+    optimization: { text: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+    warning: { text: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
+    achievement: { text: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20' },
+    pattern: { text: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
 };
 
 interface QuickInsightsProps {
@@ -51,34 +51,28 @@ export function QuickInsights({ maxItems = 3 }: QuickInsightsProps) {
 
     return (
         <section className="space-y-3">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-xl font-semibold text-foreground">Actions</h2>
-                    <p className="text-xs text-foreground-muted">Quick fixes and wins</p>
-                </div>
-                <span className="text-xs text-foreground-muted">{totalActions} available</span>
-            </div>
-
-            <GlassCard className="p-3">
+            {/* Summary Bar */}
+            <GlassCard className="p-3 border border-emerald-500/10">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <div className="p-1.5 rounded-lg bg-secondary text-foreground">
-                            <Zap className="w-4 h-4" />
+                        <div className="p-1.5 rounded-lg bg-emerald-500/20">
+                            <Zap className="w-4 h-4 text-emerald-400" />
                         </div>
                         <div>
-                            <span className="text-sm font-medium text-foreground">
-                                {totalActions} action{totalActions !== 1 ? 's' : ''}
+                            <span className="text-sm font-medium text-white">
+                                {totalActions} action{totalActions !== 1 ? 's' : ''} available
                             </span>
-                            <span className="text-xs text-foreground-muted ml-2">
+                            <span className="text-xs text-gray-500 ml-2">
                                 {warningCount > 0 && `${warningCount} warning${warningCount !== 1 ? 's' : ''}`}
                                 {warningCount > 0 && achievementCount > 0 && ' · '}
-                                {achievementCount > 0 && `${achievementCount} win${achievementCount !== 1 ? 's' : ''}`}
+                                {achievementCount > 0 && `${achievementCount} achievement${achievementCount !== 1 ? 's' : ''}`}
                             </span>
                         </div>
                     </div>
                 </div>
             </GlassCard>
 
+            {/* Quick Action Cards */}
             <div className="space-y-2">
                 <AnimatePresence mode="popLayout">
                     {displayInsights.map((insight, index) => (
@@ -93,10 +87,11 @@ export function QuickInsights({ maxItems = 3 }: QuickInsightsProps) {
                 </AnimatePresence>
             </div>
 
+            {/* Show More / Less */}
             {actionableInsights.length > maxItems && (
                 <button
                     onClick={() => setShowAll(!showAll)}
-                    className="flex items-center gap-1 text-xs text-foreground-muted hover:text-foreground transition-colors mx-auto"
+                    className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-300 transition-colors mx-auto"
                 >
                     {showAll ? (
                         <>Show less <ChevronUp className="w-3 h-3" /></>
@@ -108,6 +103,10 @@ export function QuickInsights({ maxItems = 3 }: QuickInsightsProps) {
         </section>
     );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INDIVIDUAL QUICK INSIGHT CARD
+// ═══════════════════════════════════════════════════════════════════════════
 
 interface QuickInsightCardProps {
     insight: BudgetInsight;
@@ -134,26 +133,29 @@ function QuickInsightCard({ insight, index, onApply, onDismiss }: QuickInsightCa
             exit={{ opacity: 0, x: -20, height: 0 }}
             transition={{ delay: index * 0.05 }}
         >
-            <div className={`flex items-center gap-3 p-3 rounded-lg border ${colors.border} bg-secondary/40 group hover:bg-secondary transition-all`}>
+            <div className={`flex items-center gap-3 p-3 rounded-xl bg-gray-800/30 border ${colors.border} group hover:bg-gray-800/50 transition-all`}>
+                {/* Icon */}
                 <div className={`p-2 rounded-lg ${colors.bg} ${colors.text} flex-shrink-0`}>
                     {QUICK_INSIGHT_ICONS[insight.insightType]}
                 </div>
 
+                {/* Content */}
                 <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{insight.title}</p>
+                    <p className="text-sm font-medium text-white truncate">{insight.title}</p>
                     {insight.impact && (
                         <p className={`text-xs ${colors.text}`}>{insight.impact}</p>
                     )}
                 </div>
 
+                {/* Actions */}
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                     {isApplied ? (
                         <motion.div
                             initial={{ scale: 0 }}
                             animate={{ scale: 1 }}
-                            className="p-2 rounded-lg bg-secondary text-foreground"
+                            className="p-2 rounded-lg bg-emerald-500/20"
                         >
-                            <Check className="w-4 h-4" />
+                            <Check className="w-4 h-4 text-emerald-400" />
                         </motion.div>
                     ) : (
                         <>
@@ -166,7 +168,7 @@ function QuickInsightCard({ insight, index, onApply, onDismiss }: QuickInsightCa
                             </button>
                             <button
                                 onClick={onDismiss}
-                                className="p-2 rounded-lg bg-secondary text-foreground-muted hover:text-foreground transition-colors opacity-0 group-hover:opacity-100"
+                                className="p-2 rounded-lg bg-gray-800/50 text-gray-500 hover:text-gray-300 hover:bg-gray-700/50 transition-colors opacity-0 group-hover:opacity-100"
                                 title="Dismiss"
                             >
                                 <X className="w-3.5 h-3.5" />

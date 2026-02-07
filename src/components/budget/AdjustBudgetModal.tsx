@@ -106,12 +106,12 @@ export function AdjustBudgetModal({ isOpen, onClose }: AdjustBudgetModalProps) {
         <Modal
             isOpen={isOpen}
             onClose={onClose}
-            title="Adjust Caps"
+            title="Adjust Budgets"
             subtitle="Reallocate your spending categories"
         >
-            <div className="space-y-5 p-6">
+            <div className="space-y-5">
                 {error && (
-                    <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm">
+                    <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-400 text-sm">
                         {error}
                     </div>
                 )}
@@ -126,9 +126,9 @@ export function AdjustBudgetModal({ isOpen, onClose }: AdjustBudgetModalProps) {
 
                 {/* Fixed Categories Notice */}
                 {config?.nonNegotiableCategories && config.nonNegotiableCategories.length > 0 && (
-                    <div className="p-3 rounded-lg bg-primary/10 border border-primary/20 flex items-center gap-2">
-                        <Lock className="w-4 h-4 text-primary" />
-                        <p className="text-sm text-foreground">
+                    <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center gap-2">
+                        <Lock className="w-4 h-4 text-blue-400" />
+                        <p className="text-sm text-blue-300">
                             Protected categories: {config.nonNegotiableCategories.join(', ')}
                         </p>
                     </div>
@@ -159,10 +159,10 @@ export function AdjustBudgetModal({ isOpen, onClose }: AdjustBudgetModalProps) {
                             {simulation.warnings.map((warning, i) => (
                                 <div
                                     key={i}
-                                    className="p-3 rounded-lg bg-warning/10 border border-warning/20 flex items-start gap-2"
+                                    className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-start gap-2"
                                 >
-                                    <AlertTriangle className="w-4 h-4 text-warning mt-0.5 flex-shrink-0" />
-                                    <p className="text-sm text-foreground">{warning}</p>
+                                    <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                                    <p className="text-sm text-amber-300">{warning}</p>
                                 </div>
                             ))}
                         </motion.div>
@@ -174,7 +174,7 @@ export function AdjustBudgetModal({ isOpen, onClose }: AdjustBudgetModalProps) {
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex-1 py-3 px-4 rounded-md btn-secondary"
+                        className="flex-1 py-3 px-4 rounded-xl bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors font-medium"
                     >
                         Cancel
                     </button>
@@ -183,7 +183,7 @@ export function AdjustBudgetModal({ isOpen, onClose }: AdjustBudgetModalProps) {
                         disabled={isSubmitting || Math.abs(difference) < 0.01}
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        className="flex-1 py-3 px-4 rounded-md btn-primary flex items-center justify-center gap-2 disabled:opacity-50"
+                        className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium hover:from-emerald-400 hover:to-teal-400 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                     >
                         {isSubmitting ? (
                             <>
@@ -218,12 +218,12 @@ function LivePreviewPanel({ currentMonth, simulation, difference, config }: Live
     const hasChanges = Math.abs(difference) > 0.01;
 
     return (
-        <div className="p-4 rounded-lg bg-secondary/60 border border-border space-y-3">
+        <div className="p-4 rounded-xl bg-gray-800/50 border border-gray-700 space-y-3">
             <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-medium text-foreground">Budget Impact Preview</span>
+                <span className="text-sm font-medium text-white">Budget Impact Preview</span>
                 {hasChanges && (
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        difference > 0 ? 'bg-warning-soft text-warning' : 'bg-success-soft text-success'
+                        difference > 0 ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'
                     }`}>
                         {difference > 0 ? '+' : ''}{difference.toFixed(0)} change
                     </span>
@@ -233,7 +233,7 @@ function LivePreviewPanel({ currentMonth, simulation, difference, config }: Live
             <div className="grid grid-cols-2 gap-3">
                 {/* Total Budget */}
                 <MetricPreview
-                    icon={<TrendingDown className="w-3.5 h-3.5 text-primary" />}
+                    icon={<TrendingDown className="w-3.5 h-3.5 text-purple-400" />}
                     label="Total Budget"
                     current={currentMonth.totalBudget}
                     projected={simulation?.newTotalBudget ?? null}
@@ -241,7 +241,7 @@ function LivePreviewPanel({ currentMonth, simulation, difference, config }: Live
 
                 {/* Safe to Spend */}
                 <MetricPreview
-                    icon={<Wallet className="w-3.5 h-3.5 text-success" />}
+                    icon={<Wallet className="w-3.5 h-3.5 text-emerald-400" />}
                     label="Safe to Spend"
                     current={currentMonth.safeToSpend}
                     projected={simulation?.newSafeToSpend ?? null}
@@ -249,7 +249,7 @@ function LivePreviewPanel({ currentMonth, simulation, difference, config }: Live
 
                 {/* Savings Target */}
                 <MetricPreview
-                    icon={<PiggyBank className="w-3.5 h-3.5 text-primary" />}
+                    icon={<PiggyBank className="w-3.5 h-3.5 text-blue-400" />}
                     label="Savings"
                     current={currentMonth.savingsActual}
                     projected={simulation?.newSavingsActual ?? null}
@@ -257,16 +257,16 @@ function LivePreviewPanel({ currentMonth, simulation, difference, config }: Live
 
                 {/* Status Changes */}
                 {simulation && simulation.categoryStatuses.some(cs => cs.oldStatus !== cs.newStatus) ? (
-                    <div className="p-2.5 rounded-lg bg-card border border-border">
-                        <p className="text-xs text-foreground-muted mb-1">Status Changes</p>
+                    <div className="p-2.5 rounded-lg bg-gray-900/50 border border-gray-700/50">
+                        <p className="text-xs text-gray-500 mb-1">Status Changes</p>
                         <div className="space-y-1">
                             {simulation.categoryStatuses
                                 .filter(cs => cs.oldStatus !== cs.newStatus)
                                 .slice(0, 2)
                                 .map(cs => (
                                     <div key={cs.category} className="flex items-center gap-1 text-xs">
-                                        <span className="text-foreground-muted truncate">{cs.category}</span>
-                                        <ArrowRight className="w-3 h-3 text-foreground-muted flex-shrink-0" />
+                                        <span className="text-gray-400 truncate">{cs.category}</span>
+                                        <ArrowRight className="w-3 h-3 text-gray-600 flex-shrink-0" />
                                         <StatusBadge status={cs.newStatus} />
                                     </div>
                                 ))
@@ -274,9 +274,9 @@ function LivePreviewPanel({ currentMonth, simulation, difference, config }: Live
                         </div>
                     </div>
                 ) : (
-                    <div className="p-2.5 rounded-lg bg-card border border-border">
-                        <p className="text-xs text-foreground-muted mb-1">Income</p>
-                        <p className="text-sm font-semibold text-foreground">
+                    <div className="p-2.5 rounded-lg bg-gray-900/50 border border-gray-700/50">
+                        <p className="text-xs text-gray-500 mb-1">Income</p>
+                        <p className="text-sm font-semibold text-white">
                             ${config.monthlyIncome.toLocaleString()}
                         </p>
                     </div>
@@ -301,20 +301,20 @@ function MetricPreview({
     const diff = projected !== null ? projected - current : 0;
 
     return (
-        <div className="p-2.5 rounded-lg bg-card border border-border">
+        <div className="p-2.5 rounded-lg bg-gray-900/50 border border-gray-700/50">
             <div className="flex items-center gap-1.5 mb-1">
                 {icon}
-                <p className="text-xs text-foreground-muted">{label}</p>
+                <p className="text-xs text-gray-500">{label}</p>
             </div>
             <div className="flex items-baseline gap-2">
-                <p className={`text-sm font-semibold ${hasChange ? 'text-foreground-muted line-through' : 'text-foreground'}`}>
+                <p className={`text-sm font-semibold ${hasChange ? 'text-gray-500 line-through' : 'text-white'}`}>
                     ${current.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </p>
                 {hasChange && (
                     <motion.p
                         initial={{ opacity: 0, x: -5 }}
                         animate={{ opacity: 1, x: 0 }}
-                        className={`text-sm font-semibold ${diff > 0 ? 'text-success' : 'text-warning'}`}
+                        className={`text-sm font-semibold ${diff > 0 ? 'text-emerald-400' : 'text-amber-400'}`}
                     >
                         ${(projected!).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                     </motion.p>
@@ -326,13 +326,13 @@ function MetricPreview({
 
 function StatusBadge({ status }: { status: string }) {
     const colors: Record<string, string> = {
-        healthy: 'text-success bg-success-soft',
-        warning: 'text-warning bg-warning-soft',
-        danger: 'text-destructive bg-destructive/10',
+        healthy: 'text-emerald-400 bg-emerald-500/20',
+        warning: 'text-amber-400 bg-amber-500/20',
+        danger: 'text-red-400 bg-red-500/20',
     };
 
     return (
-        <span className={`text-xs px-1.5 py-0.5 rounded ${colors[status] || 'text-foreground-muted bg-secondary'}`}>
+        <span className={`text-xs px-1.5 py-0.5 rounded ${colors[status] || 'text-gray-400 bg-gray-500/20'}`}>
             {status}
         </span>
     );
@@ -383,25 +383,25 @@ function CategorySlider({ category, value, onChange, simulation }: CategorySlide
     );
 
     return (
-        <div className={`p-4 rounded-lg border transition-all ${
+        <div className={`p-4 rounded-xl bg-gray-800/30 border transition-all ${
             isChanged
-                ? 'border-primary/30 bg-primary/5'
-                : 'border-border bg-secondary/40'
+                ? 'border-emerald-500/30 bg-emerald-500/5'
+                : 'border-gray-700/50'
         }`}>
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                    <span className="font-medium text-foreground">{category.category}</span>
+                    <span className="font-medium text-white">{category.category}</span>
                     {statusChange && (
                         <StatusBadge status={statusChange.newStatus} />
                     )}
                 </div>
                 <div className="flex items-center gap-2">
-                    <span className="text-foreground-muted">$</span>
+                    <span className="text-gray-400">$</span>
                     <input
                         type="number"
                         value={inputValue}
                         onChange={handleInputChange}
-                        className="w-20 px-2 py-1 input-elegant text-foreground text-right"
+                        className="w-20 px-2 py-1 bg-gray-800 border border-gray-600 rounded-lg text-white text-right focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     />
                 </div>
             </div>
@@ -414,16 +414,16 @@ function CategorySlider({ category, value, onChange, simulation }: CategorySlide
                 step="10"
                 value={value}
                 onChange={handleSliderChange}
-                className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-primary"
+                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
                 style={{
-                    background: `linear-gradient(to right, var(--primary) 0%, var(--primary) ${(value / maxValue) * 100}%, var(--border) ${(value / maxValue) * 100}%, var(--border) 100%)`,
+                    background: `linear-gradient(to right, rgb(16, 185, 129) 0%, rgb(16, 185, 129) ${(value / maxValue) * 100}%, rgb(55, 65, 81) ${(value / maxValue) * 100}%, rgb(55, 65, 81) 100%)`,
                 }}
             />
 
             {/* Stats */}
-            <div className="flex justify-between text-xs text-foreground-muted mt-2">
+            <div className="flex justify-between text-xs text-gray-500 mt-2">
                 <span>Spent: ${category.spent.toLocaleString()}</span>
-                <span className={percentUsed >= 100 ? 'text-destructive' : percentUsed >= 75 ? 'text-warning' : 'text-foreground-muted'}>
+                <span className={percentUsed >= 100 ? 'text-red-400' : percentUsed >= 75 ? 'text-amber-400' : 'text-gray-500'}>
                     {percentUsed.toFixed(0)}% used
                 </span>
             </div>
@@ -435,7 +435,7 @@ function CategorySlider({ category, value, onChange, simulation }: CategorySlide
                     animate={{ opacity: 1, height: 'auto' }}
                     className="mt-2 text-xs"
                 >
-                    <span className={value > category.allocated ? 'text-warning' : 'text-success'}>
+                    <span className={value > category.allocated ? 'text-amber-400' : 'text-emerald-400'}>
                         {value > category.allocated ? '+' : ''}{(value - category.allocated).toFixed(0)} from ${category.allocated.toFixed(0)}
                     </span>
                 </motion.div>

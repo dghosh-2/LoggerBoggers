@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { GlassCard } from '@/components/ui/glass-card';
-import { GlassButton } from '@/components/ui/glass-button';
 import { useBudgetStore } from '@/stores/budgetStore';
 import { InsightReasoningPanel } from './InsightReasoningPanel';
 import {
@@ -13,6 +12,8 @@ import {
     TrendingUp,
     X,
     ArrowRight,
+    Sparkles,
+    Check,
 } from 'lucide-react';
 import type { BudgetInsight, InsightType } from '@/types/budget';
 
@@ -25,31 +26,31 @@ const INSIGHT_CONFIG: Record<InsightType, {
 }> = {
     optimization: {
         icon: <Lightbulb className="w-5 h-5" />,
-        color: 'text-foreground',
-        bgColor: 'bg-secondary',
-        borderColor: 'border-border',
-        actionLabel: 'Apply',
+        color: 'text-emerald-400',
+        bgColor: 'bg-emerald-500/10',
+        borderColor: 'border-emerald-500/20',
+        actionLabel: 'Apply Reallocation',
     },
     warning: {
         icon: <AlertTriangle className="w-5 h-5" />,
-        color: 'text-foreground',
-        bgColor: 'bg-secondary',
-        borderColor: 'border-border',
-        actionLabel: 'Fix',
+        color: 'text-amber-400',
+        bgColor: 'bg-amber-500/10',
+        borderColor: 'border-amber-500/20',
+        actionLabel: 'Fix Now',
     },
     achievement: {
         icon: <Trophy className="w-5 h-5" />,
-        color: 'text-foreground',
-        bgColor: 'bg-secondary',
-        borderColor: 'border-border',
-        actionLabel: 'Save',
+        color: 'text-purple-400',
+        bgColor: 'bg-purple-500/10',
+        borderColor: 'border-purple-500/20',
+        actionLabel: 'Celebrate',
     },
     pattern: {
         icon: <TrendingUp className="w-5 h-5" />,
-        color: 'text-foreground',
-        bgColor: 'bg-secondary',
-        borderColor: 'border-border',
-        actionLabel: 'View',
+        color: 'text-blue-400',
+        bgColor: 'bg-blue-500/10',
+        borderColor: 'border-blue-500/20',
+        actionLabel: 'Take Action',
     },
 };
 
@@ -60,11 +61,13 @@ export function BudgetInsights() {
         return (
             <section className="space-y-4">
                 <div className="flex items-center gap-2">
-                    <h2 className="text-xl font-semibold text-foreground">Insights</h2>
+                    <Sparkles className="w-5 h-5 text-emerald-400" />
+                    <h2 className="text-xl font-semibold text-white">AI Insights</h2>
                 </div>
                 <GlassCard className="p-8 text-center">
-                    <p className="text-foreground-muted">
-                        Insights will appear here once we have enough data.
+                    <Sparkles className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                    <p className="text-gray-400">
+                        We&apos;ll analyze your spending patterns and provide personalized insights soon.
                     </p>
                 </GlassCard>
             </section>
@@ -73,16 +76,18 @@ export function BudgetInsights() {
 
     return (
         <section className="space-y-4">
+            {/* Section Header */}
             <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-xl font-semibold text-foreground">Insights</h2>
-                    <p className="text-xs text-foreground-muted">Simple suggestions based on your spending</p>
+                <div className="flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-emerald-400" />
+                    <h2 className="text-xl font-semibold text-white">AI Insights</h2>
                 </div>
-                <span className="text-sm text-foreground-muted">
+                <span className="text-sm text-gray-500">
                     {insights.filter(i => i.isActionable).length} actionable
                 </span>
             </div>
 
+            {/* Insights Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {insights.map((insight, index) => (
                     <InsightCard
@@ -113,6 +118,7 @@ function InsightCard({ insight, index, onDismiss, onAction }: InsightCardProps) 
     const handleAction = async () => {
         setIsApplied(true);
         onAction();
+        // Auto-dismiss after applying
         setTimeout(() => {
             onDismiss();
         }, 1500);
@@ -124,37 +130,41 @@ function InsightCard({ insight, index, onDismiss, onAction }: InsightCardProps) 
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
         >
-            <GlassCard className={`p-4 border ${config.borderColor} transition-all`}>
+            <GlassCard className={`p-4 border ${config.borderColor} hover:border-opacity-50 transition-all`}>
+                {/* Header */}
                 <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
                         <div className={`p-2 rounded-lg ${config.bgColor} ${config.color}`}>
                             {config.icon}
                         </div>
                         <div>
-                            <h3 className="font-semibold text-foreground text-sm">{insight.title}</h3>
-                            <span className="text-xs text-foreground-muted capitalize">
+                            <h3 className="font-semibold text-white text-sm">{insight.title}</h3>
+                            <span className={`text-xs ${config.color} capitalize`}>
                                 {insight.insightType}
                             </span>
                         </div>
                     </div>
                     <button
                         onClick={onDismiss}
-                        className="p-1 rounded-lg text-foreground-muted hover:text-foreground hover:bg-secondary transition-colors"
+                        className="p-1 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-colors"
                     >
                         <X className="w-4 h-4" />
                     </button>
                 </div>
 
-                <p className="text-sm text-foreground-muted mb-3 leading-relaxed">{insight.description}</p>
+                {/* Description */}
+                <p className="text-sm text-gray-400 mb-3 leading-relaxed">{insight.description}</p>
 
+                {/* Impact Badge */}
                 {insight.impact && (
-                    <div className="p-2.5 rounded-lg bg-secondary mb-3">
-                        <p className="text-sm font-medium text-foreground">
+                    <div className={`p-2.5 rounded-lg ${config.bgColor} mb-3`}>
+                        <p className={`text-sm font-medium ${config.color}`}>
                             Impact: {insight.impact}
                         </p>
                     </div>
                 )}
 
+                {/* Reasoning Panel (clickable accordion) */}
                 {insight.reasoning && (
                     <InsightReasoningPanel
                         reasoning={insight.reasoning}
@@ -163,17 +173,29 @@ function InsightCard({ insight, index, onDismiss, onAction }: InsightCardProps) 
                     />
                 )}
 
+                {/* Action Button */}
                 {insight.isActionable && (
-                    <GlassButton
+                    <button
                         onClick={handleAction}
                         disabled={isApplied}
-                        variant="secondary"
-                        size="md"
-                        className="w-full mt-3"
+                        className={`w-full flex items-center justify-center gap-2 p-3 rounded-lg mt-3 ${
+                            isApplied
+                                ? 'bg-emerald-500/20 text-emerald-400'
+                                : `${config.bgColor} ${config.color} hover:opacity-80`
+                        } transition-all text-sm font-medium`}
                     >
-                        {isApplied ? 'Saved' : config.actionLabel}
-                        {!isApplied && <ArrowRight className="w-4 h-4" />}
-                    </GlassButton>
+                        {isApplied ? (
+                            <>
+                                <Check className="w-4 h-4" />
+                                Applied!
+                            </>
+                        ) : (
+                            <>
+                                {config.actionLabel}
+                                <ArrowRight className="w-4 h-4" />
+                            </>
+                        )}
+                    </button>
                 )}
             </GlassCard>
         </motion.div>

@@ -92,7 +92,6 @@ export const usePortfolioStore = create<PortfolioState>()(
         summary: null,
         isAuthenticated: false,
         lastFetchedAt: null,
-        isLoading: false,
         error: null,
       }),
 
@@ -131,35 +130,18 @@ export const usePortfolioStore = create<PortfolioState>()(
 );
 
 // Helper hook for fetching portfolio data with caching
-let inFlightFetch: Promise<void> | null = null;
-
 export function usePortfolioData() {
   const store = usePortfolioStore();
-
-  const fetchData = async (force = false, options?: { silent?: boolean }) => {
+  
+  const fetchData = async (force = false) => {
     // Skip if we have fresh data and not forcing
     if (!force && !store.shouldRefetch()) {
       return;
     }
 
-    if (inFlightFetch) {
-      return inFlightFetch;
-    }
-
-    const hasCachedData =
-      store.institutions.length > 0 ||
-      store.bankAccounts.length > 0 ||
-      store.investmentAccounts.length > 0 ||
-      store.loans.length > 0 ||
-      store.holdings.length > 0 ||
-      store.summary !== null;
-
-    if (!options?.silent && !hasCachedData) {
-      store.setLoading(true);
-    }
-
-    const doFetch = async () => {
-      try {
+    store.setLoading(true);
+    
+    try {
       // First check if user is authenticated by calling summary API
       const authCheckResponse = await fetch('/api/data/summary');
       const authCheckData = await authCheckResponse.json();
@@ -236,25 +218,19 @@ export function usePortfolioData() {
         finalInvestmentAccounts = [...investmentAccounts, ...newInvestmentAccounts];
       }
 
-        store.setData({
-          institutions: finalInstitutions,
-          bankAccounts: finalBankAccounts,
-          investmentAccounts: finalInvestmentAccounts,
-          holdings,
-          loans,
-          summary,
-          isAuthenticated: true,
-        });
-      } catch (error: any) {
-        store.setError(error.message || 'Failed to load portfolio data');
-        store.clearData();
-      } finally {
-        inFlightFetch = null;
-      }
-    };
-
-    inFlightFetch = doFetch();
-    return inFlightFetch;
+      store.setData({
+        institutions: finalInstitutions,
+        bankAccounts: finalBankAccounts,
+        investmentAccounts: finalInvestmentAccounts,
+        holdings,
+        loans,
+        summary,
+        isAuthenticated: true,
+      });
+    } catch (error: any) {
+      store.setError(error.message || 'Failed to load portfolio data');
+      store.clearData();
+    }
   };
 
   const refetch = () => fetchData(true);

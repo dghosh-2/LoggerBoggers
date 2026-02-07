@@ -2,10 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
+import { cn } from '@/lib/utils';
 
 interface DogLoadingAnimationProps {
     message?: string;
     className?: string;
+    trackClassName?: string;
     size?: 'sm' | 'md' | 'lg' | 'xl';
     showMessage?: boolean;
 }
@@ -13,6 +15,7 @@ interface DogLoadingAnimationProps {
 export function DogLoadingAnimation({ 
     message = 'Loading...',
     className = '',
+    trackClassName = '',
     size = 'md',
     showMessage = true,
 }: DogLoadingAnimationProps) {
@@ -65,9 +68,16 @@ export function DogLoadingAnimation({
     const leftPosition = `calc(${dogPosition}% - ${(dogPosition / 100) * config.width}px)`;
     
     return (
-        <div className={`w-full flex flex-col items-center ${className}`}>
+        <div className={cn('w-full flex flex-col items-center', className)}>
             {/* Running dog */}
-            <div className={`relative w-full ${config.containerHeight} overflow-visible rounded-lg bg-secondary/30`}>
+            <div
+                className={cn(
+                    'relative w-full overflow-visible rounded-lg bg-secondary/30',
+                    config.containerHeight,
+                    // Allow callers to override the default height (e.g. full-page loading state).
+                    trackClassName
+                )}
+            >
                 <div
                     className="absolute bottom-2"
                     style={{ 
@@ -148,7 +158,7 @@ export function DogRunnerSimple({
     const leftPosition = `calc(${dogPosition}% - ${(dogPosition / 100) * config.width}px)`;
     
     return (
-        <div className={`relative ${config.containerHeight} overflow-visible ${className}`}>
+        <div className={cn('relative overflow-visible', config.containerHeight, className)}>
             <div
                 className="absolute bottom-1"
                 style={{ 

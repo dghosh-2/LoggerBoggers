@@ -13,10 +13,7 @@ import {
     ShoppingBag,
     Zap,
     GraduationCap,
-    Shield,
-    Car,
-    Tv,
-    MoreHorizontal
+    Shield
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -31,10 +28,7 @@ const iconMap: any = {
     ShoppingBag,
     Zap,
     GraduationCap,
-    Shield,
-    Car,
-    Tv,
-    MoreHorizontal
+    Shield
 };
 
 const CustomNode = ({ data, isConnectable, selected }: NodeProps) => {

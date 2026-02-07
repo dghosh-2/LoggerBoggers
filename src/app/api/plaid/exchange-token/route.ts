@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { plaidClient } from '@/lib/plaid-client';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getUserIdFromRequest } from '@/lib/auth';
-import { generateAggregatedStatistics } from '@/lib/aggregated-statistics';
+import { runPostConnectBackfillOnce } from '@/lib/post-connect-backfill';
 
 export async function POST(request: NextRequest) {
     console.log('=== EXCHANGE TOKEN API CALLED ===');
@@ -398,9 +398,9 @@ export async function POST(request: NextRequest) {
                 console.log('Successfully updated user_plaid_connections for user:', userId);
             }
 
-            // Generate aggregated statistics for chatbot and dashboards
-            console.log('=== GENERATING AGGREGATED STATISTICS ===');
-            await generateAggregatedStatistics(userId);
+            // Run one-time post-connect backfills (net worth series, aggregated stats, purchase locations, etc.)
+            console.log('=== RUNNING POST-CONNECT BACKFILL (ONCE) ===');
+            await runPostConnectBackfillOnce(userId);
 
             // Trigger budget recalculation (client-side will pick this up)
             console.log('=== DATA SYNC COMPLETE - Budget will auto-refresh on client ===');

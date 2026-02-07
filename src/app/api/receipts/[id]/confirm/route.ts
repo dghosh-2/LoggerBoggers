@@ -3,6 +3,7 @@ import { supabase } from '@repo/core';
 import { getUserIdFromRequest } from '@/lib/auth';
 import { normalizeCategory } from '@/lib/categories';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { insertPurchaseLocations } from '@/lib/purchase-locations';
 
 type CorrectedJson = {
     merchant?: unknown;
@@ -233,9 +234,9 @@ export async function POST(
             try {
                 const geo = await geocodeNominatim(bestAddress);
                 if (geo) {
-                    await supabaseAdmin.from('purchase_locations').insert({
+                    const res = await insertPurchaseLocations({
                         user_id: userId,
-                        transaction_id: ftx?.id ?? null,
+                        financial_transaction_id: ftx?.id ?? null,
                         address: bestAddress,
                         merchant_name: merchantName,
                         latitude: geo.lat,
@@ -245,6 +246,10 @@ export async function POST(
                         date: txDate,
                         source: 'receipt_scan',
                     });
+                    if (!res.ok) {
+                        // Ignore: globe caching is non-critical, but log for diagnosis.
+                        console.error('Error inserting purchase_location from receipt confirm:', res.error);
+                    }
                 }
             } catch (e) {
                 // Ignore: globe caching is non-critical.
