@@ -15,7 +15,8 @@ export function useFinancialData() {
     const { 
         transactions, 
         summary, 
-        isConnected, 
+        isConnected,
+        isAuthenticated,
         isLoading: loading, 
         error,
         setData,
@@ -23,6 +24,7 @@ export function useFinancialData() {
         setError,
         invalidateCache,
         shouldRefetch,
+        clearData,
     } = store;
 
     const fetchData = useCallback(async (force = false) => {
@@ -38,22 +40,31 @@ export function useFinancialData() {
             const summaryResponse = await fetch('/api/data/summary');
             const summaryData = await summaryResponse.json();
 
-            // Always fetch transactions for the logged-in user.
-            // This app treats "connected" as "has data", not strictly "Plaid connected".
-            const txResponse = await fetch('/api/data/transactions?limit=5000');
-            const txResult = await txResponse.json();
-            const txData: Transaction[] = txResult.transactions || [];
+            // Check if user is authenticated
+            const isAuth = summaryData.is_authenticated === true;
+            
+            let txData: Transaction[] = [];
+            
+            // Only fetch transactions if connected AND authenticated
+            if (summaryData.is_connected && isAuth) {
+                const txResponse = await fetch('/api/data/transactions?limit=5000');
+                const txResult = await txResponse.json();
+                txData = txResult.transactions || [];
+            }
 
             setData({
                 transactions: txData,
                 summary: summaryData,
-                isConnected: Boolean(summaryData.is_connected) || txData.length > 0,
+                isConnected: summaryData.is_connected,
+                isAuthenticated: isAuth,
             });
         } catch (err: any) {
             console.error('Error fetching financial data:', err);
             setError(err.message);
+            // Clear data on error to prevent stale cache issues
+            clearData();
         }
-    }, [shouldRefetch, setLoading, setData, setError]);
+    }, [shouldRefetch, setLoading, setData, setError, clearData]);
 
     useEffect(() => {
         fetchData();
@@ -97,6 +108,7 @@ export function useFinancialData() {
         transactions,
         summary,
         isConnected,
+        isAuthenticated,
         loading,
         error,
         refetch,
@@ -130,17 +142,25 @@ export async function refreshGlobalFinancialData() {
 
         const summaryResponse = await fetch('/api/data/summary');
         const summaryData = await summaryResponse.json();
-        const txResponse = await fetch('/api/data/transactions?limit=5000');
-        const txResult = await txResponse.json();
-        const txData: Transaction[] = txResult.transactions || [];
+
+        const isAuth = summaryData.is_authenticated === true;
+        let txData: Transaction[] = [];
+        
+        if (summaryData.is_connected && isAuth) {
+            const txResponse = await fetch('/api/data/transactions?limit=5000');
+            const txResult = await txResponse.json();
+            txData = txResult.transactions || [];
+        }
 
         store.setData({
             transactions: txData,
             summary: summaryData,
-            isConnected: Boolean(summaryData.is_connected) || txData.length > 0,
+            isConnected: summaryData.is_connected,
+            isAuthenticated: isAuth,
         });
     } catch (err) {
         console.error('Error refreshing global financial data:', err);
         store.setError('Failed to refresh financial data');
+        store.clearData();
     }
 }

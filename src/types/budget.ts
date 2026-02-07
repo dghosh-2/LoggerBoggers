@@ -156,6 +156,30 @@ export interface BudgetAlert {
 
 export type InsightType = 'optimization' | 'warning' | 'achievement' | 'pattern';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Decision Tracking / Reasoning
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ReasoningDataPoint {
+    label: string;
+    value: string | number;
+    unit?: string;
+}
+
+export interface ReasoningStep {
+    phase: 'data' | 'analysis' | 'decision';
+    title: string;
+    detail: string;
+    dataPoints?: ReasoningDataPoint[];
+}
+
+export interface InsightReasoning {
+    steps: ReasoningStep[];
+    confidence: number; // 0-1
+    alternativeActions: string[];
+    dataSourceDescription: string;
+}
+
 export interface BudgetInsight {
     id: string;
     userId: string;
@@ -168,6 +192,51 @@ export interface BudgetInsight {
     actionPayload: Record<string, unknown> | null;
     dismissed: boolean;
     createdAt: string;
+    reasoning?: InsightReasoning | null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Trend Data (for charts)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface TrendDataPoint {
+    month: string; // YYYY-MM
+    value: number;
+}
+
+export interface CategoryTrend {
+    category: string;
+    dataPoints: TrendDataPoint[];
+    slope: number; // monthly change in $
+    rSquared: number;
+    direction: 'increasing' | 'decreasing' | 'stable';
+    projectedNextMonth: number;
+}
+
+export interface DayOfWeekData {
+    day: string;
+    average: number;
+    total: number;
+}
+
+export interface TrendAnalytics {
+    categoryTrends: CategoryTrend[];
+    dayOfWeekData: DayOfWeekData[];
+    topCategories: Array<{ category: string; total: number; percentOfBudget: number }>;
+    monthOverMonthChange: number; // percentage
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Budget Simulation
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface BudgetSimulationResult {
+    newTotalBudget: number;
+    newSafeToSpend: number;
+    newSavingsTarget: number;
+    newSavingsActual: number;
+    categoryStatuses: Array<{ category: string; oldStatus: string; newStatus: string }>;
+    warnings: string[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

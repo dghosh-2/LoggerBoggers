@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getUserIdFromRequest } from '@/lib/auth';
-import { generateFiveYearsOfTransactions, generateFiveYearsOfIncome } from '@/lib/fake-transaction-generator';
+import { generateFiveYearsOfTransactions, generateFiveYearsOfIncome, generateHoldings } from '@/lib/fake-transaction-generator';
+import { generateAggregatedStatistics } from '@/lib/aggregated-statistics';
 
 const NESSIE_BASE_URL = 'http://api.nessieisreal.com';
 const API_KEY = process.env.CAPITAL_ONE_API_KEY;
@@ -232,12 +233,17 @@ export async function POST(request: NextRequest) {
         // Generate 5 years of fake historical data (same as Plaid flow)
         // This matches Plaid's behavior - Plaid sandbox provides 30-90 days of real data,
         // but we generate 5 years of historical data for a complete demo experience
+        console.log('=== CAPITAL ONE: GENERATING FAKE DATA ===');
         const fakeTransactions = generateFiveYearsOfTransactions();
         const fakeIncome = generateFiveYearsOfIncome();
+        console.log(`Generated ${fakeTransactions.length} transactions`);
+        console.log(`Generated ${fakeIncome.length} income records`);
 
         // Clear existing data and insert new
+        console.log('=== CAPITAL ONE: CLEARING EXISTING DATA ===');
         await supabaseAdmin.from('transactions').delete().eq('uuid_user_id', userId);
         await supabaseAdmin.from('income').delete().eq('uuid_user_id', userId);
+        console.log('Cleared existing transactions and income');
 
         // Add user_id to fake transactions and income
         // Use 'capital_one' as source to distinguish from Plaid transactions
@@ -249,29 +255,50 @@ export async function POST(request: NextRequest) {
         const savingsAccountId = accountsToStore[1].plaid_account_id;
         const creditAccountId = accountsToStore[2].plaid_account_id;
         
-        const allTransactionsWithUser = fakeTransactions.map((tx, index) => {
-            // Determine account based on transaction type
-            let accountId = checkingAccountId; // Default to checking
-            
-            // Credit card transactions (shopping, entertainment, some food)
-            if (tx.category === 'Shopping' || 
-                (tx.category === 'Entertainment' && Math.random() > 0.3) ||
-                (tx.category === 'Food & Drink' && Math.random() > 0.5)) {
-                accountId = creditAccountId;
+        // First, ensure all categories exist in the database
+        const categoryNames = ['Food & Drink', 'Transportation', 'Shopping', 'Entertainment', 
+                              'Bills & Utilities', 'Health & Fitness', 'Travel', 'Personal Care', 
+                              'Education', 'Other'];
+        
+        // Get existing categories
+        const { data: existingCategories } = await supabaseAdmin
+            .from('categories')
+            .select('id, name');
+        
+        const categoryMap: Record<string, string> = {};
+        (existingCategories || []).forEach(cat => {
+            categoryMap[cat.name] = cat.id;
+        });
+        
+        // Create missing categories
+        for (const catName of categoryNames) {
+            if (!categoryMap[catName]) {
+                const { data: newCat, error: catError } = await supabaseAdmin
+                    .from('categories')
+                    .insert({ name: catName })
+                    .select('id, name')
+                    .single();
+                if (newCat) {
+                    categoryMap[newCat.name] = newCat.id;
+                    console.log(`Created category: ${catName}`);
+                }
             }
-            // Occasional savings transfers (income-related)
-            else if (tx.category === 'Other' && index % 20 === 0) {
-                accountId = savingsAccountId;
-            }
+        }
+        
+        console.log('Category map:', categoryMap);
+        
+        // Transform transactions to match actual database schema
+        // Actual schema: id, receipt_id, merchant_name, amount, transaction_date, category_id, notes, created_at, user_id
+        const allTransactionsWithUser = fakeTransactions.map((tx) => {
+            const categoryId = categoryMap[tx.category] || categoryMap['Other'];
             
             return {
-                ...tx,
-                user_id: userId,
-                uuid_user_id: userId,
-                source: 'capital_one' as const,
-                account_id: accountId,
-                pending: false,
-                // Ensure all fields are populated - generator already includes location, merchant_name, etc.
+                merchant_name: tx.merchant_name || tx.name,
+                amount: tx.amount,
+                transaction_date: tx.date, // Schema uses transaction_date not date
+                category_id: categoryId,   // Schema uses category_id not category
+                user_id: userId,           // Schema uses user_id (no uuid_user_id)
+                notes: tx.location || null, // Store location in notes field
             };
         });
 
@@ -282,23 +309,51 @@ export async function POST(request: NextRequest) {
         }));
 
         // Insert transactions in batches
+        console.log('=== CAPITAL ONE: INSERTING TRANSACTIONS ===');
         const BATCH_SIZE = 500;
+        let insertedTx = 0;
+        
+        // #region agent log
+        const sampleTx = allTransactionsWithUser[0];
+        fetch('http://127.0.0.1:7245/ingest/2d405ccf-cb3f-4611-bc27-f95a616c15c9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'capital-one/connect/route.ts:295',message:'Sample transaction object keys',data:{keys:Object.keys(sampleTx||{}),sample:sampleTx},timestamp:Date.now(),hypothesisId:'A,B'})}).catch(()=>{});
+        // #endregion
+        
         for (let i = 0; i < allTransactionsWithUser.length; i += BATCH_SIZE) {
             const batch = allTransactionsWithUser.slice(i, i + BATCH_SIZE);
             const { error: txError } = await supabaseAdmin.from('transactions').insert(batch);
             if (txError) {
                 console.error('Error inserting transactions batch:', txError);
+                // #region agent log
+                fetch('http://127.0.0.1:7245/ingest/2d405ccf-cb3f-4611-bc27-f95a616c15c9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'capital-one/connect/route.ts:305',message:'Transaction insert error details',data:{error:txError,batchIndex:i,firstItemKeys:Object.keys(batch[0]||{})},timestamp:Date.now(),hypothesisId:'A,B'})}).catch(()=>{});
+                // #endregion
+            } else {
+                insertedTx += batch.length;
             }
         }
+        console.log(`Successfully inserted ${insertedTx} transactions`);
 
         // Insert income
+        console.log('=== CAPITAL ONE: INSERTING INCOME ===');
+        let insertedIncome = 0;
+        
+        // #region agent log
+        const sampleIncome = fakeIncomeWithUser[0];
+        fetch('http://127.0.0.1:7245/ingest/2d405ccf-cb3f-4611-bc27-f95a616c15c9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'capital-one/connect/route.ts:320',message:'Sample income object keys',data:{keys:Object.keys(sampleIncome||{}),sample:sampleIncome},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+        
         for (let i = 0; i < fakeIncomeWithUser.length; i += BATCH_SIZE) {
             const batch = fakeIncomeWithUser.slice(i, i + BATCH_SIZE);
             const { error: incError } = await supabaseAdmin.from('income').insert(batch);
             if (incError) {
                 console.error('Error inserting income batch:', incError);
+                // #region agent log
+                fetch('http://127.0.0.1:7245/ingest/2d405ccf-cb3f-4611-bc27-f95a616c15c9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'capital-one/connect/route.ts:330',message:'Income insert error',data:{error:incError},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
+                // #endregion
+            } else {
+                insertedIncome += batch.length;
             }
         }
+        console.log(`Successfully inserted ${insertedIncome} income records`);
 
         // Sync some transactions to Capital One API (for demo purposes)
         if (capitalOneData && capitalOneData.accounts.length > 0) {
@@ -309,6 +364,38 @@ export async function POST(request: NextRequest) {
                 } catch (e) {
                     console.error('Error syncing to Capital One:', e);
                 }
+            }
+        }
+
+        // Generate and insert holdings for portfolio
+        const fakeHoldings = generateHoldings();
+        
+        // Clear existing holdings and insert new
+        await supabaseAdmin.from('holdings').delete().eq('uuid_user_id', userId);
+        
+        const holdingsWithUser = fakeHoldings.map(holding => ({
+            user_id: userId,
+            uuid_user_id: userId,
+            // Note: account_id column may not exist in holdings table
+            plaid_security_id: `sec_cap1_${holding.symbol.toLowerCase()}_${Date.now()}`,
+            symbol: holding.symbol,
+            name: holding.name,
+            quantity: holding.quantity,
+            price: holding.price,
+            value: holding.value,
+            cost_basis: holding.cost_basis,
+            gain_loss: holding.gain_loss,
+            gain_loss_percent: holding.gain_loss_percent,
+            location: holding.location,
+            last_updated_at: new Date().toISOString(),
+        }));
+        
+        if (holdingsWithUser.length > 0) {
+            const { error: holdingsError } = await supabaseAdmin.from('holdings').insert(holdingsWithUser);
+            if (holdingsError) {
+                console.error('Error inserting holdings:', holdingsError);
+            } else {
+                console.log(`Successfully inserted ${holdingsWithUser.length} holdings for Capital One user:`, userId);
             }
         }
 
@@ -351,6 +438,10 @@ export async function POST(request: NextRequest) {
         } else {
             console.log('Successfully updated user_plaid_connections for Capital One user:', userId);
         }
+
+        // Generate aggregated statistics for chatbot and dashboards
+        console.log('=== CAPITAL ONE: GENERATING AGGREGATED STATISTICS ===');
+        await generateAggregatedStatistics(userId);
 
         return NextResponse.json({ 
             success: true,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import crypto from 'crypto';
 
 // Simple password hashing (in production, use bcrypt)
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Check if username already exists
-        const { data: existingUser } = await supabase
+        const { data: existingUser } = await supabaseAdmin
             .from('users')
             .select('id')
             .eq('username', username.toLowerCase())
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
 
         // Create user
         const passwordHash = hashPassword(password);
-        const { data: newUser, error: createError } = await supabase
+        const { data: newUser, error: createError } = await supabaseAdmin
             .from('users')
             .insert({
                 username: username.toLowerCase(),
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Create initial user_plaid_connections record
-        await supabase
+        await supabaseAdmin
             .from('user_plaid_connections')
             .insert({
                 user_id: newUser.id,
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + 30); // 30 day session
 
-        const { error: sessionError } = await supabase
+        const { error: sessionError } = await supabaseAdmin
             .from('sessions')
             .insert({
                 user_id: newUser.id,

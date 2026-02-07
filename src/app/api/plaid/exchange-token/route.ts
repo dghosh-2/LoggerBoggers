@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { plaidClient } from '@/lib/plaid-client';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getUserIdFromRequest } from '@/lib/auth';
+import { generateAggregatedStatistics } from '@/lib/aggregated-statistics';
 
 export async function POST(request: NextRequest) {
+    console.log('=== EXCHANGE TOKEN API CALLED ===');
     try {
         // Get authenticated user ID
         const userId = await getUserIdFromRequest(request);
+        console.log('User ID from request:', userId);
         
         if (!userId) {
             console.error('Authentication failed: No user ID found');
@@ -16,7 +19,9 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const { public_token, institution } = await request.json();
+        const body = await request.json();
+        const { public_token, institution } = body;
+        console.log('Request body received:', { hasPublicToken: !!public_token, institution });
 
         if (!public_token) {
             console.error('Missing public_token in request');
@@ -159,7 +164,7 @@ export async function POST(request: NextRequest) {
             const plaidTransactions = transactionsResponse.data.transactions;
 
             // Import the generator and category mapper
-            const { generateFiveYearsOfTransactions, generateFiveYearsOfIncome } = await import('@/lib/fake-transaction-generator');
+            const { generateFiveYearsOfTransactions, generateFiveYearsOfIncome, generateHoldings } = await import('@/lib/fake-transaction-generator');
 
             // Map Plaid categories to our simplified categories
             // Also check merchant name for better categorization
@@ -241,8 +246,11 @@ export async function POST(request: NextRequest) {
             });
 
             // Generate 5 years of fake historical data (up to TODAY, not 90 days ago)
+            console.log('=== GENERATING FAKE DATA ===');
             const fakeTransactions = generateFiveYearsOfTransactions();
             const fakeIncome = generateFiveYearsOfIncome();
+            console.log(`Generated ${fakeTransactions.length} transactions`);
+            console.log(`Generated ${fakeIncome.length} income records`);
 
             // Use ALL fake transactions - they go up to current date
             // Don't filter by 90 days since Plaid sandbox data has unrealistic amounts
@@ -250,33 +258,119 @@ export async function POST(request: NextRequest) {
             const allTransactions = fakeTransactions;
 
             // Clear existing data and insert new
-            await supabaseAdmin.from('transactions').delete().eq('uuid_user_id', userId);
+            console.log('=== CLEARING EXISTING DATA ===');
+            await supabaseAdmin.from('transactions').delete().eq('user_id', userId);
             await supabaseAdmin.from('income').delete().eq('uuid_user_id', userId);
+            console.log('Cleared existing transactions and income');
 
-            // Add user_id to fake transactions and income
-            const allTransactionsWithUser = allTransactions.map(tx => ({
-                ...tx,
-                user_id: userId,
-                uuid_user_id: userId,
-            }));
+            // Ensure categories exist and build category map
+            const CATEGORY_NAMES = [
+                'Food & Drink', 'Shopping', 'Transportation', 'Bills & Utilities',
+                'Entertainment', 'Health & Fitness', 'Travel', 'Personal Care', 'Education', 'Other'
+            ];
+            const categoryMap: Record<string, string> = {};
+            for (const categoryName of CATEGORY_NAMES) {
+                const { data: existing } = await supabaseAdmin
+                    .from('categories')
+                    .select('id')
+                    .eq('name', categoryName)
+                    .single();
+                
+                if (existing) {
+                    categoryMap[categoryName] = existing.id;
+                } else {
+                    const { data: created } = await supabaseAdmin
+                        .from('categories')
+                        .insert({ name: categoryName })
+                        .select('id')
+                        .single();
+                    if (created) {
+                        categoryMap[categoryName] = created.id;
+                    }
+                }
+            }
+
+            // Transform transactions to match actual database schema
+            // Fake generator produces: { category, date, merchant_name, amount, location, name }
+            // Database expects: { category_id, transaction_date, merchant_name, amount, notes, user_id }
+            const allTransactionsWithUser = allTransactions.map(tx => {
+                const categoryId = categoryMap[tx.category] || categoryMap['Other'];
+                return {
+                    merchant_name: tx.merchant_name || tx.name,
+                    amount: tx.amount,
+                    transaction_date: tx.date,
+                    category_id: categoryId,
+                    user_id: userId,
+                    notes: tx.location || null,
+                };
+            });
 
             const fakeIncomeWithUser = fakeIncome.map(inc => ({
-                ...inc,
-                user_id: userId,
+                amount: inc.amount,
+                date: inc.date,
+                source: inc.source || 'Salary',
                 uuid_user_id: userId,
             }));
 
             // Insert transactions in batches
+            console.log('=== INSERTING TRANSACTIONS ===');
             const BATCH_SIZE = 500;
+            let insertedTx = 0;
             for (let i = 0; i < allTransactionsWithUser.length; i += BATCH_SIZE) {
                 const batch = allTransactionsWithUser.slice(i, i + BATCH_SIZE);
-                await supabaseAdmin.from('transactions').insert(batch);
+                const { error: txError } = await supabaseAdmin.from('transactions').insert(batch);
+                if (txError) {
+                    console.error(`Error inserting transaction batch ${i}:`, txError);
+                } else {
+                    insertedTx += batch.length;
+                }
             }
+            console.log(`Successfully inserted ${insertedTx} transactions`);
 
             // Insert income
+            console.log('=== INSERTING INCOME ===');
+            let insertedIncome = 0;
             for (let i = 0; i < fakeIncomeWithUser.length; i += BATCH_SIZE) {
                 const batch = fakeIncomeWithUser.slice(i, i + BATCH_SIZE);
-                await supabaseAdmin.from('income').insert(batch);
+                const { error: incError } = await supabaseAdmin.from('income').insert(batch);
+                if (incError) {
+                    console.error(`Error inserting income batch ${i}:`, incError);
+                } else {
+                    insertedIncome += batch.length;
+                }
+            }
+            console.log(`Successfully inserted ${insertedIncome} income records`);
+
+            // Generate and insert holdings for investment accounts
+            const fakeHoldings = generateHoldings();
+            
+            // Clear existing holdings and insert new
+            await supabaseAdmin.from('holdings').delete().eq('uuid_user_id', userId);
+            
+            const holdingsWithUser = fakeHoldings.map(holding => ({
+                user_id: userId,
+                uuid_user_id: userId,
+                // Note: account_id column may not exist in holdings table
+                plaid_security_id: `sec_${holding.symbol.toLowerCase()}_${Date.now()}`,
+                symbol: holding.symbol,
+                name: holding.name,
+                quantity: holding.quantity,
+                price: holding.price,
+                value: holding.value,
+                cost_basis: holding.cost_basis,
+                gain_loss: holding.gain_loss,
+                gain_loss_percent: holding.gain_loss_percent,
+                location: holding.location,
+                last_updated_at: new Date().toISOString(),
+            }));
+            
+            if (holdingsWithUser.length > 0) {
+                const { error: holdingsError } = await supabaseAdmin.from('holdings').insert(holdingsWithUser);
+                if (holdingsError) {
+                    console.error('Error inserting holdings:', holdingsError);
+                } else {
+                    console.log(`Successfully inserted ${holdingsWithUser.length} holdings for user:`, userId);
+                }
             }
 
             // Update user connection status - use select then insert/update for reliability
@@ -318,6 +412,13 @@ export async function POST(request: NextRequest) {
             } else {
                 console.log('Successfully updated user_plaid_connections for user:', userId);
             }
+
+            // Generate aggregated statistics for chatbot and dashboards
+            console.log('=== GENERATING AGGREGATED STATISTICS ===');
+            await generateAggregatedStatistics(userId);
+
+            // Trigger budget recalculation (client-side will pick this up)
+            console.log('=== DATA SYNC COMPLETE - Budget will auto-refresh on client ===');
 
         } catch (syncError: any) {
             console.error('Error syncing data:', syncError);
