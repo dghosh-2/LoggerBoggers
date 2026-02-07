@@ -9,11 +9,13 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  ReferenceLine
+  ReferenceLine,
+  Line
 } from 'recharts';
 import { motion } from 'framer-motion';
 import { useThemeStore } from '@/stores/theme-store';
 import { TrendingUp, TrendingDown } from 'lucide-react';
+import { SimulationOutput } from '@/lib/simulation-engine';
 
 interface SimulationChartProps {
   baseIncome: number;
@@ -21,6 +23,7 @@ interface SimulationChartProps {
   incomeChange: number;
   expenseChange: number;
   months: number;
+  simulationResult?: SimulationOutput | null;
 }
 
 // Seeded random for consistent but varied results
@@ -57,7 +60,8 @@ export function SimulationChart({
   baseExpenses,
   incomeChange,
   expenseChange,
-  months
+  months,
+  simulationResult
 }: SimulationChartProps) {
   const { theme } = useThemeStore();
   const isDark = theme === 'dark';
@@ -81,46 +85,56 @@ export function SimulationChart({
       cumulative: 0,
       cumulativeHigh: 0,
       cumulativeLow: 0,
+      simulationCumulative: null,
       isBaseline: true
     });
 
     let cumulativeSavings = 0;
     let cumulativeHigh = 0;
     let cumulativeLow = 0;
+    let simulationCumulativeBalance = 0;
 
     for (let i = 1; i <= months; i++) {
       const monthIndex = (currentMonth + i) % 12;
-      
+
       // Gradual transition to target (ease-out curve over ~6 months)
       const transitionProgress = Math.min(1, i / 6);
       const easeOut = 1 - Math.pow(1 - transitionProgress, 3);
-      
+
       // Current targets based on transition
       const currentTargetIncome = baseIncome + (targetIncome - baseIncome) * easeOut;
       const currentTargetExpenses = baseExpenses + (targetExpenses - baseExpenses) * easeOut;
-      
+
       // Apply seasonal factors
       const seasonalExpenseFactor = SEASONAL_EXPENSE_FACTORS[monthIndex] || 1;
       const incomeEvent = INCOME_EVENTS[monthIndex] || 1;
-      
+
       // Add organic randomness (seeded for consistency)
       const randomSeed = i * 137 + incomeChange * 13 + expenseChange * 7;
       const incomeNoise = 1 + (seededRandom(randomSeed) - 0.5) * 0.06;
       const expenseNoise = 1 + (seededRandom(randomSeed + 1) - 0.5) * 0.08;
-      
+
       // Calculate final values
       const monthIncome = Math.round(currentTargetIncome * incomeEvent * incomeNoise);
       const monthExpenses = Math.round(currentTargetExpenses * seasonalExpenseFactor * expenseNoise);
       const monthSavings = monthIncome - monthExpenses;
-      
+
       // Optimistic/pessimistic scenarios for confidence band
       const optimisticSavings = monthSavings * 1.15;
       const pessimisticSavings = monthSavings * 0.85;
-      
+
       cumulativeSavings += monthSavings;
       cumulativeHigh += optimisticSavings;
       cumulativeLow += pessimisticSavings;
-      
+
+      // Get simulation data if available
+      let simulationCumulative = null;
+      if (simulationResult?.projections && i <= simulationResult.projections.length) {
+        const simProjection = simulationResult.projections[i - 1];
+        simulationCumulativeBalance = simProjection.balance - 5000; // Subtract starting balance to show net change
+        simulationCumulative = simulationCumulativeBalance;
+      }
+
       data.push({
         month: monthNames[monthIndex],
         income: monthIncome,
@@ -129,6 +143,7 @@ export function SimulationChart({
         cumulative: Math.round(cumulativeSavings),
         cumulativeHigh: Math.round(cumulativeHigh),
         cumulativeLow: Math.round(cumulativeLow),
+        simulationCumulative,
         isBaseline: false,
         hasBonus: incomeEvent > 1,
         isHighSpend: seasonalExpenseFactor > 1.1
@@ -136,7 +151,7 @@ export function SimulationChart({
     }
 
     return data;
-  }, [baseIncome, baseExpenses, incomeChange, expenseChange, months]);
+  }, [baseIncome, baseExpenses, incomeChange, expenseChange, months, simulationResult]);
 
   // Calculate summary stats
   const finalCumulative = chartData[chartData.length - 1]?.cumulative || 0;
@@ -147,7 +162,7 @@ export function SimulationChart({
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="bg-card border border-border rounded-lg p-2.5 shadow-md">
+        <div className="bg-popover/95 backdrop-blur-sm border border-border rounded-xl p-3 shadow-xl">
           <div className="flex items-center gap-2 mb-2">
             <p className="font-semibold text-foreground">{label}</p>
             {data.hasBonus && (
@@ -180,6 +195,14 @@ export function SimulationChart({
                     ${data.cumulative?.toLocaleString()}
                   </span>
                 </div>
+                {data.simulationCumulative !== null && (
+                  <div className="flex items-center justify-between gap-6">
+                    <span className="text-foreground-muted">Simulation</span>
+                    <span className={`font-mono font-semibold ${data.simulationCumulative >= 0 ? 'text-purple-500' : 'text-destructive'}`}>
+                      ${data.simulationCumulative?.toLocaleString()}
+                    </span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between gap-6 text-[10px] opacity-70">
                   <span className="text-foreground-muted">Range</span>
                   <span className="font-mono">
@@ -212,6 +235,12 @@ export function SimulationChart({
             <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: isDark ? '#34d399' : '#059669' }} />
             <span className="text-xs text-foreground-muted">Monthly</span>
           </div>
+          {simulationResult && (
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-purple-500" />
+              <span className="text-xs text-foreground-muted">Simulation</span>
+            </div>
+          )}
           <div className="flex items-center gap-1.5">
             <div className="w-4 h-2 rounded-sm bg-primary/20 border border-dashed border-primary/40" />
             <span className="text-xs text-foreground-muted">Range</span>
@@ -228,33 +257,33 @@ export function SimulationChart({
           >
             <defs>
               <linearGradient id="cumulativeGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={isDark ? '#818CF8' : '#6366F1'} stopOpacity={0.15} />
-                <stop offset="95%" stopColor={isDark ? '#818CF8' : '#6366F1'} stopOpacity={0} />
+                <stop offset="5%" stopColor={isDark ? '#d4a017' : '#b8860b'} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={isDark ? '#d4a017' : '#b8860b'} stopOpacity={0} />
               </linearGradient>
               <linearGradient id="savingsGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={isDark ? '#34d399' : '#10B981'} stopOpacity={0.15} />
-                <stop offset="95%" stopColor={isDark ? '#34d399' : '#10B981'} stopOpacity={0} />
+                <stop offset="5%" stopColor={isDark ? '#34d399' : '#059669'} stopOpacity={0.2} />
+                <stop offset="95%" stopColor={isDark ? '#34d399' : '#059669'} stopOpacity={0} />
               </linearGradient>
               <linearGradient id="confidenceGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={isDark ? '#818CF8' : '#6366F1'} stopOpacity={0.06} />
-                <stop offset="100%" stopColor={isDark ? '#818CF8' : '#6366F1'} stopOpacity={0.02} />
+                <stop offset="0%" stopColor={isDark ? '#d4a017' : '#b8860b'} stopOpacity={0.1} />
+                <stop offset="100%" stopColor={isDark ? '#d4a017' : '#b8860b'} stopOpacity={0.05} />
               </linearGradient>
             </defs>
-            <CartesianGrid 
-              strokeDasharray="3 3" 
-              stroke={isDark ? '#27272A' : '#E4E4E7'} 
-              vertical={false} 
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke={isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}
+              vertical={false}
             />
             <XAxis
               dataKey="month"
-              stroke={isDark ? '#52525B' : '#71717A'}
+              stroke={isDark ? '#8a8780' : '#6b6860'}
               fontSize={11}
               tickLine={false}
               axisLine={false}
               dy={5}
             />
             <YAxis
-              stroke={isDark ? '#52525B' : '#71717A'}
+              stroke={isDark ? '#8a8780' : '#6b6860'}
               fontSize={11}
               tickLine={false}
               axisLine={false}
@@ -262,7 +291,7 @@ export function SimulationChart({
               dx={-5}
             />
             <Tooltip content={<CustomTooltip />} />
-            <ReferenceLine y={0} stroke={isDark ? '#3F3F46' : '#D4D4D8'} strokeDasharray="3 3" />
+            <ReferenceLine y={0} stroke={isDark ? '#6b6860' : '#9ca3af'} strokeDasharray="3 3" />
             {/* Confidence band - high range */}
             <Area
               type="monotone"
@@ -276,7 +305,7 @@ export function SimulationChart({
             <Area
               type="monotone"
               dataKey="cumulativeLow"
-              stroke={isDark ? 'rgba(129, 140, 248, 0.15)' : 'rgba(99, 102, 241, 0.15)'}
+              stroke={isDark ? 'rgba(212, 160, 23, 0.2)' : 'rgba(184, 134, 11, 0.2)'}
               strokeWidth={1}
               strokeDasharray="4 4"
               fill="none"
@@ -287,29 +316,41 @@ export function SimulationChart({
             <Area
               type="monotone"
               dataKey="cumulative"
-              stroke={isDark ? '#818CF8' : '#6366F1'}
-              strokeWidth={2}
+              stroke={isDark ? '#d4a017' : '#b8860b'}
+              strokeWidth={2.5}
               fill="url(#cumulativeGradient)"
               dot={false}
-              activeDot={{ r: 4, fill: isDark ? '#818CF8' : '#6366F1', strokeWidth: 0 }}
+              activeDot={{ r: 5, fill: isDark ? '#d4a017' : '#b8860b', strokeWidth: 0 }}
             />
             {/* Monthly savings */}
             <Area
               type="monotone"
               dataKey="savings"
-              stroke={isDark ? '#34d399' : '#10B981'}
+              stroke={isDark ? '#34d399' : '#059669'}
               strokeWidth={1.5}
               fill="url(#savingsGradient)"
               dot={false}
-              activeDot={{ r: 3, fill: isDark ? '#34d399' : '#10B981', strokeWidth: 0 }}
+              activeDot={{ r: 4, fill: isDark ? '#34d399' : '#059669', strokeWidth: 0 }}
             />
+            {/* Simulation line - only show if simulation data exists */}
+            {simulationResult && (
+              <Line
+                type="monotone"
+                dataKey="simulationCumulative"
+                stroke="#a855f7"
+                strokeWidth={2.5}
+                dot={false}
+                activeDot={{ r: 5, fill: '#a855f7', strokeWidth: 0 }}
+                connectNulls={false}
+              />
+            )}
           </AreaChart>
         </ResponsiveContainer>
       </div>
 
       {/* Summary Stats */}
       <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-border">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center"
@@ -319,7 +360,7 @@ export function SimulationChart({
             ${Math.abs(finalCumulative).toLocaleString()}
           </p>
         </motion.div>
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05 }}
@@ -330,7 +371,7 @@ export function SimulationChart({
             ${Math.abs(avgMonthlySavings).toLocaleString()}
           </p>
         </motion.div>
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}

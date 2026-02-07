@@ -62,6 +62,7 @@ interface SimulationState {
   askAI: (query: string) => Promise<void>;
   addScenario: (scenario: SimulationScenario) => void;
   setActiveScenario: (id: string | null) => void;
+  applyAIRecommendation: (adjustment: { type: 'income' | 'expense'; amount: number }) => void;
 }
 
 export const useSimulationStore = create<SimulationState>((set, get) => ({
@@ -80,19 +81,19 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   isSimulating: false,
 
   setIncomeChange: (value) => {
-    set({ incomeChange: value });
+    set({ incomeChange: value, simulationResult: null, aiResponse: null });
   },
 
   setExpenseChange: (value) => {
-    set({ expenseChange: value });
+    set({ expenseChange: value, simulationResult: null, aiResponse: null });
   },
 
   setSavingsRate: (value) => {
-    set({ savingsRate: value });
+    set({ savingsRate: value, simulationResult: null, aiResponse: null });
   },
 
   setSimulationMonths: (value) => {
-    set({ simulationMonths: value });
+    set({ simulationMonths: value, simulationResult: null, aiResponse: null });
   },
 
   setCustomEventQuery: (query) => {
@@ -180,6 +181,24 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
     set((state) => ({ scenarios: [...state.scenarios, scenario] })),
 
   setActiveScenario: (id) => set({ activeScenario: id }),
+
+  applyAIRecommendation: (adjustment) => {
+    const { incomeChange, expenseChange } = get();
+
+    if (adjustment.type === 'income') {
+      // Convert absolute amount to percentage change
+      const baseIncome = 9500;
+      const percentChange = (adjustment.amount / baseIncome) * 100;
+      const newIncomeChange = Math.max(-50, Math.min(50, incomeChange + percentChange));
+      set({ incomeChange: Math.round(newIncomeChange) });
+    } else {
+      // Convert absolute amount to percentage change
+      const baseExpenses = 6400;
+      const percentChange = (adjustment.amount / baseExpenses) * 100;
+      const newExpenseChange = Math.max(-50, Math.min(50, expenseChange + percentChange));
+      set({ expenseChange: Math.round(newExpenseChange) });
+    }
+  },
 }));
 
 // Initialize with news on first load

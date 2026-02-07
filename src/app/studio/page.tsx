@@ -19,6 +19,7 @@ import { toast } from "@/components/ui/toast";
 import { useSimulationStore } from "@/stores/simulation-store";
 import { SimulationChart } from "@/components/charts/simulation-chart";
 import { cn } from "@/lib/utils";
+import { SimulationAIResults, RisksAndOpportunities, useSimulationData } from "@/components/studio/SimulationAIResults";
 
 export default function StudioPage() {
   const {
@@ -37,6 +38,7 @@ export default function StudioPage() {
     aiResponse,
     isLoadingAI,
     simulationResult,
+    applyAIRecommendation,
   } = useSimulationStore();
 
   const [activeScenario, setActiveScenario] = useState<string | null>(null);
@@ -95,95 +97,128 @@ export default function StudioPage() {
     await askAI(aiQuery);
   };
 
+  const handleApplyRecommendation = (adjustment: { type: 'income' | 'expense'; amount: number; description: string }) => {
+    applyAIRecommendation(adjustment);
+    const changeType = adjustment.type === 'income' ? 'Income' : 'Expense';
+    const sign = adjustment.amount >= 0 ? '+' : '';
+    toast.success(`Applied: ${changeType} ${sign}$${adjustment.amount}`);
+  };
+
+  // Get structured AI data for separate cards
+  const structuredData = useSimulationData(aiResponse, simulationResult);
+
+  // Calculate projected values
   const baseIncome = 9500;
   const baseExpenses = 6400;
-  const projectedIncome = baseIncome * (1 + incomeChange / 100);
-  const projectedExpenses = baseExpenses * (1 + expenseChange / 100);
+
+  // Use simulation results if available, otherwise estimate based on sliders
+  const projectedIncome = simulationResult
+    ? Math.round(simulationResult.totalIncome / simulationResult.projections.length)
+    : baseIncome * (1 + incomeChange / 100);
+
+  const projectedExpenses = simulationResult
+    ? Math.round(simulationResult.totalExpenses / simulationResult.projections.length)
+    : baseExpenses * (1 + expenseChange / 100);
+
   const projectedSavings = projectedIncome - projectedExpenses;
+
+  // Calculate effective percentage changes
+  const effectiveIncomeChange = Math.round(((projectedIncome - baseIncome) / baseIncome) * 100);
+  const effectiveExpenseChange = Math.round(((projectedExpenses - baseExpenses) / baseExpenses) * 100);
+
   const monthlyGoal = 3500;
   const goalProgress = Math.min((projectedSavings / monthlyGoal) * 100, 100);
 
   return (
     <PageTransition>
-      <div className="space-y-6">
+      <div className="space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
+            <h1 className="text-3xl font-semibold tracking-tight flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-primary/10">
+                <Sliders className="w-6 h-6 text-primary" />
+              </div>
               Studio
             </h1>
-            <p className="text-foreground-muted text-sm mt-1">
+            <p className="text-foreground-muted mt-1">
               Simulate financial scenarios and explore possibilities
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <button
+          <div className="flex items-center gap-3">
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={handleReset}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary border border-border text-xs font-medium text-foreground-muted hover:text-foreground transition-colors duration-150 cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-secondary border border-border text-sm font-medium text-foreground-muted hover:text-foreground transition-colors"
             >
-              <RotateCcw className="w-3 h-3" />
+              <RotateCcw className="w-4 h-4" />
               Reset
-            </button>
-            <button
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={handleRunSimulation}
               disabled={isSimulating}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSimulating ? (
                 <>
-                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                   Running...
                 </>
               ) : (
                 <>
-                  <Play className="w-3 h-3" />
+                  <Play className="w-4 h-4" />
                   Simulate
                 </>
               )}
-            </button>
+            </motion.button>
           </div>
         </div>
 
         {/* Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Controls */}
-          <div className="space-y-4">
+          <div className="space-y-6">
             {/* Quick Scenarios */}
-            <motion.div 
-              initial={{ opacity: 0, y: 8 }}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.05 }}
+              transition={{ delay: 0.1 }}
               className="card-elevated p-5"
             >
-              <h3 className="font-semibold mb-3 text-xs">Quick Scenarios</h3>
-              <div className="space-y-1.5">
+              <h3 className="font-semibold mb-4 text-sm">Quick Scenarios</h3>
+              <div className="space-y-2">
                 {scenarios.map((scenario) => (
-                  <button
+                  <motion.button
                     key={scenario.id}
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.99 }}
                     onClick={() => applyScenario(scenario)}
                     className={cn(
-                      "w-full p-3 rounded-lg text-left transition-all duration-150 cursor-pointer",
+                      "w-full p-3 rounded-xl text-left transition-all duration-200",
                       activeScenario === scenario.id
-                        ? "bg-accent/10 border border-accent/20"
+                        ? "bg-primary/10 border border-primary/30"
                         : "bg-secondary/50 hover:bg-secondary border border-transparent"
                     )}
                   >
-                    <p className="font-medium text-xs">{scenario.name}</p>
-                    <p className="text-[11px] text-foreground-muted mt-0.5">{scenario.description}</p>
-                  </button>
+                    <p className="font-medium text-sm">{scenario.name}</p>
+                    <p className="text-xs text-foreground-muted mt-0.5">{scenario.description}</p>
+                  </motion.button>
                 ))}
               </div>
             </motion.div>
 
             {/* Manual Controls */}
-            <motion.div 
-              initial={{ opacity: 0, y: 8 }}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
+              transition={{ delay: 0.2 }}
               className="card-elevated p-5"
             >
-              <h3 className="font-semibold mb-4 text-xs">Adjustments</h3>
-              <div className="space-y-5">
+              <h3 className="font-semibold mb-5 text-sm">Adjustments</h3>
+              <div className="space-y-6">
                 <GlassSlider
                   label="Income Change"
                   min={-50}
@@ -208,53 +243,93 @@ export default function StudioPage() {
                   onChange={setSavingsRate}
                   formatValue={(v) => `${v}%`}
                 />
-                <GlassSlider
-                  label="Duration"
-                  min={3}
-                  max={36}
-                  value={simulationMonths}
-                  onChange={setSimulationMonths}
-                  formatValue={(v) => `${v} mo`}
-                />
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-medium text-foreground-muted">Duration</label>
+                    <span className="text-xs font-mono text-primary">
+                      {simulationMonths >= 12 ? `${simulationMonths / 12} Years` : `${simulationMonths} Months`}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[6, 12, 24, 60].map((m) => (
+                      <button
+                        key={m}
+                        onClick={() => setSimulationMonths(m)}
+                        className={cn(
+                          "px-2 py-2 rounded-lg text-xs font-medium transition-all duration-200 border",
+                          simulationMonths === m
+                            ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                            : "bg-secondary/30 text-foreground hover:bg-secondary/50 border-transparent hover:border-border"
+                        )}
+                      >
+                        {m >= 12 ? `${m / 12}Y` : `${m}M`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </motion.div>
 
             {/* Goal Progress */}
-            <motion.div 
-              initial={{ opacity: 0, y: 8 }}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 }}
+              transition={{ delay: 0.3 }}
               className="card-elevated p-5"
             >
-              <div className="flex items-center justify-between mb-2.5">
-                <h3 className="font-semibold flex items-center gap-1.5 text-xs">
-                  <Target className="w-3.5 h-3.5 text-primary" />
-                  Monthly Savings Goal
-                </h3>
-                <span className="text-xs font-mono text-foreground-muted tabular-nums">${monthlyGoal.toLocaleString()}</span>
-              </div>
-              <div className="h-1.5 bg-secondary rounded-full overflow-hidden mb-2.5">
-                <motion.div
-                  className="h-full rounded-full bg-primary"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${goalProgress}%` }}
-                  transition={{ duration: 0.4, ease: "easeOut" }}
-                />
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-foreground-muted tabular-nums">Projected: ${projectedSavings.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                <span className="font-semibold text-primary tabular-nums">{goalProgress.toFixed(0)}%</span>
+              <h3 className="font-semibold mb-4 flex items-center gap-2 text-sm">
+                <Target className="w-4 h-4 text-primary" />
+                Monthly Savings Goal
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-xs text-foreground-muted">Target</span>
+                    <span className="text-sm font-semibold font-mono text-primary">
+                      ${projectedSavings.toLocaleString()}/mo
+                    </span>
+                  </div>
+                  <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${Math.min((projectedSavings / 3000) * 100, 100)}%` }}
+                      className="h-full bg-primary rounded-full"
+                      transition={{ delay: 0.4, duration: 0.5 }}
+                    />
+                  </div>
+                </div>
+                <div className="pt-3 border-t border-border">
+                  <p className="text-xs text-foreground-muted mb-2">Annual Goal</p>
+                  <p className="text-lg font-semibold font-mono text-primary">
+                    ${(projectedSavings * 12).toLocaleString()}
+                  </p>
+                </div>
               </div>
             </motion.div>
+
+            {/* Risks & Opportunities - New Card */}
+            {structuredData && (structuredData.risks.length > 0 || structuredData.opportunities.length > 0) && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.35 }}
+                className="card-elevated p-5"
+              >
+                <RisksAndOpportunities
+                  risks={structuredData.risks}
+                  opportunities={structuredData.opportunities}
+                />
+              </motion.div>
+            )}
           </div>
 
           {/* Right Column - Results */}
-          <div className="lg:col-span-2 space-y-4">
+          <div className="lg:col-span-2 space-y-6">
             {/* Simulation Visualization */}
-            <motion.div 
-              initial={{ opacity: 0, y: 8 }}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.05 }}
+              transition={{ delay: 0.1 }}
               className="card-elevated p-5"
             >
               <SimulationChart
@@ -263,180 +338,170 @@ export default function StudioPage() {
                 incomeChange={incomeChange}
                 expenseChange={expenseChange}
                 months={simulationMonths}
+                simulationResult={simulationResult}
               />
             </motion.div>
 
             {/* Projected Summary Cards */}
-            <div className="grid grid-cols-3 gap-3">
-              <motion.div 
-                initial={{ opacity: 0, y: 8 }}
+            <div className="grid grid-cols-3 gap-4">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.05 }}
+                transition={{ delay: 0.1 }}
                 className="card-elevated p-4"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-[11px] text-foreground-muted">Projected Income</p>
+                  <p className="text-xs text-foreground-muted">Projected Income</p>
                   <div className={cn(
-                    "p-1 rounded-md",
-                    incomeChange >= 0 ? "bg-success-soft" : "bg-destructive-soft"
+                    "p-1.5 rounded-lg",
+                    incomeChange >= 0 ? "bg-success/10" : "bg-destructive/10"
                   )}>
                     {incomeChange >= 0 ? (
-                      <TrendingUp className="w-3 h-3 text-success" />
+                      <TrendingUp className="w-3.5 h-3.5 text-success" />
                     ) : (
-                      <TrendingDown className="w-3 h-3 text-destructive" />
+                      <TrendingDown className="w-3.5 h-3.5 text-destructive" />
                     )}
                   </div>
                 </div>
-                <p className="text-lg font-semibold font-mono tabular-nums">
+                <p className="text-xl font-semibold font-mono">
                   ${projectedIncome.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </p>
                 <p className={cn(
-                  "text-[11px] mt-0.5 tabular-nums",
-                  incomeChange >= 0 ? "text-success" : "text-destructive"
+                  "text-xs mt-1",
+                  effectiveIncomeChange >= 0 ? "text-success" : "text-destructive"
                 )}>
-                  {incomeChange >= 0 ? "+" : ""}{incomeChange}% from current
+                  {effectiveIncomeChange >= 0 ? "+" : ""}{effectiveIncomeChange}% from current
                 </p>
               </motion.div>
 
-              <motion.div 
-                initial={{ opacity: 0, y: 8 }}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.08 }}
+                transition={{ delay: 0.15 }}
                 className="card-elevated p-4"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-[11px] text-foreground-muted">Projected Expenses</p>
+                  <p className="text-xs text-foreground-muted">Projected Expenses</p>
                   <div className={cn(
-                    "p-1 rounded-md",
-                    expenseChange <= 0 ? "bg-success-soft" : "bg-destructive-soft"
+                    "p-1.5 rounded-lg",
+                    expenseChange <= 0 ? "bg-success/10" : "bg-destructive/10"
                   )}>
                     {expenseChange <= 0 ? (
-                      <TrendingDown className="w-3 h-3 text-success" />
+                      <TrendingDown className="w-3.5 h-3.5 text-success" />
                     ) : (
-                      <TrendingUp className="w-3 h-3 text-destructive" />
+                      <TrendingUp className="w-3.5 h-3.5 text-destructive" />
                     )}
                   </div>
                 </div>
-                <p className="text-lg font-semibold font-mono tabular-nums">
+                <p className="text-xl font-semibold font-mono">
                   ${projectedExpenses.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </p>
                 <p className={cn(
-                  "text-[11px] mt-0.5 tabular-nums",
-                  expenseChange <= 0 ? "text-success" : "text-destructive"
+                  "text-xs mt-1",
+                  effectiveExpenseChange <= 0 ? "text-success" : "text-destructive"
                 )}>
-                  {expenseChange >= 0 ? "+" : ""}{expenseChange}% from current
+                  {effectiveExpenseChange >= 0 ? "+" : ""}{effectiveExpenseChange}% from current
                 </p>
               </motion.div>
 
-              <motion.div 
-                initial={{ opacity: 0, y: 8 }}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.11 }}
+                transition={{ delay: 0.2 }}
                 className="card-elevated p-4"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-[11px] text-foreground-muted">Net Savings</p>
+                  <p className="text-xs text-foreground-muted">Net Savings</p>
                   <div className={cn(
-                    "p-1 rounded-md",
-                    projectedSavings >= 0 ? "bg-success-soft" : "bg-destructive-soft"
+                    "p-1.5 rounded-lg",
+                    projectedSavings >= 0 ? "bg-success/10" : "bg-destructive/10"
                   )}>
                     <Target className={cn(
-                      "w-3 h-3",
+                      "w-3.5 h-3.5",
                       projectedSavings >= 0 ? "text-success" : "text-destructive"
                     )} />
                   </div>
                 </div>
-                <p className="text-lg font-semibold font-mono tabular-nums">
+                <p className="text-xl font-semibold font-mono">
                   ${projectedSavings.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </p>
-                <p className="text-[11px] mt-0.5 text-foreground-muted">
+                <p className="text-xs mt-1 text-foreground-muted">
                   per month
                 </p>
               </motion.div>
             </div>
 
             {/* AI Chat Section */}
-            <motion.div 
-              initial={{ opacity: 0, y: 8 }}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.14 }}
+              transition={{ delay: 0.25 }}
               className="card-elevated p-5"
             >
-              <h3 className="font-semibold mb-3 flex items-center gap-1.5 text-xs">
-                <MessageSquare className="w-3.5 h-3.5 text-primary" />
+              <h3 className="font-semibold mb-4 flex items-center gap-2 text-sm">
+                <MessageSquare className="w-4 h-4 text-primary" />
                 Ask AI About Your Scenario
               </h3>
-              <div className="flex gap-2 mb-3">
+              <div className="flex gap-2 mb-4">
                 <input
                   type="text"
                   value={aiQuery}
                   onChange={(e) => setAiQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleAskAI()}
                   placeholder="e.g., What if rent increases by 10%?"
-                  className="flex-1 px-3.5 py-2.5 rounded-lg bg-secondary border border-border focus:border-primary focus:outline-none transition-colors text-xs placeholder:text-foreground-muted"
+                  className="flex-1 px-4 py-3 rounded-xl bg-secondary/50 border border-border focus:border-primary focus:outline-none transition-colors text-sm placeholder:text-foreground-muted"
                 />
-                <button
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={handleAskAI}
                   disabled={isLoadingAI || !aiQuery.trim()}
-                  className="px-3.5 py-2.5 rounded-lg bg-primary text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                  className="px-4 py-3 rounded-xl bg-primary text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isLoadingAI ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
-                    <Send className="w-3.5 h-3.5" />
+                    <Send className="w-4 h-4" />
                   )}
-                </button>
+                </motion.button>
               </div>
 
-              {aiResponse && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="p-3.5 rounded-lg bg-accent/[0.06] border border-accent/15"
-                >
-                  <p className="text-xs whitespace-pre-wrap text-foreground">{aiResponse}</p>
-                </motion.div>
-              )}
-
-              {simulationResult?.insights && simulationResult.insights.length > 0 && (
-                <div className="mt-3 space-y-1.5">
-                  <p className="text-[10px] font-medium text-foreground-muted uppercase tracking-wider">Insights</p>
-                  {simulationResult.insights.map((insight, i) => (
-                    <div key={i} className="flex items-start gap-2 p-2.5 bg-secondary/40 rounded-lg text-xs">
-                      <div className="w-1 h-1 rounded-full bg-primary shrink-0 mt-1.5" />
-                      <span>{insight}</span>
-                    </div>
-                  ))}
-                </div>
+              {/* AI Response with New Card UI */}
+              {(aiResponse || simulationResult) && (
+                <SimulationAIResults
+                  aiResponse={aiResponse}
+                  simulationResult={simulationResult}
+                  onApplyRecommendation={handleApplyRecommendation}
+                />
               )}
             </motion.div>
 
             {/* Monthly Projections */}
             {simulationResult?.projections && (
-              <motion.div 
-                initial={{ opacity: 0, y: 8 }}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="card-elevated p-5"
               >
-                <h3 className="font-semibold mb-3 text-xs">Monthly Projections</h3>
+                <h3 className="font-semibold mb-4 text-sm">Monthly Projections</h3>
                 <div className="overflow-x-auto -mx-2 px-2">
-                  <div className="flex gap-2.5 pb-2">
+                  <div className="flex gap-3 pb-2">
                     {simulationResult.projections.slice(0, 6).map((proj, i) => (
-                      <div key={i} className="min-w-[120px] p-3 bg-secondary/40 rounded-lg">
-                        <p className="font-medium text-xs mb-2 text-foreground">{proj.monthName}</p>
-                        <div className="space-y-1 text-[11px]">
+                      <div key={i} className="min-w-[130px] p-3 bg-secondary/30 rounded-xl">
+                        <p className="font-medium text-sm mb-2 text-foreground">{proj.monthName}</p>
+                        <div className="space-y-1.5 text-xs">
                           <div className="flex justify-between">
                             <span className="text-foreground-muted">Income</span>
-                            <span className="text-success font-mono tabular-nums">${proj.income.toLocaleString()}</span>
+                            <span className="text-success font-mono">${proj.income.toLocaleString()}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-foreground-muted">Expenses</span>
-                            <span className="text-destructive font-mono tabular-nums">${proj.expenses.toLocaleString()}</span>
+                            <span className="text-destructive font-mono">${proj.expenses.toLocaleString()}</span>
                           </div>
                           <div className="flex justify-between pt-1 border-t border-border">
                             <span className="text-foreground-muted">Net</span>
                             <span className={cn(
-                              "font-mono font-medium tabular-nums",
+                              "font-mono font-medium",
                               proj.balance >= 0 ? 'text-success' : 'text-destructive'
                             )}>
                               ${proj.balance.toLocaleString()}
