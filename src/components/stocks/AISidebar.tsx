@@ -347,7 +347,7 @@ export function AISidebar({
                                         {riskSummary.overallRisk.toUpperCase()}
                                     </span>
                                 </div>
-                                <div className="h-2 bg-white/30 rounded-full overflow-hidden">
+                                <div className="h-2 bg-secondary rounded-full overflow-hidden">
                                     <motion.div 
                                         className={`h-full rounded-full ${
                                             riskSummary.overallRisk === 'high' ? 'bg-destructive' :

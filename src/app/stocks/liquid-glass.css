@@ -44,10 +44,9 @@
 
 .glass-sidebar {
     position: relative;
-    border-radius: 24px;
-    background: rgba(255, 255, 255, 0.2);
-    backdrop-filter: blur(30px) saturate(140%);
-    -webkit-backdrop-filter: blur(30px) saturate(140%);
+    border-radius: 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -56,12 +55,12 @@
 
 .glass-insight {
     padding: 12px;
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    background: var(--secondary);
 }
 
 .glass-insight:hover {
-    background: rgba(255, 255, 255, 0.25);
+    background: var(--background-tertiary);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -75,14 +74,14 @@
     border-radius: 20px;
     font-size: 12px;
     font-weight: 500;
-    background: rgba(255, 255, 255, 0.3);
-    color: rgba(80, 60, 20, 0.9);
+    background: var(--secondary);
+    color: var(--foreground-muted);
     cursor: pointer;
     transition: background 0.2s ease;
 }
 
 .glass-pill:hover {
-    background: rgba(255, 255, 255, 0.45);
+    background: var(--background-tertiary);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -91,7 +90,7 @@
 
 .glass-divider {
     height: 1px;
-    background: rgba(150, 120, 60, 0.15);
+    background: var(--border);
     margin: 12px 0;
 }
 
