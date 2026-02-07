@@ -38,19 +38,16 @@ export function useFinancialData() {
             const summaryResponse = await fetch('/api/data/summary');
             const summaryData = await summaryResponse.json();
 
-            let txData: Transaction[] = [];
-            
-            // Only fetch transactions if connected
-            if (summaryData.is_connected) {
-                const txResponse = await fetch('/api/data/transactions?limit=5000');
-                const txResult = await txResponse.json();
-                txData = txResult.transactions || [];
-            }
+            // Always fetch transactions for the logged-in user.
+            // This app treats "connected" as "has data", not strictly "Plaid connected".
+            const txResponse = await fetch('/api/data/transactions?limit=5000');
+            const txResult = await txResponse.json();
+            const txData: Transaction[] = txResult.transactions || [];
 
             setData({
                 transactions: txData,
                 summary: summaryData,
-                isConnected: summaryData.is_connected,
+                isConnected: Boolean(summaryData.is_connected) || txData.length > 0,
             });
         } catch (err: any) {
             console.error('Error fetching financial data:', err);
@@ -133,19 +130,14 @@ export async function refreshGlobalFinancialData() {
 
         const summaryResponse = await fetch('/api/data/summary');
         const summaryData = await summaryResponse.json();
-
-        let txData: Transaction[] = [];
-        
-        if (summaryData.is_connected) {
-            const txResponse = await fetch('/api/data/transactions?limit=5000');
-            const txResult = await txResponse.json();
-            txData = txResult.transactions || [];
-        }
+        const txResponse = await fetch('/api/data/transactions?limit=5000');
+        const txResult = await txResponse.json();
+        const txData: Transaction[] = txResult.transactions || [];
 
         store.setData({
             transactions: txData,
             summary: summaryData,
-            isConnected: summaryData.is_connected,
+            isConnected: Boolean(summaryData.is_connected) || txData.length > 0,
         });
     } catch (err) {
         console.error('Error refreshing global financial data:', err);

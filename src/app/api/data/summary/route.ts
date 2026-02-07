@@ -35,21 +35,6 @@ export async function GET(request: NextRequest) {
         
         const isConnected = connectionData?.is_connected || false;
         
-        if (!isConnected) {
-            // Return zeros if not connected
-            return NextResponse.json({
-                is_connected: false,
-                total_spending: 0,
-                total_income: 0,
-                net_worth: 0,
-                monthly_spending: 0,
-                monthly_income: 0,
-                spending_by_category: {},
-                recent_transactions: [],
-                monthly_trend: [],
-            });
-        }
-        
         // Get current month dates
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
@@ -62,7 +47,7 @@ export async function GET(request: NextRequest) {
         
         // Fetch all transactions for calculations
         const { data: allTransactions } = await supabaseAdmin
-            .from('transactions')
+            .from('financial_transactions')
             .select('amount, category, date, name')
             .eq('uuid_user_id', userId)
             .gte('date', twelveMonthsAgoStr)
@@ -140,8 +125,11 @@ export async function GET(request: NextRequest) {
         fetch('http://127.0.0.1:7245/ingest/2d405ccf-cb3f-4611-bc27-f95a616c15c9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'summary/route.ts:138',message:'Summary data computed',data:{txCount:transactions.length,incomeCount:income.length,categories:Object.keys(spendingByCategory),recentTxSample:recentTransactions.slice(0,3)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
         // #endregion
         
+        const hasAnyData = transactions.length > 0 || income.length > 0;
+
         return NextResponse.json({
-            is_connected: true,
+            // "connected" means "has usable data" for the dashboard. Plaid is optional for the MVP.
+            is_connected: isConnected || hasAnyData,
             total_spending: Math.round(totalSpending * 100) / 100,
             total_income: Math.round(totalIncome * 100) / 100,
             net_worth: Math.round((totalIncome - totalSpending) * 100) / 100,

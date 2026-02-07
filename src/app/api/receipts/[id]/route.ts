@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@repo/core';
+import { getUserIdFromRequest } from '@/lib/auth';
 
 export async function GET(
     req: Request,
@@ -7,6 +8,8 @@ export async function GET(
 ) {
     try {
         const { id } = await params;
+        const userId = await getUserIdFromRequest(req);
+        if (!userId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
 
         // Fetch receipt with full OCR/audit/normalized details
         const { data: receipt, error: rError } = await supabase
@@ -19,6 +22,7 @@ export async function GET(
         receipt_amount_breakdowns (*)
       `)
             .eq('id', id)
+            .eq('user_id', userId)
             .single();
 
         if (rError) throw rError;

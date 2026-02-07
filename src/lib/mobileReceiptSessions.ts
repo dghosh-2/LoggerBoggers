@@ -2,6 +2,7 @@ export type MobileSessionStatus = 'waiting' | 'uploading' | 'processed' | 'error
 
 export interface MobileReceiptSession {
     sessionId: string;
+    userId: string;
     status: MobileSessionStatus;
     receiptId: string | null;
     error: string | null;
@@ -35,7 +36,7 @@ function cleanupExpiredSessions() {
     }
 }
 
-export function createMobileSession() {
+export function createMobileSession(userId: string) {
     cleanupExpiredSessions();
 
     const sessionId = crypto.randomUUID();
@@ -43,6 +44,7 @@ export function createMobileSession() {
 
     const session: MobileReceiptSession = {
         sessionId,
+        userId,
         status: 'waiting',
         receiptId: null,
         error: null,

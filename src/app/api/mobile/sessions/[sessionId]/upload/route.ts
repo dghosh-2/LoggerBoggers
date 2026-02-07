@@ -36,7 +36,7 @@ export async function POST(
             data: { publicUrl },
         } = supabase.storage.from(RECEIPTS_BUCKET).getPublicUrl(fileName);
 
-        const receiptId = await createReceiptAndTriggerOcr(publicUrl);
+        const receiptId = await createReceiptAndTriggerOcr(publicUrl, session.userId);
 
         // Fire-and-forget: run Dedalus OCR -> chat extraction and store results.
         // Use absolute URL derived from this request (works in local dev and deployments).
