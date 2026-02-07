@@ -3,14 +3,13 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GlassCard } from '@/components/ui/glass-card';
+import { GlassButton } from '@/components/ui/glass-button';
 import { useBudgetStore } from '@/stores/budgetStore';
 import {
-    ChevronDown,
     ChevronRight,
     Lock,
     Settings,
     ShoppingBag,
-    Home,
     Car,
     Utensils,
     Film,
@@ -53,30 +52,32 @@ export function CategoryBreakdown({ onAdjustBudgets }: CategoryBreakdownProps) {
 
     return (
         <section className="space-y-4">
-            {/* Section Header */}
             <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-white">Budget Breakdown</h2>
-                <button
+                <div>
+                    <h2 className="text-xl font-semibold text-foreground">Categories</h2>
+                    <p className="text-xs text-foreground-muted">Fixed and flexible spending</p>
+                </div>
+                <GlassButton
                     onClick={onAdjustBudgets}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 transition-colors text-sm"
+                    variant="secondary"
+                    size="sm"
                 >
                     <Settings className="w-4 h-4" />
-                    Adjust Budgets
-                </button>
+                    Adjust
+                </GlassButton>
             </div>
 
-            {/* Fixed Expenses */}
             <GlassCard className="overflow-hidden">
-                <div className="p-4 border-b border-gray-700/50">
+                <div className="p-4 border-b border-border">
                     <div className="flex items-center gap-2">
-                        <Lock className="w-4 h-4 text-gray-400" />
-                        <h3 className="font-medium text-gray-300">Fixed Expenses</h3>
-                        <span className="ml-auto text-sm text-gray-500">
+                        <Lock className="w-4 h-4 text-foreground-muted" />
+                        <h3 className="font-medium text-foreground">Fixed</h3>
+                        <span className="ml-auto text-sm text-foreground-muted">
                             ${fixedCategories.reduce((sum, c) => sum + c.allocated, 0).toLocaleString()}
                         </span>
                     </div>
                 </div>
-                <div className="divide-y divide-gray-700/30">
+                <div className="divide-y divide-border">
                     {fixedCategories.map((category, index) => (
                         <CategoryRow
                             key={category.category}
@@ -87,25 +88,24 @@ export function CategoryBreakdown({ onAdjustBudgets }: CategoryBreakdownProps) {
                         />
                     ))}
                     {fixedCategories.length === 0 && (
-                        <div className="p-4 text-center text-gray-500 text-sm">
-                            No fixed expenses configured
+                        <div className="p-4 text-center text-foreground-muted text-sm">
+                            No fixed categories configured
                         </div>
                     )}
                 </div>
             </GlassCard>
 
-            {/* Flexible Expenses */}
             <GlassCard className="overflow-hidden">
-                <div className="p-4 border-b border-gray-700/50">
+                <div className="p-4 border-b border-border">
                     <div className="flex items-center gap-2">
-                        <ShoppingBag className="w-4 h-4 text-gray-400" />
-                        <h3 className="font-medium text-gray-300">Flexible Expenses</h3>
-                        <span className="ml-auto text-sm text-gray-500">
+                        <ShoppingBag className="w-4 h-4 text-foreground-muted" />
+                        <h3 className="font-medium text-foreground">Flexible</h3>
+                        <span className="ml-auto text-sm text-foreground-muted">
                             ${flexibleCategories.reduce((sum, c) => sum + c.allocated, 0).toLocaleString()}
                         </span>
                     </div>
                 </div>
-                <div className="divide-y divide-gray-700/30">
+                <div className="divide-y divide-border">
                     {flexibleCategories.map((category, index) => (
                         <CategoryRow
                             key={category.category}
@@ -116,8 +116,8 @@ export function CategoryBreakdown({ onAdjustBudgets }: CategoryBreakdownProps) {
                         />
                     ))}
                     {flexibleCategories.length === 0 && (
-                        <div className="p-4 text-center text-gray-500 text-sm">
-                            No flexible expenses yet
+                        <div className="p-4 text-center text-foreground-muted text-sm">
+                            No flexible categories yet
                         </div>
                     )}
                 </div>
@@ -136,12 +136,6 @@ interface CategoryRowProps {
 function CategoryRow({ category, index, isExpanded, onToggle }: CategoryRowProps) {
     const icon = CATEGORY_ICONS[normalizeCategory(category.category)] || <MoreHorizontal className="w-4 h-4" />;
 
-    const statusColors = {
-        healthy: 'bg-emerald-500',
-        warning: 'bg-amber-500',
-        danger: 'bg-red-500',
-    };
-
     return (
         <div>
             <motion.button
@@ -149,51 +143,46 @@ function CategoryRow({ category, index, isExpanded, onToggle }: CategoryRowProps
                 animate={{ opacity: 1 }}
                 transition={{ delay: index * 0.05 }}
                 onClick={onToggle}
-                className="w-full p-4 flex items-center gap-4 hover:bg-white/5 transition-colors"
+                className="w-full p-4 flex items-center gap-4 hover:bg-secondary transition-colors"
             >
-                {/* Icon */}
-                <div className="p-2 rounded-lg bg-gray-700/50 text-gray-400">
+                <div className="p-2 rounded-lg bg-secondary text-foreground-muted">
                     {icon}
                 </div>
 
-                {/* Category Info */}
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                            <span className="font-medium text-white">{category.category}</span>
+                            <span className="font-medium text-foreground">{category.category}</span>
                             {category.isFixed && (
-                                <Lock className="w-3 h-3 text-gray-500" />
+                                <Lock className="w-3 h-3 text-foreground-muted" />
                             )}
                         </div>
                         <div className="text-right">
-                            <span className="text-white font-medium">
+                            <span className="text-foreground font-medium">
                                 ${category.spent.toLocaleString()}
                             </span>
-                            <span className="text-gray-500"> / ${category.allocated.toLocaleString()}</span>
+                            <span className="text-foreground-muted"> / ${category.allocated.toLocaleString()}</span>
                         </div>
                     </div>
 
-                    {/* Progress Bar */}
-                    <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                    <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
                         <motion.div
                             initial={{ width: 0 }}
                             animate={{ width: `${Math.min(category.percentUsed, 100)}%` }}
                             transition={{ duration: 0.5, delay: index * 0.05 }}
-                            className={`h-full rounded-full ${statusColors[category.status]}`}
+                            className="h-full rounded-full bg-primary"
                         />
                     </div>
                 </div>
 
-                {/* Expand Icon */}
                 <motion.div
                     animate={{ rotate: isExpanded ? 90 : 0 }}
                     transition={{ duration: 0.2 }}
                 >
-                    <ChevronRight className="w-5 h-5 text-gray-500" />
+                    <ChevronRight className="w-5 h-5 text-foreground-muted" />
                 </motion.div>
             </motion.button>
 
-            {/* Expanded Content */}
             <AnimatePresence>
                 {isExpanded && (
                     <motion.div
@@ -204,28 +193,25 @@ function CategoryRow({ category, index, isExpanded, onToggle }: CategoryRowProps
                         className="overflow-hidden"
                     >
                         <div className="px-4 pb-4 pt-0">
-                            <div className="p-4 rounded-xl bg-gray-800/50 space-y-3">
+                            <div className="p-4 rounded-lg bg-secondary/60 space-y-3">
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-gray-400">Spent this month</span>
-                                    <span className="text-white">${category.spent.toLocaleString()}</span>
+                                    <span className="text-foreground-muted">Spent this month</span>
+                                    <span className="text-foreground">${category.spent.toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-gray-400">Budget allocated</span>
-                                    <span className="text-white">${category.allocated.toLocaleString()}</span>
+                                    <span className="text-foreground-muted">Budget allocated</span>
+                                    <span className="text-foreground">${category.allocated.toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-gray-400">Remaining</span>
-                                    <span className={category.remaining >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+                                    <span className="text-foreground-muted">Remaining</span>
+                                    <span className={category.remaining >= 0 ? 'text-foreground' : 'text-destructive'}>
                                         ${category.remaining.toLocaleString()}
                                     </span>
                                 </div>
-                                <div className="pt-2 border-t border-gray-700/50">
+                                <div className="pt-2 border-t border-border">
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-gray-400">Usage</span>
-                                        <span className={`font-medium ${category.status === 'danger' ? 'text-red-400' :
-                                                category.status === 'warning' ? 'text-amber-400' :
-                                                    'text-emerald-400'
-                                            }`}>
+                                        <span className="text-foreground-muted">Usage</span>
+                                        <span className="font-medium text-foreground">
                                             {category.percentUsed.toFixed(1)}%
                                         </span>
                                     </div>

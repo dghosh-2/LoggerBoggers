@@ -104,7 +104,7 @@ export const INITIAL_NODES = [
         id: '1',
         type: 'custom',
         position: { x: 350, y: 0 },
-        data: { label: 'Tech Salary', amount: '$8,400', type: 'income', icon: 'Wallet' }
+        data: { label: 'Salary', amount: '$8,400', type: 'income', icon: 'Wallet' }
     },
 
     // Level 2: Accounts
@@ -112,13 +112,13 @@ export const INITIAL_NODES = [
         id: '2',
         type: 'custom',
         position: { x: 200, y: 180 },
-        data: { label: 'Chase Checking', amount: '$12,450', type: 'account', icon: 'CreditCard' }
+        data: { label: 'Checking', amount: '$12,450', type: 'account', icon: 'CreditCard' }
     },
     {
         id: '3',
         type: 'custom',
         position: { x: 500, y: 180 },
-        data: { label: 'Dime Savings', amount: '$34,000', type: 'account', icon: 'PiggyBank' }
+        data: { label: 'Savings', amount: '$34,000', type: 'account', icon: 'PiggyBank' }
     },
 
     // Level 3: Expenses (Categories)

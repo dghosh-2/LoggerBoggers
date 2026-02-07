@@ -115,7 +115,7 @@ export function BudgetOnboarding({ onComplete }: BudgetOnboardingProps) {
         localStorage.setItem('budget_preferences', JSON.stringify(preferences));
         localStorage.setItem('budget_onboarding_complete', 'true');
         
-        // Simulate AI processing
+        // Simulate processing
         await new Promise(resolve => setTimeout(resolve, 2500));
         
         setIsProcessing(false);
@@ -178,11 +178,11 @@ export function BudgetOnboarding({ onComplete }: BudgetOnboardingProps) {
                         
                         <div>
                             <h2 className="text-3xl font-bold text-white mb-3">
-                                AI-Powered Budgeting
+                                Budget Setup
                             </h2>
                             <p className="text-gray-400 max-w-md mx-auto">
-                                Let's set up your personalized budget. I'll analyze your spending patterns 
-                                and create a smart budget that adapts to your lifestyle.
+                                Let's set up your budget based on your spending patterns
+                                and preferences.
                             </p>
                         </div>
 
@@ -322,7 +322,7 @@ export function BudgetOnboarding({ onComplete }: BudgetOnboardingProps) {
                                 What are your financial goals?
                             </h2>
                             <p className="text-gray-400">
-                                Tell us what you're working towards. Our AI will help you get there.
+                                Tell us what you're working towards. We'll help you stay on track.
                             </p>
                         </div>
 
@@ -338,7 +338,7 @@ export function BudgetOnboarding({ onComplete }: BudgetOnboardingProps) {
                                 />
                             </div>
                             <p className="text-xs text-gray-500 mt-2">
-                                Be as specific as you'd like. Our AI uses this to personalize your insights.
+                                Be as specific as you'd like. We'll use this to personalize your insights.
                             </p>
                         </div>
 
@@ -422,7 +422,7 @@ export function BudgetOnboarding({ onComplete }: BudgetOnboardingProps) {
                                 Protected Categories
                             </h2>
                             <p className="text-gray-400">
-                                Select expenses that should never be reduced by AI rebalancing.
+                                Select expenses that should never be reduced by automatic adjustments.
                             </p>
                         </div>
 
@@ -471,7 +471,7 @@ export function BudgetOnboarding({ onComplete }: BudgetOnboardingProps) {
                                 Creating Your Budget
                             </h2>
                             <p className="text-gray-400 max-w-md mx-auto">
-                                Our AI is analyzing your spending patterns and creating a personalized budget just for you...
+                                We are analyzing your spending patterns and creating a personalized budget...
                             </p>
                         </div>
 

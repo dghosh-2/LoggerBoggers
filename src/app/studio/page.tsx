@@ -48,6 +48,10 @@ export default function StudioPage() {
 
   const [activeScenario, setActiveScenario] = useState<string | null>(null);
   const [aiQuery, setAiQuery] = useState('');
+  const [draftIncomeChange, setDraftIncomeChange] = useState(incomeChange);
+  const [draftExpenseChange, setDraftExpenseChange] = useState(expenseChange);
+  const [draftSavingsRate, setDraftSavingsRate] = useState(savingsRate);
+  const [draftSimulationMonths, setDraftSimulationMonths] = useState(simulationMonths);
 
   const scenarios = [
     {
@@ -78,9 +82,9 @@ export default function StudioPage() {
 
   const applyScenario = (scenario: typeof scenarios[0]) => {
     setActiveScenario(scenario.id);
-    setIncomeChange(scenario.income);
-    setExpenseChange(scenario.expense);
-    setSavingsRate(scenario.savings);
+    setDraftIncomeChange(scenario.income);
+    setDraftExpenseChange(scenario.expense);
+    setDraftSavingsRate(scenario.savings);
     toast.success(`Applied "${scenario.name}" scenario`);
   };
 
@@ -88,13 +92,24 @@ export default function StudioPage() {
     resetSimulation();
     setActiveScenario(null);
     setAiQuery('');
+    setDraftIncomeChange(0);
+    setDraftExpenseChange(0);
+    setDraftSavingsRate(25);
+    setDraftSimulationMonths(12);
     toast.info("Simulation reset");
   };
 
   const handleRunSimulation = async () => {
+    setIncomeChange(draftIncomeChange);
+    setExpenseChange(draftExpenseChange);
+    setSavingsRate(draftSavingsRate);
+    setSimulationMonths(draftSimulationMonths);
     await runSimulation();
-    const totalSavings = Math.round(projectedSavings * simulationMonths);
-    toast.success(`${simulationMonths} month projection: ${totalSavings >= 0 ? '+' : ''}$${totalSavings.toLocaleString()} net savings`);
+    const draftProjectedIncome = baseIncome * (1 + draftIncomeChange / 100);
+    const draftProjectedExpenses = baseExpenses * (1 + draftExpenseChange / 100);
+    const draftProjectedSavings = draftProjectedIncome - draftProjectedExpenses;
+    const totalSavings = Math.round(draftProjectedSavings * draftSimulationMonths);
+    toast.success(`${draftSimulationMonths} month projection: ${totalSavings >= 0 ? '+' : ''}$${totalSavings.toLocaleString()} net savings`);
   };
 
   const handleAskAI = async () => {
@@ -207,9 +222,9 @@ export default function StudioPage() {
         </div>
 
         {/* Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:items-start">
           {/* Left Column - Controls */}
-          <div className="space-y-4">
+          <div className="space-y-4 lg:self-start">
             {/* Quick Scenarios */}
             <motion.div 
               initial={{ opacity: 0, y: 8 }}
@@ -250,32 +265,32 @@ export default function StudioPage() {
                   label="Income Change"
                   min={-50}
                   max={50}
-                  value={incomeChange}
-                  onChange={setIncomeChange}
+                  value={draftIncomeChange}
+                  onChange={setDraftIncomeChange}
                   formatValue={(v) => `${v > 0 ? "+" : ""}${v}%`}
                 />
                 <GlassSlider
                   label="Expense Change"
                   min={-50}
                   max={50}
-                  value={expenseChange}
-                  onChange={setExpenseChange}
+                  value={draftExpenseChange}
+                  onChange={setDraftExpenseChange}
                   formatValue={(v) => `${v > 0 ? "+" : ""}${v}%`}
                 />
                 <GlassSlider
                   label="Target Savings Rate"
                   min={0}
                   max={70}
-                  value={savingsRate}
-                  onChange={setSavingsRate}
+                  value={draftSavingsRate}
+                  onChange={setDraftSavingsRate}
                   formatValue={(v) => `${v}%`}
                 />
                 <GlassSlider
                   label="Duration"
                   min={3}
                   max={36}
-                  value={simulationMonths}
-                  onChange={setSimulationMonths}
+                  value={draftSimulationMonths}
+                  onChange={setDraftSimulationMonths}
                   formatValue={(v) => `${v} mo`}
                 />
               </div>
