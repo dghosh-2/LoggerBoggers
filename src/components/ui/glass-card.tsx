@@ -19,13 +19,21 @@ export function GlassCard({
 }: GlassCardProps) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 6 }}
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ 
-        duration: 0.25, 
+        duration: 0.3, 
         delay: delay / 1000, 
         ease: [0.25, 0.1, 0.25, 1]
       }}
+      whileHover={interactive ? { 
+        y: -4,
+        transition: { duration: 0.2, ease: "easeOut" }
+      } : undefined}
+      whileTap={interactive ? { 
+        scale: 0.98,
+        transition: { duration: 0.1 }
+      } : undefined}
       className={cn(
         "card-elevated p-6",
         interactive && "card-interactive cursor-pointer",

@@ -44,29 +44,48 @@ export function TrendCard({
   const isPositive = change >= 0;
 
   return (
-    <GlassCard delay={delay}>
+    <GlassCard delay={delay} className="group">
       <div className="flex items-center justify-between mb-4">
-        <span className="text-xs text-foreground-muted">{title}</span>
-        {icon}
+        <span className="text-xs text-foreground-muted group-hover:text-foreground transition-colors duration-200">{title}</span>
+        <motion.div
+          initial={{ scale: 1 }}
+          whileHover={{ scale: 1.1, rotate: 5 }}
+          transition={{ duration: 0.2 }}
+        >
+          {icon}
+        </motion.div>
       </div>
       
-      <motion.div className="text-2xl font-semibold tracking-tight tabular-nums font-mono">
+      <motion.div 
+        className="text-2xl font-semibold tracking-tight tabular-nums font-mono"
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ delay: (delay / 1000) + 0.2, duration: 0.3 }}
+      >
         {rounded}
       </motion.div>
       
-      <div
+      <motion.div
+        initial={{ opacity: 0, x: -8 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: (delay / 1000) + 0.4, duration: 0.3 }}
         className={`flex items-center gap-1.5 mt-2 text-xs ${
           isPositive ? "text-success" : "text-destructive"
         }`}
       >
-        {isPositive ? (
-          <TrendingUp className="w-3.5 h-3.5" />
-        ) : (
-          <TrendingDown className="w-3.5 h-3.5" />
-        )}
+        <motion.div
+          animate={{ y: [0, -2, 0] }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+        >
+          {isPositive ? (
+            <TrendingUp className="w-3.5 h-3.5" />
+          ) : (
+            <TrendingDown className="w-3.5 h-3.5" />
+          )}
+        </motion.div>
         <span className="font-medium tabular-nums">{isPositive ? "+" : ""}{change}%</span>
         <span className="text-foreground-muted">vs last month</span>
-      </div>
+      </motion.div>
     </GlassCard>
   );
 }
