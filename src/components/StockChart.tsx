@@ -14,7 +14,7 @@ interface StockChartProps {
 }
 
 const CHART_COLORS = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)'];
-const CHART_COLORS_RAW = ['#b8860b', '#0d9488', '#6366f1', '#059669', '#dc2626'];
+const CHART_COLORS_RAW = ['#18181B', '#6366F1', '#16A34A', '#CA8A04', '#DC2626'];
 
 export default function StockChart({ stocks, onDataPointClick, chartMode = 'combined' }: StockChartProps) {
     if (!stocks || stocks.length === 0) {

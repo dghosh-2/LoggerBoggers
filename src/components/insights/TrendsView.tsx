@@ -42,7 +42,7 @@ export function TrendsView() {
         if (severity === 'critical') return <TrendingUp className="w-5 h-5 text-red-500" />;
         if (id.includes('season')) return <Calendar className="w-5 h-5 text-pink-500" />;
         if (id.includes('rec')) return <Repeat className="w-5 h-5 text-blue-500" />;
-        return <Sparkles className="w-5 h-5 text-amber-500" />;
+        return <Sparkles className="w-5 h-5 text-primary" />;
     };
 
     const TrendCard = ({ title, dateLabel, amount, type }: { title: string, dateLabel: string, amount: number, type: 'past' | 'present' }) => (
@@ -76,8 +76,8 @@ export function TrendsView() {
     return (
         <div className="min-h-full w-full pt-16 p-8 pb-24 space-y-8 animate-in fade-in duration-500">
             <div className="flex items-center space-x-3 mb-6">
-                <div className="p-3 bg-purple-500/10 rounded-xl">
-                    <Sparkles className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                <div className="p-3 bg-accent/10 rounded-xl">
+                    <Sparkles className="w-6 h-6 text-accent" />
                 </div>
                 <div>
                     <h2 className="text-2xl font-bold text-foreground">Trend Intelligence</h2>
@@ -101,7 +101,7 @@ export function TrendsView() {
                         className={cn(
                             "cursor-pointer group relative p-6 rounded-2xl border backdrop-blur-md transition-all duration-300 hover:scale-[1.02] shadow-sm",
                             insight.severity === 'critical' ? "bg-red-500/5 border-red-500/20 hover:border-red-500/40" :
-                                insight.severity === 'warning' ? "bg-amber-500/5 border-amber-500/20 hover:border-amber-500/40" :
+                                insight.severity === 'warning' ? "bg-warning/5 border-warning/20 hover:border-warning/40" :
                                     "bg-card border-border hover:border-foreground/20"
                         )}
                     >

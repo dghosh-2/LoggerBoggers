@@ -53,7 +53,6 @@ export function FlexibleChart({ config, stockData, delay = 0, onExpand }: Flexib
     // Render chart based on type
     const renderChart = () => {
         const commonProps = {
-            data: chartData,
             margin: { top: 10, right: 10, left: 0, bottom: 0 },
         };
 
@@ -80,7 +79,7 @@ export function FlexibleChart({ config, stockData, delay = 0, onExpand }: Flexib
         switch (config.chartType) {
             case 'area':
                 return (
-                    <AreaChart {...commonProps}>
+                    <AreaChart data={chartData} {...commonProps}>
                         <defs>
                             {config.series.map((series, idx) => (
                                 <linearGradient key={series.symbol} id={`gradient-${series.symbol}`} x1="0" y1="0" x2="0" y2="1">
@@ -109,7 +108,7 @@ export function FlexibleChart({ config, stockData, delay = 0, onExpand }: Flexib
 
             case 'bar':
                 return (
-                    <BarChart {...commonProps}>
+                    <BarChart data={chartData} {...commonProps}>
                         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                         <XAxis {...axisProps.xAxis} />
                         <YAxis {...axisProps.yAxis} />
@@ -156,7 +155,7 @@ export function FlexibleChart({ config, stockData, delay = 0, onExpand }: Flexib
             case 'line':
             default:
                 return (
-                    <LineChart {...commonProps}>
+                    <LineChart data={chartData} {...commonProps}>
                         <defs>
                             {config.series.map((series, idx) => (
                                 <linearGradient key={`line-${series.symbol}`} id={`line-gradient-${series.symbol}`} x1="0" y1="0" x2="1" y2="0">

@@ -21,7 +21,7 @@ export function Confetti({ isActive, duration = 3000 }: ConfettiProps) {
 
   useEffect(() => {
     if (isActive) {
-      const colors = ["#b8860b", "#d4a017", "#0d9488", "#2dd4bf", "#059669", "#34d399"];
+      const colors = ["#6366F1", "#818CF8", "#18181B", "#71717A", "#16A34A", "#4ADE80"];
       const newPieces = Array.from({ length: 50 }, (_, i) => ({
         id: i,
         x: Math.random() * 100,

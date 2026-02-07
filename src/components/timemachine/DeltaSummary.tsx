@@ -112,11 +112,11 @@ export function DeltaSummary({ delta }: DeltaSummaryProps) {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.2 }}
-                className="col-span-2 lg:col-span-4 p-4 rounded-xl bg-purple-500/10 border border-purple-500/20"
+                className="col-span-2 lg:col-span-4 p-4 rounded-xl bg-accent/10 border border-accent/20"
             >
                 <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-purple-400" />
-                    <p className="text-sm font-medium text-purple-300">{delta.description}</p>
+                    <Clock className="w-4 h-4 text-accent" />
+                    <p className="text-sm font-medium text-accent">{delta.description}</p>
                 </div>
             </motion.div>
         </motion.div>

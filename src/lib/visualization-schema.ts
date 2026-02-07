@@ -41,13 +41,13 @@ export const ChartConfigSchema = z.object({
     xAxis: z.object({
         label: z.string().default('Date'),
         showGrid: z.boolean().default(true),
-    }).default({}),
+    }).default({ label: 'Date', showGrid: true }),
     yAxis: z.object({
         label: z.string().default('Price ($)'),
         showGrid: z.boolean().default(true),
         format: z.enum(['currency', 'percent', 'number']).default('currency'),
         scale: z.enum(['linear', 'log']).default('linear'),
-    }).default({}),
+    }).default({ label: 'Price ($)', showGrid: true, format: 'currency', scale: 'linear' }),
     
     // Display options
     showLegend: z.boolean().default(true),

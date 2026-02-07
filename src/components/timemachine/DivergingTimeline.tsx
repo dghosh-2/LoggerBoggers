@@ -99,7 +99,7 @@ export function DivergingTimeline() {
                     {branchValue !== undefined && (
                         <>
                             <div className="flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-purple-500" />
+                                <div className="w-2 h-2 rounded-full bg-accent" />
                                 <span className="text-xs text-foreground-muted">What If:</span>
                                 <span className="text-xs font-mono font-semibold">${branchValue?.toLocaleString()}</span>
                             </div>
@@ -140,8 +140,8 @@ export function DivergingTimeline() {
 
                         {/* Branch gradient (purple - the "what if" reality) */}
                         <linearGradient id="branchGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#a855f7" stopOpacity={0.4} />
-                            <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
+                            <stop offset="5%" stopColor="#6366F1" stopOpacity={0.4} />
+                            <stop offset="95%" stopColor="#6366F1" stopOpacity={0} />
                         </linearGradient>
                     </defs>
 
@@ -174,13 +174,13 @@ export function DivergingTimeline() {
                     {editPointIndex !== null && editPointIndex >= 0 && (
                         <ReferenceLine
                             x={chartData[editPointIndex]?.month}
-                            stroke="#a855f7"
+                            stroke="#6366F1"
                             strokeDasharray="4 4"
                             strokeWidth={2}
                             label={{
                                 value: '↓ Edit',
                                 position: 'top',
-                                fill: '#a855f7',
+                                fill: '#6366F1',
                                 fontSize: 10,
                                 fontWeight: 600,
                             }}
@@ -204,12 +204,12 @@ export function DivergingTimeline() {
                         <Area
                             type="monotone"
                             dataKey="branch"
-                            stroke="#a855f7"
+                            stroke="#6366F1"
                             strokeWidth={3}
                             fill="url(#branchGradient)"
                             name="What If"
                             dot={false}
-                            activeDot={{ r: 5, fill: '#a855f7', stroke: '#fff', strokeWidth: 2 }}
+                            activeDot={{ r: 5, fill: '#6366F1', stroke: '#fff', strokeWidth: 2 }}
                             animationDuration={800}
                             animationEasing="ease-out"
                         />

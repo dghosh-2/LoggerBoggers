@@ -109,7 +109,7 @@ export function CalendarView() {
         return days;
     }, [year, month, selectedCategory]);
 
-    // Get heatmap intensity based on amount relative to max (using primary/gold color)
+        // Get heatmap intensity based on amount relative to max (using primary color)
     const getHeatmapStyle = (amount: number) => {
         if (amount === 0) return 'bg-secondary/30 border-border';
         

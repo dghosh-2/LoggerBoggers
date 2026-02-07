@@ -149,25 +149,25 @@ export default function ImportsPage() {
 
   return (
     <PageTransition>
-      <div className="space-y-8">
+      <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight">Imports</h1>
-            <p className="text-foreground-muted mt-1">
+            <h1 className="text-2xl font-semibold tracking-tight">Imports</h1>
+            <p className="text-foreground-muted text-sm mt-1">
               Connect accounts and import your financial data
             </p>
           </div>
-          <GlassButton variant="primary" onClick={() => setShowAddAccount(true)}>
-            <Link2 className="w-4 h-4" />
+          <GlassButton variant="primary" size="sm" onClick={() => setShowAddAccount(true)}>
+            <Link2 className="w-3.5 h-3.5" />
             Add Account
           </GlassButton>
         </div>
 
         {/* Connected Accounts */}
         <div>
-          <h2 className="text-lg font-semibold mb-4">Connected Accounts</h2>
-          <div className="grid gap-4">
+          <h2 className="text-sm font-semibold mb-3">Connected Accounts</h2>
+          <div className="grid gap-2">
             {accounts.map((account) => {
               const isSyncing = syncingAccounts.has(account.id);
               const status = isSyncing 
@@ -178,38 +178,36 @@ export default function ImportsPage() {
               return (
                 <GlassCard key={account.id} interactive>
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-secondary flex items-center justify-center">
-                        <Building2 className="w-6 h-6 text-foreground-muted" />
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center">
+                        <Building2 className="w-4 h-4 text-foreground-muted" />
                       </div>
                       <div>
-                        <h3 className="font-semibold">{account.name}</h3>
-                        <p className="text-sm text-foreground-muted">
-                          {account.institution} · {account.type}
+                        <h3 className="text-sm font-semibold">{account.name}</h3>
+                        <p className="text-[11px] text-foreground-muted">
+                          {account.institution} &middot; {account.type}
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <div className={`flex items-center gap-1.5 ${status.color}`}>
-                          <StatusIcon className={`w-4 h-4 ${isSyncing ? "animate-spin" : ""}`} />
-                          <span className="text-sm font-medium">{status.label}</span>
+                        <div className={`flex items-center gap-1 ${status.color}`}>
+                          <StatusIcon className={`w-3 h-3 ${isSyncing ? "animate-spin" : ""}`} />
+                          <span className="text-[11px] font-medium">{status.label}</span>
                         </div>
-                        <p className="text-xs text-foreground-muted">
+                        <p className="text-[10px] text-foreground-muted">
                           {isSyncing ? "Syncing..." : account.lastSync}
                         </p>
                       </div>
                       
-                      <motion.button 
+                      <button 
                         onClick={() => handleSyncAccount(account.id)}
-                        className="p-2 rounded-lg hover:bg-secondary transition-colors"
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
+                        className="p-1.5 rounded-md hover:bg-secondary transition-colors duration-150 cursor-pointer"
                         disabled={isSyncing}
                       >
-                        <RefreshCw className={`w-4 h-4 text-foreground-muted ${isSyncing ? "animate-spin" : ""}`} />
-                      </motion.button>
+                        <RefreshCw className={`w-3.5 h-3.5 text-foreground-muted ${isSyncing ? "animate-spin" : ""}`} />
+                      </button>
                     </div>
                   </div>
                 </GlassCard>
@@ -219,21 +217,21 @@ export default function ImportsPage() {
         </div>
 
         {/* Import Options */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <h2 className="text-lg font-semibold mb-4">Connect New Account</h2>
-            <div className="space-y-4">
+            <h2 className="text-sm font-semibold mb-3">Connect New Account</h2>
+            <div className="space-y-2">
               {availableIntegrations.map((integration) => {
                 const Icon = integration.icon;
                 return (
                   <GlassCard key={integration.id} interactive>
-                    <div className="flex items-center gap-4">
-                      <div className="p-3 rounded-xl bg-primary/10">
-                        <Icon className="w-6 h-6 text-primary" />
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-secondary">
+                        <Icon className="w-4 h-4 text-primary" />
                       </div>
                       <div className="flex-1">
-                        <h3 className="font-semibold">{integration.name}</h3>
-                        <p className="text-sm text-foreground-muted">{integration.description}</p>
+                        <h3 className="text-sm font-semibold">{integration.name}</h3>
+                        <p className="text-[11px] text-foreground-muted">{integration.description}</p>
                       </div>
                       <GlassButton 
                         variant="secondary" 
@@ -250,7 +248,7 @@ export default function ImportsPage() {
           </div>
 
           <div>
-            <h2 className="text-lg font-semibold mb-4">Upload Files</h2>
+            <h2 className="text-sm font-semibold mb-3">Upload Files</h2>
             <UploadCard
               title="Bank Statements"
               description="Upload CSV, OFX, or QFX files from your bank"
@@ -265,19 +263,19 @@ export default function ImportsPage() {
         {/* Sync Summary */}
         <GlassCard>
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-success/10">
-                <CheckCircle className="w-6 h-6 text-success" />
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-success-soft">
+                <CheckCircle className="w-4 h-4 text-success" />
               </div>
               <div>
-                <h3 className="font-semibold">All accounts synced</h3>
-                <p className="text-sm text-foreground-muted">
+                <h3 className="text-sm font-semibold">All accounts synced</h3>
+                <p className="text-[11px] text-foreground-muted">
                   Last full sync completed {accounts[0]?.lastSync || "recently"}
                 </p>
               </div>
             </div>
-            <GlassButton variant="secondary" onClick={handleSyncAll}>
-              <RefreshCw className={`w-4 h-4 ${syncingAccounts.size > 0 ? "animate-spin" : ""}`} />
+            <GlassButton variant="secondary" size="sm" onClick={handleSyncAll}>
+              <RefreshCw className={`w-3.5 h-3.5 ${syncingAccounts.size > 0 ? "animate-spin" : ""}`} />
               Sync All
             </GlassButton>
           </div>
@@ -292,21 +290,19 @@ export default function ImportsPage() {
         subtitle="Connect your bank or financial institution"
         size="md"
       >
-        <div className="p-6 space-y-6">
+        <div className="p-5 space-y-5">
           <div>
-            <h4 className="font-medium mb-3">Popular Banks</h4>
-            <div className="grid grid-cols-2 gap-3">
+            <h4 className="text-xs font-medium mb-2.5">Popular Banks</h4>
+            <div className="grid grid-cols-2 gap-2">
               {popularBanks.map((bank) => (
-                <motion.button
+                <button
                   key={bank.id}
                   onClick={() => handleBankConnect(bank.name)}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors text-left"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  className="flex items-center gap-2.5 p-3 rounded-lg bg-secondary hover:bg-background-tertiary transition-colors duration-150 text-left cursor-pointer"
                 >
-                  <span className="text-2xl">{bank.logo}</span>
-                  <span className="font-medium text-sm">{bank.name}</span>
-                </motion.button>
+                  <span className="text-sm font-semibold text-foreground-muted">{bank.logo}</span>
+                  <span className="font-medium text-xs">{bank.name}</span>
+                </button>
               ))}
             </div>
           </div>
@@ -315,7 +311,7 @@ export default function ImportsPage() {
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-border" />
             </div>
-            <div className="relative flex justify-center text-xs uppercase">
+            <div className="relative flex justify-center text-[10px] uppercase tracking-wider">
               <span className="bg-card px-2 text-foreground-muted">or search</span>
             </div>
           </div>
@@ -324,7 +320,7 @@ export default function ImportsPage() {
             <input
               type="text"
               placeholder="Search for your bank..."
-              className="w-full px-4 py-3 rounded-xl bg-secondary border border-border focus:border-primary focus:outline-none transition-colors"
+              className="w-full px-3.5 py-2.5 rounded-lg bg-secondary border border-border focus:border-primary focus:outline-none transition-colors text-sm"
               onChange={(e) => {
                 if (e.target.value.length > 2) {
                   toast.info(`Searching for "${e.target.value}"...`);
@@ -333,7 +329,7 @@ export default function ImportsPage() {
             />
           </div>
 
-          <p className="text-xs text-foreground-muted text-center">
+          <p className="text-[10px] text-foreground-muted text-center leading-relaxed">
             We use bank-level encryption to keep your data safe. 
             Your credentials are never stored on our servers.
           </p>

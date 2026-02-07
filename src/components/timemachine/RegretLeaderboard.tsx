@@ -63,10 +63,10 @@ export function RegretLeaderboard() {
         return (
             <div className="space-y-4">
                 {/* AI Query Input */}
-                <div className="p-4 rounded-xl bg-gradient-to-br from-purple-500/10 to-blue-500/10 border border-purple-500/20">
+                <div className="p-4 rounded-xl bg-gradient-to-br from-accent/10 to-blue-500/10 border border-accent/20">
                     <div className="flex items-center gap-2 mb-3">
-                        <Sparkles className="w-4 h-4 text-purple-400" />
-                        <p className="text-xs font-medium text-purple-400">Ask AI</p>
+                        <Sparkles className="w-4 h-4 text-accent" />
+                        <p className="text-xs font-medium text-accent">Ask AI</p>
                     </div>
                     <div className="flex gap-2">
                         <input
@@ -75,13 +75,13 @@ export function RegretLeaderboard() {
                             onChange={(e) => setAiQuery(e.target.value)}
                             onKeyPress={(e) => e.key === 'Enter' && handleAiSimulation()}
                             placeholder="e.g., What if I cancel subscriptions?"
-                            className="flex-1 px-3 py-2 text-sm rounded-lg bg-background/50 border border-border focus:border-purple-500/50 focus:outline-none focus:ring-1 focus:ring-purple-500/50 transition-colors"
+                            className="flex-1 px-3 py-2 text-sm rounded-lg bg-background/50 border border-border focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/50 transition-colors"
                             disabled={isAiLoading}
                         />
                         <button
                             onClick={handleAiSimulation}
                             disabled={isAiLoading || !aiQuery.trim()}
-                            className="px-3 py-2 rounded-lg bg-purple-500 text-white text-sm font-medium hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                            className="px-3 py-2 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
                         >
                             {isAiLoading ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -107,11 +107,11 @@ export function RegretLeaderboard() {
             <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="p-4 rounded-xl bg-gradient-to-br from-purple-500/10 to-blue-500/10 border border-purple-500/20"
+                className="p-4 rounded-xl bg-gradient-to-br from-accent/10 to-primary/10 border border-accent/20"
             >
                 <div className="flex items-center gap-2 mb-3">
-                    <Sparkles className="w-4 h-4 text-purple-400" />
-                    <p className="text-xs font-medium text-purple-400">Ask AI for suggestions</p>
+                    <Sparkles className="w-4 h-4 text-accent" />
+                    <p className="text-xs font-medium text-accent">Ask AI for suggestions</p>
                 </div>
                 <div className="flex gap-2">
                     <input
@@ -120,13 +120,13 @@ export function RegretLeaderboard() {
                         onChange={(e) => setAiQuery(e.target.value)}
                         onKeyPress={(e) => e.key === 'Enter' && handleAiSimulation()}
                         placeholder="e.g., What if I cancel subscriptions?"
-                        className="flex-1 px-3 py-2 text-sm rounded-lg bg-background/50 border border-border focus:border-purple-500/50 focus:outline-none focus:ring-1 focus:ring-purple-500/50 transition-colors"
+                        className="flex-1 px-3 py-2 text-sm rounded-lg bg-background/50 border border-border focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/50 transition-colors"
                         disabled={isAiLoading}
                     />
                     <button
                         onClick={handleAiSimulation}
                         disabled={isAiLoading || !aiQuery.trim()}
-                        className="px-3 py-2 rounded-lg bg-purple-500 text-white text-sm font-medium hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                        className="px-3 py-2 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
                     >
                         {isAiLoading ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
@@ -154,8 +154,8 @@ export function RegretLeaderboard() {
                                 "w-full relative p-4 rounded-xl border transition-all text-left",
                                 "hover:shadow-md active:scale-[0.99]",
                                 applied
-                                    ? "bg-purple-500/20 border-purple-500/40 cursor-default"
-                                    : "bg-card border-border hover:border-purple-500/40 hover:bg-purple-500/5 cursor-pointer"
+                                    ? "bg-accent/20 border-accent/40 cursor-default"
+                                    : "bg-card border-border hover:border-accent/40 hover:bg-accent/5 cursor-pointer"
                             )}
                         >
                             <div>
@@ -180,10 +180,10 @@ export function RegretLeaderboard() {
 
                                     {regret.goalTimeReduction > 0.1 && (
                                         <div className="flex items-center gap-1.5">
-                                            <div className="p-1 rounded-md bg-purple-500/10">
-                                                <Clock className="w-3.5 h-3.5 text-purple-400" />
+                                            <div className="p-1 rounded-md bg-accent/10">
+                                                <Clock className="w-3.5 h-3.5 text-accent" />
                                             </div>
-                                            <span className="text-xs font-medium text-purple-400">
+                                            <span className="text-xs font-medium text-accent">
                                                 {regret.goalTimeReduction.toFixed(1)}mo sooner
                                             </span>
                                         </div>
@@ -200,7 +200,7 @@ export function RegretLeaderboard() {
                                         exit={{ scale: 0, opacity: 0 }}
                                         className="absolute right-3 top-3"
                                     >
-                                        <div className="px-2.5 py-1 rounded-full bg-purple-500 text-[10px] text-white font-bold shadow-md">
+                                        <div className="px-2.5 py-1 rounded-full bg-accent text-[10px] text-white font-bold shadow-md">
                                             ✓ Applied
                                         </div>
                                     </motion.div>

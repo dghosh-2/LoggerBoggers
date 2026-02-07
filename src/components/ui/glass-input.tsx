@@ -17,16 +17,13 @@ export function GlassInput({
   ...props
 }: GlassInputProps) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       {label && (
-        <label className="block text-sm font-medium text-foreground-muted">
+        <label className="block text-xs font-medium text-foreground-muted">
           {label}
         </label>
       )}
-      <motion.div
-        className="relative"
-        whileFocus={{ scale: 1.01 }}
-      >
+      <motion.div className="relative">
         {icon && (
           <div className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted">
             {icon}
@@ -34,10 +31,10 @@ export function GlassInput({
         )}
         <motion.input
           className={cn(
-            "w-full px-4 py-3 bg-input border border-border rounded-xl",
-            "text-foreground placeholder:text-foreground-muted",
-            "focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none",
-            "transition-all duration-200",
+            "w-full px-3 py-2 bg-input border border-border rounded-md",
+            "text-sm text-foreground placeholder:text-foreground-muted",
+            "focus:border-foreground focus:ring-1 focus:ring-foreground/10 focus:outline-none",
+            "transition-all duration-100",
             icon && "pl-10",
             className
           )}

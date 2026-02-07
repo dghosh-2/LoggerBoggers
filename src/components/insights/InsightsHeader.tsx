@@ -46,7 +46,7 @@ export function InsightsHeader() {
                 <div className="h-6 w-px bg-border mx-1" />
 
                 <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 ring-2 ring-background" />
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-accent ring-2 ring-background" />
                     <div className="text-xs">
                         <p className="font-medium text-foreground">Krish Mody</p>
                         <p className="text-foreground-muted">Pro Plan</p>

@@ -34,7 +34,6 @@ export function Modal({
 }: ModalProps) {
   const { setNavbarHidden } = useUIStore();
 
-  // Close on escape key and manage navbar visibility
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -66,39 +65,37 @@ export function Modal({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            transition={{ duration: 0.15 }}
+            className="absolute inset-0 bg-black/50"
             onClick={onClose}
           />
           
           {/* Modal */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-            className={`relative w-full ${sizeClasses[size]} card-elevated overflow-hidden`}
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ duration: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
+            className={`relative w-full ${sizeClasses[size]} bg-card border border-border rounded-md shadow-lg overflow-hidden`}
           >
             {/* Header */}
             {(title || subtitle) && (
-              <div className="flex items-start justify-between p-6 border-b border-border">
+              <div className="flex items-start justify-between px-6 py-4 border-b border-border">
                 <div>
-                  {title && <h2 className="text-xl font-semibold">{title}</h2>}
-                  {subtitle && <p className="text-sm text-foreground-muted mt-1">{subtitle}</p>}
+                  {title && <h2 className="text-sm font-semibold">{title}</h2>}
+                  {subtitle && <p className="text-xs text-foreground-muted mt-0.5">{subtitle}</p>}
                 </div>
-                <motion.button
+                <button
                   onClick={onClose}
-                  className="p-2 -m-2 rounded-lg hover:bg-secondary transition-colors"
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
+                  className="p-1 -m-1 rounded hover:bg-secondary transition-colors duration-100 cursor-pointer"
                 >
-                  <X className="w-5 h-5 text-foreground-muted" />
-                </motion.button>
+                  <X className="w-4 h-4 text-foreground-muted" />
+                </button>
               </div>
             )}
             
             {/* Content */}
-            <div className={`${size === "full" ? "overflow-auto max-h-[calc(90vh-120px)]" : ""}`}>
+            <div className={`${size === "full" ? "overflow-auto max-h-[calc(90vh-60px)]" : ""}`}>
               {children}
             </div>
           </motion.div>
