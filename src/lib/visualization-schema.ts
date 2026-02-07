@@ -173,7 +173,7 @@ export const DataTableSchema = z.object({
         format: z.enum(['text', 'currency', 'percent', 'number', 'date']).default('text'),
         sortable: z.boolean().default(true),
     })),
-    rows: z.array(z.record(z.any())),
+    rows: z.array(z.record(z.string(), z.any())),
     showPagination: z.boolean().default(false),
     pageSize: z.number().default(10),
 });
@@ -355,13 +355,26 @@ export const OrchestratorVisualizationSchema = z.object({
         showAISidebar: z.boolean().default(true),
         showRiskInSidebar: z.boolean().default(true),
         showPersonalizedInsights: z.boolean().default(true),
-    }).default({}),
+    }).default({
+        showRiskMetrics: true,
+        showRecommendations: true,
+        showStatistics: true,
+        showCorrelations: false,
+        enableDeepDive: true,
+        showNews: false,
+        showAISidebar: true,
+        showRiskInSidebar: true,
+        showPersonalizedInsights: true,
+    }),
     
     // Display preferences
     theme: z.object({
         colorScheme: z.enum(['default', 'monochrome', 'vibrant']).default('default'),
         chartStyle: z.enum(['modern', 'classic', 'minimal']).default('modern'),
-    }).default({}),
+    }).default({
+        colorScheme: 'default',
+        chartStyle: 'modern',
+    }),
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

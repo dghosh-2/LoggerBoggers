@@ -30,6 +30,7 @@ import {
   PieChart,
   BarChart3
 } from "lucide-react";
+import Image from "next/image";
 import { PageTransition } from "@/components/layout/page-transition";
 import { GlassCard } from "@/components/ui/glass-card";
 import { GlassButton } from "@/components/ui/glass-button";
@@ -71,13 +72,22 @@ const portfolioHistory = [
 ];
 
 const popularBanks = [
-  { id: "chase", name: "Chase", logo: "C", color: "#117ACA" },
-  { id: "bofa", name: "Bank of America", logo: "B", color: "#E31837" },
-  { id: "wells", name: "Wells Fargo", logo: "W", color: "#D71E28" },
-  { id: "citi", name: "Citibank", logo: "Ci", color: "#003B70" },
-  { id: "capital", name: "Capital One", logo: "CO", color: "#D03027" },
-  { id: "fidelity", name: "Fidelity", logo: "F", color: "#4AA74A" },
+  { id: "chase", name: "Chase", logo: "C", color: "#117ACA", image: "/banks/chase.png" },
+  { id: "bofa", name: "Bank of America", logo: "B", color: "#E31837", image: "/banks/bankofamerica.jpeg" },
+  { id: "wells", name: "Wells Fargo", logo: "W", color: "#D71E28", image: "/banks/wellsfargo.png" },
+  { id: "capital", name: "Capital One", logo: "CO", color: "#D03027", image: "/banks/capitalone.jpg" },
+  { id: "fidelity", name: "Fidelity", logo: "F", color: "#4AA74A", image: "/banks/fidelity.jpg" },
+  { id: "sofi", name: "SoFi", logo: "S", color: "#00B4D8", image: "/banks/sofi.jpeg" },
 ];
+
+const bankLogoMap: Record<string, string> = {
+  "Chase": "/banks/chase.png",
+  "Bank of America": "/banks/bankofamerica.jpeg",
+  "Wells Fargo": "/banks/wellsfargo.png",
+  "Capital One": "/banks/capitalone.jpg",
+  "Fidelity": "/banks/fidelity.jpg",
+  "SoFi": "/banks/sofi.jpeg",
+};
 
 const recommendations = [
   {
@@ -277,12 +287,16 @@ export default function PortfolioPage() {
                 <GlassCard key={institution.id}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div 
-                        className="w-9 h-9 rounded-lg flex items-center justify-center text-white font-bold text-sm"
-                        style={{ backgroundColor: institution.primaryColor || '#6366f1' }}
-                      >
-                        {institution.name.charAt(0)}
-                      </div>
+                      {bankLogoMap[institution.name] ? (
+                        <Image src={bankLogoMap[institution.name]} alt={institution.name} width={36} height={36} className="rounded-lg object-contain shrink-0" />
+                      ) : (
+                        <div 
+                          className="w-9 h-9 rounded-lg flex items-center justify-center text-white font-bold text-sm"
+                          style={{ backgroundColor: institution.primaryColor || '#6366f1' }}
+                        >
+                          {institution.name.charAt(0)}
+                        </div>
+                      )}
                       <div>
                         <h3 className="text-sm font-semibold">{institution.name}</h3>
                         <p className="text-[11px] text-foreground-muted">
@@ -806,24 +820,7 @@ export default function PortfolioPage() {
           </div>
         )}
 
-        {/* ═══════════════════════════════════════════════════════════════════
-            SECTION 8: MANUAL IMPORT
-        ═══════════════════════════════════════════════════════════════════ */}
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <FileSpreadsheet className="w-4 h-4 text-foreground-muted" />
-            <h2 className="text-sm font-semibold">Manual Import</h2>
-          </div>
 
-          <UploadCard
-            title="Import Financial Data"
-            description="Upload CSV, OFX, or QFX files from your bank or brokerage"
-            acceptedFormats={["CSV", "OFX", "QFX", "PDF"]}
-            onUpload={(file) => {
-              toast.success(`${file.name} uploaded successfully!`);
-            }}
-          />
-        </div>
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════
@@ -856,12 +853,7 @@ export default function PortfolioPage() {
                   onClick={() => handleBankConnect(bank.name)}
                   className="flex items-center gap-2.5 p-2.5 rounded-lg bg-secondary hover:bg-background-tertiary transition-colors duration-150 text-left cursor-pointer"
                 >
-                  <div 
-                    className="w-8 h-8 rounded-md flex items-center justify-center text-white font-bold text-xs"
-                    style={{ backgroundColor: bank.color }}
-                  >
-                    {bank.logo}
-                  </div>
+                  <Image src={bank.image} alt={bank.name} width={32} height={32} className="rounded-md object-contain shrink-0" />
                   <span className="font-medium text-xs">{bank.name}</span>
                 </button>
               ))}
