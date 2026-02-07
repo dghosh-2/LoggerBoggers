@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
         const limit = parseInt(searchParams.get('limit') || '1000');
         
         let query = supabaseAdmin
-            .from('financial_transactions')
+            .from('transactions')
             .select('*')
             .eq('uuid_user_id', userId)
             .order('date', { ascending: false })

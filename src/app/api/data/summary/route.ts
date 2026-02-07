@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
         
         // Fetch all transactions for calculations
         const { data: allTransactions } = await supabaseAdmin
-            .from('financial_transactions')
+            .from('transactions')
             .select('amount, category, date, name')
             .eq('uuid_user_id', userId)
             .gte('date', twelveMonthsAgoStr)
