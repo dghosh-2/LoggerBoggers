@@ -250,7 +250,7 @@ export async function POST(request: NextRequest) {
             const allTransactions = fakeTransactions;
 
             // Clear existing data and insert new
-            await supabaseAdmin.from('financial_transactions').delete().eq('uuid_user_id', userId);
+            await supabaseAdmin.from('transactions').delete().eq('uuid_user_id', userId);
             await supabaseAdmin.from('income').delete().eq('uuid_user_id', userId);
 
             // Add user_id to fake transactions and income
@@ -270,7 +270,7 @@ export async function POST(request: NextRequest) {
             const BATCH_SIZE = 500;
             for (let i = 0; i < allTransactionsWithUser.length; i += BATCH_SIZE) {
                 const batch = allTransactionsWithUser.slice(i, i + BATCH_SIZE);
-                await supabaseAdmin.from('financial_transactions').insert(batch);
+                await supabaseAdmin.from('transactions').insert(batch);
             }
 
             // Insert income
@@ -279,17 +279,45 @@ export async function POST(request: NextRequest) {
                 await supabaseAdmin.from('income').insert(batch);
             }
 
-            // Update user connection status
-            await supabaseAdmin.from('user_plaid_connections').upsert({
-                user_id: userId,
-                uuid_user_id: userId,
-                is_connected: true,
-                plaid_item_id: itemId,
-                connected_at: new Date().toISOString(),
-                last_sync_at: new Date().toISOString(),
-            }, {
-                onConflict: 'uuid_user_id',
-            });
+            // Update user connection status - use select then insert/update for reliability
+            const { data: existingConnection } = await supabaseAdmin
+                .from('user_plaid_connections')
+                .select('id')
+                .eq('uuid_user_id', userId)
+                .single();
+
+            let connectionError;
+            if (existingConnection) {
+                // Update existing record
+                const { error } = await supabaseAdmin
+                    .from('user_plaid_connections')
+                    .update({
+                        is_connected: true,
+                        plaid_item_id: itemId,
+                        last_sync_at: new Date().toISOString(),
+                    })
+                    .eq('uuid_user_id', userId);
+                connectionError = error;
+            } else {
+                // Insert new record
+                const { error } = await supabaseAdmin
+                    .from('user_plaid_connections')
+                    .insert({
+                        user_id: userId,
+                        uuid_user_id: userId,
+                        is_connected: true,
+                        plaid_item_id: itemId,
+                        connected_at: new Date().toISOString(),
+                        last_sync_at: new Date().toISOString(),
+                    });
+                connectionError = error;
+            }
+
+            if (connectionError) {
+                console.error('Error updating user_plaid_connections:', connectionError);
+            } else {
+                console.log('Successfully updated user_plaid_connections for user:', userId);
+            }
 
         } catch (syncError: any) {
             console.error('Error syncing data:', syncError);
