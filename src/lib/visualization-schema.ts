@@ -232,6 +232,55 @@ export const RecommendationsPanelSchema = z.object({
     disclaimer: z.string().optional(),
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// USER QUESTIONS & AI SIDEBAR SCHEMAS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** User question extracted from query */
+export const UserQuestionSchema = z.object({
+    question: z.string().describe('The question the user is asking'),
+    category: z.enum(['risk', 'performance', 'comparison', 'prediction', 'general', 'technical']),
+});
+
+/** AI response to a user question */
+export const AIResponseSchema = z.object({
+    question: z.string(),
+    answer: z.string(),
+    confidence: z.number().min(0).max(100).optional(),
+    sources: z.array(z.string()).optional(),
+});
+
+/** AI Sidebar content configuration */
+export const AISidebarContentSchema = z.object({
+    summary: z.string().describe('Brief summary of the analysis'),
+    userQuestions: z.array(UserQuestionSchema).optional(),
+    aiResponses: z.array(AIResponseSchema).optional(),
+    keyInsights: z.array(z.object({
+        title: z.string(),
+        description: z.string(),
+        type: z.enum(['positive', 'negative', 'neutral', 'warning']),
+    })).optional(),
+    riskSummary: z.object({
+        overallRisk: z.enum(['very_low', 'low', 'medium', 'high', 'very_high']),
+        explanation: z.string(),
+        factors: z.array(z.object({
+            name: z.string(),
+            impact: z.enum(['positive', 'negative', 'neutral']),
+            value: z.string(),
+        })).optional(),
+    }).optional(),
+    personalizedInsights: z.array(z.object({
+        title: z.string(),
+        description: z.string(),
+        relevance: z.string().optional(),
+    })).optional(),
+    additionalSections: z.array(z.object({
+        title: z.string(),
+        content: z.string(),
+        icon: z.string().optional(),
+    })).optional(),
+});
+
 // ─────────────────════════════════════════════════════════════════════════════
 // MASTER ORCHESTRATOR OUTPUT SCHEMA
 // This is what the AI returns to configure the entire visualization
@@ -260,6 +309,10 @@ export const OrchestratorVisualizationSchema = z.object({
     }),
     dataGranularity: z.enum(['1m', '5m', '15m', '1h', '1d', '1wk', '1mo']).default('1d'),
     
+    // ═══════════════════════════════════════════════════════════════════════
+    // LEFT PANEL: VISUALS ONLY
+    // ═══════════════════════════════════════════════════════════════════════
+    
     // Visualization configuration
     layout: LayoutConfigSchema,
     
@@ -275,8 +328,21 @@ export const OrchestratorVisualizationSchema = z.object({
     // Data tables
     tables: z.array(DataTableSchema).optional(),
     
-    // AI recommendations
+    // ═══════════════════════════════════════════════════════════════════════
+    // RIGHT PANEL: AI SIDEBAR CONTENT
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    // AI Sidebar content
+    sidebarContent: AISidebarContentSchema.optional(),
+    
+    // Extracted questions from user query
+    extractedQuestions: z.array(z.string()).optional().describe('Questions extracted from user query to answer in sidebar'),
+    
+    // AI recommendations (legacy, kept for compatibility)
     recommendations: RecommendationsPanelSchema.optional(),
+    
+    // Risk layout: where to show risk info
+    riskLayout: z.enum(['inline', 'sidebar_only', 'both', 'compact', 'detailed', 'comparison']).default('sidebar_only'),
     
     // Feature flags
     features: z.object({
@@ -286,6 +352,9 @@ export const OrchestratorVisualizationSchema = z.object({
         showCorrelations: z.boolean().default(false),
         enableDeepDive: z.boolean().default(true),
         showNews: z.boolean().default(false),
+        showAISidebar: z.boolean().default(true),
+        showRiskInSidebar: z.boolean().default(true),
+        showPersonalizedInsights: z.boolean().default(true),
     }).default({}),
     
     // Display preferences
@@ -316,6 +385,9 @@ export type LayoutPanel = z.infer<typeof LayoutPanelSchema>;
 export type LayoutConfig = z.infer<typeof LayoutConfigSchema>;
 export type Insight = z.infer<typeof InsightSchema>;
 export type RecommendationsPanel = z.infer<typeof RecommendationsPanelSchema>;
+export type UserQuestion = z.infer<typeof UserQuestionSchema>;
+export type AIResponse = z.infer<typeof AIResponseSchema>;
+export type AISidebarContent = z.infer<typeof AISidebarContentSchema>;
 export type OrchestratorVisualization = z.infer<typeof OrchestratorVisualizationSchema>;
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { LineChart, Search, TrendingUp, Sparkles, BarChart3 } from 'lucide-react';
+import { LineChart, Search, TrendingUp } from 'lucide-react';
 import { PageTransition } from '@/components/layout/page-transition';
 import { GlassCard } from '@/components/ui/glass-card';
 import { Modal } from '@/components/ui/modal';
@@ -10,8 +10,8 @@ import SearchBar from '@/components/SearchBar';
 import { FlexibleChart } from '@/components/stocks/FlexibleChart';
 import { RiskPanel } from '@/components/stocks/RiskPanel';
 import { ChartContainer, MetricCard, Section } from '@/components/stocks/ChartContainer';
+import { AISidebar } from '@/components/stocks/AISidebar';
 import DeepDiveModal from '@/components/DeepDiveModal';
-import AIRecommendations from '@/components/AIRecommendations';
 import { toast } from '@/components/ui/toast';
 import { StockData } from '@/lib/schemas';
 
@@ -23,11 +23,15 @@ interface OrchestratorOutput {
     layout: { type: string; columns: number };
     charts: any[];
     riskLayout: string;
+    extractedQuestions?: string[];
     features: {
         showRiskMetrics: boolean;
         showRecommendations: boolean;
         showStatistics: boolean;
         enableDeepDive: boolean;
+        showAISidebar: boolean;
+        showRiskInSidebar: boolean;
+        showPersonalizedInsights: boolean;
     };
 }
 
@@ -85,8 +89,8 @@ export default function StocksPage() {
             const dataResult = await dataResponse.json();
             setStocksData(dataResult.stocks);
 
-            if (orchestratorData.features.showRecommendations) {
-                fetchRecommendations(query, dataResult.stocks);
+            if (orchestratorData.features.showRecommendations || orchestratorData.features.showAISidebar) {
+                fetchRecommendations(query, dataResult.stocks, orchestratorData.extractedQuestions || []);
             }
 
             if (orchestratorData.features.showRiskMetrics) {
@@ -102,12 +106,12 @@ export default function StocksPage() {
         }
     };
 
-    const fetchRecommendations = async (query: string, stocks: StockData[]) => {
+    const fetchRecommendations = async (query: string, stocks: StockData[], extractedQuestions: string[]) => {
         try {
             const response = await fetch('/api/stocks/recommendations', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query, stocks }),
+                body: JSON.stringify({ query, stocks, extractedQuestions }),
             });
             if (response.ok) {
                 const result = await response.json();
@@ -188,6 +192,8 @@ export default function StocksPage() {
 
         const { layout, charts, riskLayout, features } = orchestratorOutput;
         const stats = calculateStats();
+        const showSidebar = features.showAISidebar !== false;
+        const showRiskInline = riskLayout === 'inline' || riskLayout === 'both';
 
         const getGridClass = () => {
             switch (layout.type) {
@@ -205,96 +211,97 @@ export default function StocksPage() {
         };
 
         return (
-            <div className="space-y-4">
-                {/* Query Summary */}
-                <motion.div 
-                    className="bg-card border border-border rounded-xl py-3.5 px-4"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: 0.1 }}
-                >
-                    <div className="flex items-center justify-between flex-wrap gap-3">
-                        <div className="flex items-center gap-2.5">
-                            <div className="p-1.5 rounded-md bg-secondary">
-                                <Search className="w-3.5 h-3.5 text-primary" />
+            <div className="flex gap-6">
+                {/* Left Panel: Visuals */}
+                <div className="flex-1 space-y-4 min-w-0">
+                    {/* Query Summary */}
+                    <motion.div 
+                        className="bg-card border border-border rounded-xl py-3.5 px-4"
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3, delay: 0.1 }}
+                    >
+                        <div className="flex items-center justify-between flex-wrap gap-3">
+                            <div className="flex items-center gap-2.5">
+                                <div className="p-1.5 rounded-md bg-secondary">
+                                    <Search className="w-3.5 h-3.5 text-primary" />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium">{orchestratorOutput.intent}</p>
+                                    <p className="text-[11px] text-foreground-muted">
+                                        {stocksData.length} stock(s) &middot; {orchestratorOutput.timeRange.period} period
+                                    </p>
+                                </div>
                             </div>
-                            <div>
-                                <p className="text-sm font-medium">{orchestratorOutput.intent}</p>
-                                <p className="text-[11px] text-foreground-muted">
-                                    {stocksData.length} stock(s) &middot; {orchestratorOutput.timeRange.period} period
-                                </p>
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-[11px] px-2 py-0.5 rounded-md bg-secondary font-medium">
+                                    {orchestratorOutput.queryType.replace('_', ' ')}
+                                </span>
+                                <span className="text-[11px] px-2 py-0.5 rounded-md bg-secondary font-medium">
+                                    {layout.type}
+                                </span>
                             </div>
                         </div>
-                        <div className="flex items-center gap-1.5">
-                            <span className="text-[11px] px-2 py-0.5 rounded-md bg-secondary font-medium">
-                                {orchestratorOutput.queryType.replace('_', ' ')}
-                            </span>
-                            <span className="text-[11px] px-2 py-0.5 rounded-md bg-secondary font-medium">
-                                {layout.type}
-                            </span>
-                        </div>
-                    </div>
-                </motion.div>
+                    </motion.div>
 
-                {/* Statistics Grid */}
-                {features.showStatistics && stats.length > 0 && (
-                    <Section columns={Math.min(stats.length * 2, 4) as 1 | 2 | 3 | 4} gap="md" delay={150}>
-                        {stats.map((stat, idx) => (
-                            <React.Fragment key={stat.symbol}>
-                                <MetricCard
-                                    label={`${stat.symbol} Price`}
-                                    value={`$${stat.price.toFixed(2)}`}
-                                    change={stat.change}
-                                    changeLabel={orchestratorOutput.timeRange.period}
-                                    color={stat.change >= 0 ? 'success' : 'danger'}
-                                    delay={200 + idx * 50}
-                                />
-                                <MetricCard
-                                    label={`${stat.symbol} Range`}
-                                    value={`$${stat.low.toFixed(0)} - $${stat.high.toFixed(0)}`}
-                                    color="info"
-                                    delay={225 + idx * 50}
-                                />
-                            </React.Fragment>
+                    {/* Statistics Grid */}
+                    {features.showStatistics && stats.length > 0 && (
+                        <Section columns={Math.min(stats.length * 2, 4) as 1 | 2 | 3 | 4} gap="md" delay={150}>
+                            {stats.map((stat, idx) => (
+                                <React.Fragment key={stat.symbol}>
+                                    <MetricCard
+                                        label={`${stat.symbol} Price`}
+                                        value={`$${stat.price.toFixed(2)}`}
+                                        change={stat.change}
+                                        changeLabel={orchestratorOutput.timeRange.period}
+                                        color={stat.change >= 0 ? 'success' : 'danger'}
+                                        delay={200 + idx * 50}
+                                    />
+                                    <MetricCard
+                                        label={`${stat.symbol} Range`}
+                                        value={`$${stat.low.toFixed(0)} - $${stat.high.toFixed(0)}`}
+                                        color="info"
+                                        delay={225 + idx * 50}
+                                    />
+                                </React.Fragment>
+                            ))}
+                        </Section>
+                    )}
+
+                    {/* Charts Grid */}
+                    <div className={`grid ${getGridClass()} gap-4`}>
+                        {charts.map((chartConfig, idx) => (
+                            <FlexibleChart
+                                key={chartConfig.id}
+                                config={chartConfig}
+                                stockData={stocksData}
+                                delay={300 + idx * 100}
+                                onExpand={() => setExpandedChart(chartConfig)}
+                            />
                         ))}
-                    </Section>
-                )}
+                    </div>
 
-                {/* Charts Grid */}
-                <div className={`grid ${getGridClass()} gap-4`}>
-                    {charts.map((chartConfig, idx) => (
-                        <FlexibleChart
-                            key={chartConfig.id}
-                            config={chartConfig}
-                            stockData={stocksData}
-                            delay={300 + idx * 100}
-                            onExpand={() => setExpandedChart(chartConfig)}
+                    {/* Risk Panel (inline mode only) */}
+                    {showRiskInline && features.showRiskMetrics && riskData.length > 0 && (
+                        <RiskPanel
+                            riskData={riskData}
+                            layout={riskLayout as 'compact' | 'detailed' | 'comparison'}
+                            delay={500}
                         />
-                    ))}
+                    )}
                 </div>
 
-                {/* Risk and Recommendations Row */}
-                {(features.showRiskMetrics || features.showRecommendations) && (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                        {features.showRiskMetrics && riskData.length > 0 && (
-                            <div className="lg:col-span-2">
-                                <RiskPanel
-                                    riskData={riskData}
-                                    layout={riskLayout as 'compact' | 'detailed' | 'comparison'}
-                                    delay={500}
-                                />
-                            </div>
-                        )}
-
-                        {features.showRecommendations && (
-                            <div className="lg:col-span-1">
-                                <AIRecommendations
-                                    recommendations={recommendations}
-                                    loading={!recommendations && loading}
-                                    useLiquidGlass={true}
-                                />
-                            </div>
-                        )}
+                {/* Right Panel: AI Sidebar */}
+                {showSidebar && (
+                    <div className="w-80 flex-shrink-0 sticky top-24 h-fit">
+                        <AISidebar
+                            recommendations={recommendations}
+                            stocksData={stocksData}
+                            riskData={riskData}
+                            loading={loading || (!recommendations && features.showRecommendations)}
+                            query={currentQuery}
+                            extractedQuestions={orchestratorOutput.extractedQuestions || []}
+                        />
                     </div>
                 )}
             </div>
@@ -358,14 +365,13 @@ export default function StocksPage() {
                             
                             <div className="flex flex-wrap justify-center gap-2 max-w-2xl mx-auto">
                                 {[
-                                    'Compare Apple and Google over 5 years',
-                                    'Show Tesla and NVIDIA in separate graphs',
-                                    'How risky is AMD compared to Intel?',
-                                    'Microsoft stock with area chart',
+                                    'Compare Apple and Google',
+                                    'How risky is NVIDIA?',
+                                    'Tesla vs Microsoft',
                                 ].map((example, idx) => (
                                     <motion.button
                                         key={idx}
-                                        className="px-3 py-1.5 text-xs bg-secondary border border-border rounded-lg hover:border-border-strong hover:bg-secondary transition-all duration-150 cursor-pointer"
+                                        className="px-4 py-2 text-sm bg-white/30 backdrop-blur-sm rounded-full hover:bg-white/45 transition-all duration-150 cursor-pointer"
                                         onClick={() => handleSearch(example)}
                                         initial={{ opacity: 0, y: 6 }}
                                         animate={{ opacity: 1, y: 0 }}
