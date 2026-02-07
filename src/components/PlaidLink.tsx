@@ -63,12 +63,17 @@ function PlaidLinkButtonInner({
     const [loading, setLoading] = useState(false);
 
     const handleOnSuccess = useCallback(async (public_token: string, metadata: any) => {
+        console.log('=== PLAID LINK SUCCESS ===');
+        console.log('Public token received:', public_token?.substring(0, 20) + '...');
+        console.log('Metadata:', JSON.stringify(metadata, null, 2));
+        
         setLoading(true);
         let attempt = 0;
         const MAX_EXCHANGE_RETRIES = 2;
         
         while (attempt <= MAX_EXCHANGE_RETRIES) {
             try {
+                console.log(`Exchange attempt ${attempt + 1}...`);
                 // Add timeout for exchange request
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
@@ -146,6 +151,9 @@ function PlaidLinkButtonInner({
     }, [onSuccess]);
 
     const handleOnExit = useCallback((err: any, metadata: any) => {
+        console.log('=== PLAID LINK EXIT ===');
+        console.log('Error:', err);
+        console.log('Exit metadata:', JSON.stringify(metadata, null, 2));
         if (err) {
             console.error('Plaid Link exit error:', err);
         }
