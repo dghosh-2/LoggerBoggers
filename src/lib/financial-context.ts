@@ -16,7 +16,7 @@ interface IncomeData {
 }
 
 /**
- * Fetch financial data from Supabase for a specific user
+ * Fetch ALL financial data from Supabase for a specific user (no date filter)
  */
 async function fetchSupabaseData(userId?: string) {
     const result = {
@@ -40,29 +40,25 @@ async function fetchSupabaseData(userId?: string) {
 
         result.isConnected = connectionData?.is_connected || false;
 
-        // Fetch transactions from last 6 months
-        const sixMonthsAgo = new Date();
-        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-        const sixMonthsAgoStr = sixMonthsAgo.toISOString().split('T')[0];
-
+        // Fetch ALL transactions (no date filter — let the LLM answer questions about any period)
         const { data: transactions } = await supabaseAdmin
             .from('financial_transactions')
             .select('amount, category, name, date, merchant_name')
             .eq('uuid_user_id', userId)
-            .gte('date', sixMonthsAgoStr)
-            .order('date', { ascending: false });
+            .order('date', { ascending: false })
+            .limit(2000);
 
         if (transactions) {
             result.transactions = transactions;
         }
 
-        // Fetch income from last 6 months
+        // Fetch ALL income
         const { data: income } = await supabaseAdmin
             .from('income')
             .select('amount, source, name, date')
             .eq('uuid_user_id', userId)
-            .gte('date', sixMonthsAgoStr)
-            .order('date', { ascending: false });
+            .order('date', { ascending: false })
+            .limit(500);
 
         if (income) {
             result.income = income;
@@ -149,6 +145,19 @@ function analyzeIncome(income: IncomeData[]) {
 }
 
 /**
+ * Group transactions by year for yearly breakdowns
+ */
+function groupByYear(transactions: TransactionData[]): Record<string, TransactionData[]> {
+    const groups: Record<string, TransactionData[]> = {};
+    for (const t of transactions) {
+        const year = t.date.substring(0, 4);
+        if (!groups[year]) groups[year] = [];
+        groups[year].push(t);
+    }
+    return groups;
+}
+
+/**
  * Fetch all available financial data for the user
  * This provides context to the AI about the user's actual financial situation
  */
@@ -165,28 +174,39 @@ export async function getFinancialContext(userId?: string): Promise<string> {
             contextParts.push('ACCOUNT STATUS: No bank accounts connected');
         }
 
-        // 2. Analyze and format transaction data
+        // 2. All-time spending summary
         if (supabaseData.transactions.length > 0) {
-            const spending = analyzeTransactions(supabaseData.transactions);
+            const allTime = analyzeTransactions(supabaseData.transactions);
+            const dateRange = `${supabaseData.transactions[supabaseData.transactions.length - 1].date} to ${supabaseData.transactions[0].date}`;
 
             const spendingContext = [
-                'SPENDING DATA (Last 6 Months):',
-                `- Total Spending: $${spending.totalSpending.toFixed(2)}`,
-                `- Average Monthly: $${spending.avgMonthlySpending.toFixed(2)}`,
+                `SPENDING DATA (${supabaseData.transactions.length} transactions, ${dateRange}):`,
+                `- All-Time Total: $${allTime.totalSpending.toFixed(2)}`,
+                `- Average Monthly: $${allTime.avgMonthlySpending.toFixed(2)}`,
                 '',
-                'Top Spending Categories:',
-                ...spending.categoryBreakdown.map(cat =>
+                'Top Spending Categories (all-time):',
+                ...allTime.categoryBreakdown.map(cat =>
                     `  - ${cat.category}: $${cat.total.toFixed(2)} (${cat.percentage.toFixed(1)}%)`
                 ),
                 '',
-                'Top Merchants:',
-                ...spending.topMerchants.map(m => `  - ${m.name}: $${m.total.toFixed(2)}`),
+                'Top Merchants (all-time):',
+                ...allTime.topMerchants.map(m => `  - ${m.name}: $${m.total.toFixed(2)}`),
                 '',
-                'Recent Transactions:',
-                ...spending.recentTransactions.slice(0, 5).map(t =>
+                'Most Recent Transactions:',
+                ...allTime.recentTransactions.slice(0, 5).map(t =>
                     `  - ${t.date}: ${t.merchant_name || t.name} - $${Number(t.amount).toFixed(2)} (${t.category})`
                 ),
             ];
+
+            // Add per-year breakdown
+            const byYear = groupByYear(supabaseData.transactions);
+            const years = Object.keys(byYear).sort().reverse();
+            spendingContext.push('', 'Yearly Spending Breakdown:');
+            for (const year of years) {
+                const yearData = analyzeTransactions(byYear[year]);
+                const topCats = yearData.categoryBreakdown.slice(0, 3).map(c => c.category).join(', ');
+                spendingContext.push(`  - ${year}: $${yearData.totalSpending.toFixed(2)} (${byYear[year].length} txns, top: ${topCats})`);
+            }
 
             contextParts.push(spendingContext.join('\n'));
         } else {
@@ -198,7 +218,7 @@ export async function getFinancialContext(userId?: string): Promise<string> {
             const incomeAnalysis = analyzeIncome(supabaseData.income);
 
             const incomeContext = [
-                'INCOME DATA (Last 6 Months):',
+                `INCOME DATA (${supabaseData.income.length} records):`,
                 `- Total Income: $${incomeAnalysis.totalIncome.toFixed(2)}`,
                 `- Average Monthly: $${incomeAnalysis.avgMonthlyIncome.toFixed(2)}`,
                 `- Sources: ${incomeAnalysis.sources.join(', ')}`,
@@ -206,10 +226,10 @@ export async function getFinancialContext(userId?: string): Promise<string> {
 
             contextParts.push(incomeContext.join('\n'));
 
-            // Calculate net worth / savings
+            // Calculate net savings
             const spending = analyzeTransactions(supabaseData.transactions);
             const netSavings = incomeAnalysis.totalIncome - spending.totalSpending;
-            contextParts.push(`\nNET SAVINGS (6 months): $${netSavings.toFixed(2)} (${netSavings >= 0 ? 'positive' : 'negative'})`);
+            contextParts.push(`\nNET SAVINGS (all-time): $${netSavings.toFixed(2)} (${netSavings >= 0 ? 'positive' : 'negative'})`);
         }
 
         // Combine all context
@@ -231,7 +251,7 @@ export async function getConciseFinancialContext(userId?: string): Promise<strin
     try {
         const contextParts: string[] = [];
 
-        // Fetch real data from Supabase
+        // Fetch real data from Supabase (all-time)
         const supabaseData = await fetchSupabaseData(userId);
 
         if (supabaseData.transactions.length > 0) {
@@ -239,7 +259,8 @@ export async function getConciseFinancialContext(userId?: string): Promise<strin
             const topCategories = spending.categoryBreakdown.slice(0, 3).map(c => c.category);
 
             contextParts.push(
-                `Monthly spending: ~$${spending.avgMonthlySpending.toFixed(0)}`,
+                `Total transactions: ${supabaseData.transactions.length}`,
+                `Avg monthly spending: ~$${spending.avgMonthlySpending.toFixed(0)}`,
                 `Top categories: ${topCategories.join(', ')}`
             );
         }
@@ -250,8 +271,8 @@ export async function getConciseFinancialContext(userId?: string): Promise<strin
             const monthlySavings = incomeAnalysis.avgMonthlyIncome - spending.avgMonthlySpending;
 
             contextParts.push(
-                `Monthly income: ~$${incomeAnalysis.avgMonthlyIncome.toFixed(0)}`,
-                `Monthly savings: ~$${monthlySavings.toFixed(0)}`
+                `Avg monthly income: ~$${incomeAnalysis.avgMonthlyIncome.toFixed(0)}`,
+                `Avg monthly savings: ~$${monthlySavings.toFixed(0)}`
             );
         }
 

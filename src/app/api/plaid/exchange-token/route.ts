@@ -163,9 +163,6 @@ export async function POST(request: NextRequest) {
 
             const plaidTransactions = transactionsResponse.data.transactions;
 
-            // Import the generator and category mapper
-            const { generateFiveYearsOfTransactions, generateFiveYearsOfIncome, generateHoldings } = await import('@/lib/fake-transaction-generator');
-
             // Map Plaid categories to our simplified categories
             // Also check merchant name for better categorization
             const mapPlaidCategory = (plaidCategories: string[] | null | undefined, merchantName?: string | null): string => {
@@ -243,48 +240,59 @@ export async function POST(request: NextRequest) {
                 };
             });
 
-            // Only seed demo data once per user; never wipe existing history.
+            // Seed transactions and income independently — only skip if that specific table already has data.
             const [{ data: anyTx }, { data: anyIncome }] = await Promise.all([
                 supabaseAdmin.from('financial_transactions').select('id').eq('uuid_user_id', userId).limit(1),
                 supabaseAdmin.from('income').select('id').eq('uuid_user_id', userId).limit(1),
             ]);
-            const hasExistingFinancialData = (anyTx?.length ?? 0) > 0 || (anyIncome?.length ?? 0) > 0;
+            const hasTransactions = (anyTx?.length ?? 0) > 0;
+            const hasIncome = (anyIncome?.length ?? 0) > 0;
 
+            const { generateFiveYearsOfTransactions, generateFiveYearsOfIncome, generateHoldings } = await import('@/lib/fake-transaction-generator');
             const BATCH_SIZE = 500;
-            if (!hasExistingFinancialData) {
-                // Generate 5 years of fake historical data (up to TODAY, not 90 days ago)
-                console.log('=== GENERATING FAKE DATA (FIRST TIME ONLY) ===');
+
+            // Seed transactions if missing
+            if (!hasTransactions) {
+                console.log('=== GENERATING FAKE TRANSACTIONS ===');
                 const fakeTransactions = generateFiveYearsOfTransactions();
-                const fakeIncome = generateFiveYearsOfIncome();
                 console.log(`Generated ${fakeTransactions.length} transactions`);
+
+                const allTransactionsWithUser = fakeTransactions.map(tx => ({
+                    user_id: userId,
+                    uuid_user_id: userId,
+                    merchant_name: tx.merchant_name || tx.name,
+                    name: tx.name || tx.merchant_name,
+                    amount: tx.amount,
+                    date: tx.date,
+                    category: tx.category || 'Other',
+                    source: 'plaid',
+                    location: tx.location || null,
+                    pending: false,
+                    tip: tx.tip || null,
+                    tax: tx.tax || null,
+                }));
+
+                let insertedTx = 0;
+                for (let i = 0; i < allTransactionsWithUser.length; i += BATCH_SIZE) {
+                    const batch = allTransactionsWithUser.slice(i, i + BATCH_SIZE);
+                    const { error: txError } = await supabaseAdmin.from('financial_transactions').insert(batch);
+                    if (txError) {
+                        console.error(`Error inserting transaction batch ${i}:`, txError);
+                    } else {
+                        insertedTx += batch.length;
+                    }
+                }
+                console.log(`Successfully inserted ${insertedTx} transactions`);
+            } else {
+                console.log('Skipping transaction seed: existing data found for user:', userId);
+            }
+
+            // Seed income if missing
+            if (!hasIncome) {
+                console.log('=== GENERATING FAKE INCOME ===');
+                const fakeIncome = generateFiveYearsOfIncome();
                 console.log(`Generated ${fakeIncome.length} income records`);
 
-                // Use ALL fake transactions - they go up to current date
-                // Don't filter by 90 days since Plaid sandbox data has unrealistic amounts
-                // For a real production app, you'd want to merge Plaid data properly
-                const allTransactions = fakeTransactions;
-
-                // Transform transactions to match actual database schema
-                // Schema: user_id, uuid_user_id, date, category, name, merchant_name, amount, tip, tax, location, source, pending
-                const allTransactionsWithUser = allTransactions.map(tx => {
-                    return {
-                        user_id: userId,
-                        uuid_user_id: userId,
-                        merchant_name: tx.merchant_name || tx.name,
-                        name: tx.name || tx.merchant_name,
-                        amount: tx.amount,
-                        date: tx.date,
-                        category: tx.category || 'Other',
-                        source: 'plaid',
-                        location: tx.location || null,
-                        pending: false,
-                        tip: tx.tip || null,
-                        tax: tx.tax || null,
-                    };
-                });
-
-                // Transform income to match actual schema
-                // Schema: user_id, uuid_user_id, amount, source, name, date, recurring, frequency, location
                 const fakeIncomeWithUser = fakeIncome.map(inc => ({
                     user_id: userId,
                     uuid_user_id: userId,
@@ -297,22 +305,6 @@ export async function POST(request: NextRequest) {
                     location: inc.location || null,
                 }));
 
-                // Insert transactions in batches
-                console.log('=== INSERTING TRANSACTIONS (SEED) ===');
-                let insertedTx = 0;
-                for (let i = 0; i < allTransactionsWithUser.length; i += BATCH_SIZE) {
-                    const batch = allTransactionsWithUser.slice(i, i + BATCH_SIZE);
-                    const { error: txError } = await supabaseAdmin.from('financial_transactions').insert(batch);
-                    if (txError) {
-                        console.error(`Error inserting transaction batch ${i}:`, txError);
-                    } else {
-                        insertedTx += batch.length;
-                    }
-                }
-                console.log(`Successfully inserted ${insertedTx} transactions`);
-
-                // Insert income
-                console.log('=== INSERTING INCOME (SEED) ===');
                 let insertedIncome = 0;
                 for (let i = 0; i < fakeIncomeWithUser.length; i += BATCH_SIZE) {
                     const batch = fakeIncomeWithUser.slice(i, i + BATCH_SIZE);
@@ -325,7 +317,7 @@ export async function POST(request: NextRequest) {
                 }
                 console.log(`Successfully inserted ${insertedIncome} income records`);
             } else {
-                console.log('Skipping demo data generation: existing financial data found for user:', userId);
+                console.log('Skipping income seed: existing data found for user:', userId);
             }
 
             // Generate and insert holdings for investment accounts
