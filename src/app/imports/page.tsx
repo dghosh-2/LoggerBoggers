@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
   Link2, 
@@ -9,7 +9,10 @@ import {
   CheckCircle,
   RefreshCw,
   AlertCircle,
-  Plus
+  Plus,
+  Wallet,
+  TrendingUp,
+  CreditCard
 } from "lucide-react";
 import Image from "next/image";
 import { PageTransition } from "@/components/layout/page-transition";
@@ -18,41 +21,31 @@ import { GlassButton } from "@/components/ui/glass-button";
 import { UploadCard } from "@/components/cards/upload-card";
 import { Modal } from "@/components/ui/modal";
 import { toast } from "@/components/ui/toast";
+import { PlaidLinkButton } from "@/components/PlaidLink";
 
-const initialAccounts = [
-  { 
-    id: "1", 
-    name: "Chase Checking", 
-    type: "Checking", 
-    institution: "Chase", 
-    status: "connected",
-    lastSync: "2 hours ago" 
-  },
-  { 
-    id: "2", 
-    name: "Chase Savings", 
-    type: "Savings", 
-    institution: "Chase", 
-    status: "connected",
-    lastSync: "2 hours ago" 
-  },
-  { 
-    id: "3", 
-    name: "Amex Platinum", 
-    type: "Credit Card", 
-    institution: "American Express", 
-    status: "connected",
-    lastSync: "1 hour ago" 
-  },
-  { 
-    id: "4", 
-    name: "Fidelity 401k", 
-    type: "Investment", 
-    institution: "Fidelity", 
-    status: "connected",
-    lastSync: "3 hours ago" 
-  },
-];
+interface PlaidAccount {
+  id: string;
+  name: string;
+  officialName?: string;
+  type: string;
+  subtype?: string;
+  mask?: string;
+  currentBalance: number;
+  availableBalance?: number;
+  institution: string;
+  itemId: string;
+}
+
+interface PlaidInstitution {
+  id: string;
+  itemId: string;
+  name: string;
+  logo?: string;
+  primaryColor?: string;
+  accounts: PlaidAccount[];
+  status: string;
+  lastSync: string;
+}
 
 const availableIntegrations = [
   { id: "plaid", name: "Plaid", description: "Connect 10,000+ institutions", icon: Link2, image: "/banks/plaid3.png" },
@@ -69,7 +62,9 @@ const popularBanks = [
 ];
 
 export default function ImportsPage() {
-  const [accounts, setAccounts] = useState(initialAccounts);
+  const [institutions, setInstitutions] = useState<PlaidInstitution[]>([]);
+  const [accounts, setAccounts] = useState<PlaidAccount[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [syncingAccounts, setSyncingAccounts] = useState<Set<string>>(new Set());
 
@@ -91,35 +86,41 @@ export default function ImportsPage() {
     },
   };
 
-  const handleSyncAccount = (accountId: string) => {
-    setSyncingAccounts(prev => new Set([...prev, accountId]));
-    toast.info("Syncing account...");
-    
-    setTimeout(() => {
-      setSyncingAccounts(prev => {
-        const next = new Set(prev);
-        next.delete(accountId);
-        return next;
-      });
-      setAccounts(prev => prev.map(acc => 
-        acc.id === accountId 
-          ? { ...acc, lastSync: "Just now" }
-          : acc
-      ));
-      toast.success("Account synced successfully!");
-    }, 2000);
+  // Fetch connected accounts on mount
+  useEffect(() => {
+    fetchAccounts();
+  }, []);
+
+  const fetchAccounts = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/plaid/accounts');
+      if (response.ok) {
+        const data = await response.json();
+        setInstitutions(data.institutions || []);
+        setAccounts(data.accounts || []);
+      }
+    } catch (error) {
+      console.error('Error fetching accounts:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSyncAll = () => {
-    const allIds = accounts.map(a => a.id);
+  const handlePlaidSuccess = () => {
+    setShowAddAccount(false);
+    fetchAccounts();
+  };
+
+  const handleSyncAll = async () => {
+    const allIds = institutions.map(i => i.itemId);
     setSyncingAccounts(new Set(allIds));
     toast.info("Syncing all accounts...");
     
-    setTimeout(() => {
-      setSyncingAccounts(new Set());
-      setAccounts(prev => prev.map(acc => ({ ...acc, lastSync: "Just now" })));
-      toast.success("All accounts synced!");
-    }, 3000);
+    // Re-fetch accounts from Plaid
+    await fetchAccounts();
+    setSyncingAccounts(new Set());
+    toast.success("All accounts synced!");
   };
 
   const handleConnect = (integrationId: string) => {
@@ -130,22 +131,20 @@ export default function ImportsPage() {
     }
   };
 
-  const handleBankConnect = (bankName: string) => {
-    toast.info(`Connecting to ${bankName}...`);
-    setShowAddAccount(false);
-    
-    setTimeout(() => {
-      const newAccount = {
-        id: String(Date.now()),
-        name: `${bankName} Account`,
-        type: "Checking",
-        institution: bankName,
-        status: "connected",
-        lastSync: "Just now",
-      };
-      setAccounts(prev => [...prev, newAccount]);
-      toast.success(`${bankName} connected successfully!`);
-    }, 1500);
+  const getAccountIcon = (type: string) => {
+    switch (type) {
+      case 'depository': return Wallet;
+      case 'investment': return TrendingUp;
+      case 'credit': return CreditCard;
+      default: return Building2;
+    }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount);
   };
 
   return (
@@ -159,10 +158,10 @@ export default function ImportsPage() {
               Connect accounts and import your financial data
             </p>
           </div>
-          <GlassButton variant="primary" size="sm" onClick={() => setShowAddAccount(true)}>
-            <Link2 className="w-3.5 h-3.5" />
-            Add Account
-          </GlassButton>
+          <PlaidLinkButton 
+            onSuccess={handlePlaidSuccess}
+            buttonText="Add Account"
+          />
         </div>
 
         {/* Import Options */}
@@ -186,13 +185,21 @@ export default function ImportsPage() {
                         <h3 className="text-sm font-semibold">{integration.name}</h3>
                         <p className="text-[11px] text-foreground-muted">{integration.description}</p>
                       </div>
-                      <GlassButton 
-                        variant="secondary" 
-                        size="sm"
-                        onClick={() => handleConnect(integration.id)}
-                      >
-                        Connect
-                      </GlassButton>
+                      {integration.id === "plaid" ? (
+                        <PlaidLinkButton 
+                          onSuccess={handlePlaidSuccess}
+                          buttonText="Connect"
+                          buttonVariant="secondary"
+                        />
+                      ) : (
+                        <GlassButton 
+                          variant="secondary" 
+                          size="sm"
+                          onClick={() => handleConnect(integration.id)}
+                        >
+                          Connect
+                        </GlassButton>
+                      )}
                     </div>
                   </GlassCard>
                 );
@@ -213,26 +220,93 @@ export default function ImportsPage() {
           </div>
         </div>
 
-        {/* Sync Summary */}
-        <GlassCard>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-success-soft">
-                <CheckCircle className="w-4 h-4 text-success" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold">All accounts synced</h3>
-                <p className="text-[11px] text-foreground-muted">
-                  Last full sync completed {accounts[0]?.lastSync || "recently"}
-                </p>
-              </div>
+        {/* Connected Accounts */}
+        {loading ? (
+          <GlassCard>
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="w-5 h-5 animate-spin text-primary" />
+              <span className="ml-2 text-sm text-foreground-muted">Loading accounts...</span>
             </div>
-            <GlassButton variant="secondary" size="sm" onClick={handleSyncAll}>
-              <RefreshCw className={`w-3.5 h-3.5 ${syncingAccounts.size > 0 ? "animate-spin" : ""}`} />
-              Sync All
-            </GlassButton>
+          </GlassCard>
+        ) : institutions.length > 0 ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold">Connected Institutions ({institutions.length})</h2>
+              <GlassButton variant="secondary" size="sm" onClick={handleSyncAll}>
+                <RefreshCw className={`w-3.5 h-3.5 ${syncingAccounts.size > 0 ? "animate-spin" : ""}`} />
+                Sync All
+              </GlassButton>
+            </div>
+            
+            {institutions.map((institution) => (
+              <GlassCard key={institution.itemId}>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div 
+                        className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold"
+                        style={{ backgroundColor: institution.primaryColor || '#6366f1' }}
+                      >
+                        {institution.name.charAt(0)}
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-semibold">{institution.name}</h3>
+                        <p className="text-[11px] text-foreground-muted">
+                          {institution.accounts.length} account{institution.accounts.length !== 1 ? 's' : ''} • Last synced: {institution.lastSync}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-success" />
+                      <span className="text-xs text-success">Connected</span>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {institution.accounts.map((account) => {
+                      const Icon = getAccountIcon(account.type);
+                      return (
+                        <div 
+                          key={account.id}
+                          className="flex items-center justify-between p-2.5 rounded-lg bg-secondary/50"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Icon className="w-4 h-4 text-foreground-muted" />
+                            <div>
+                              <p className="text-xs font-medium">{account.name}</p>
+                              <p className="text-[10px] text-foreground-muted capitalize">
+                                {account.subtype || account.type} {account.mask ? `••${account.mask}` : ''}
+                              </p>
+                            </div>
+                          </div>
+                          <span className="text-xs font-semibold">
+                            {formatCurrency(account.currentBalance)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </GlassCard>
+            ))}
           </div>
-        </GlassCard>
+        ) : (
+          <GlassCard>
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <div className="p-3 rounded-full bg-secondary mb-3">
+                <Link2 className="w-6 h-6 text-foreground-muted" />
+              </div>
+              <h3 className="text-sm font-semibold mb-1">No accounts connected</h3>
+              <p className="text-xs text-foreground-muted mb-4">
+                Connect your bank accounts to get started
+              </p>
+              <PlaidLinkButton 
+                onSuccess={handlePlaidSuccess}
+                buttonText="Connect Your First Account"
+              />
+            </div>
+          </GlassCard>
+        )}
       </div>
 
       {/* Add Account Modal */}
@@ -244,20 +318,30 @@ export default function ImportsPage() {
         size="md"
       >
         <div className="p-5 space-y-5">
-          <div>
-            <h4 className="text-xs font-medium mb-2.5">Popular Banks</h4>
-            <div className="grid grid-cols-2 gap-2">
-              {popularBanks.map((bank) => (
-                <button
-                  key={bank.id}
-                  onClick={() => handleBankConnect(bank.name)}
-                  className="flex items-center gap-2.5 p-3 rounded-lg bg-secondary hover:bg-background-tertiary transition-colors duration-150 text-left cursor-pointer"
-                >
-                  <Image src={bank.image} alt={bank.name} width={28} height={28} className="rounded-md object-contain shrink-0" />
-                  <span className="font-medium text-xs">{bank.name}</span>
-                </button>
-              ))}
+          <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+            <div className="flex items-center gap-2 mb-1">
+              <Link2 className="w-4 h-4 text-primary" />
+              <span className="font-medium text-sm">Powered by Plaid</span>
             </div>
+            <p className="text-[11px] text-foreground-muted">
+              Securely connect to 10,000+ financial institutions. Your credentials are never stored on our servers.
+            </p>
+          </div>
+
+          <div className="flex flex-col items-center gap-4 py-4">
+            <div className="text-center">
+              <h4 className="text-sm font-medium mb-1">Connect Your Accounts</h4>
+              <p className="text-xs text-foreground-muted">
+                Click below to securely link your bank, investment, or loan accounts
+              </p>
+            </div>
+            
+            <PlaidLinkButton 
+              onSuccess={handlePlaidSuccess}
+              onExit={() => {}}
+              buttonText="Connect with Plaid"
+              buttonSize="md"
+            />
           </div>
 
           <div className="relative">
@@ -265,26 +349,24 @@ export default function ImportsPage() {
               <div className="w-full border-t border-border" />
             </div>
             <div className="relative flex justify-center text-[10px] uppercase tracking-wider">
-              <span className="bg-card px-2 text-foreground-muted">or search</span>
+              <span className="bg-card px-2 text-foreground-muted">supported institutions</span>
             </div>
           </div>
 
-          <div>
-            <input
-              type="text"
-              placeholder="Search for your bank..."
-              className="w-full px-3.5 py-2.5 rounded-lg bg-secondary border border-border focus:border-primary focus:outline-none transition-colors text-sm"
-              onChange={(e) => {
-                if (e.target.value.length > 2) {
-                  toast.info(`Searching for "${e.target.value}"...`);
-                }
-              }}
-            />
+          <div className="grid grid-cols-3 gap-2">
+            {popularBanks.map((bank) => (
+              <div
+                key={bank.id}
+                className="flex items-center gap-2 p-2 rounded-lg bg-secondary/50"
+              >
+                <Image src={bank.image} alt={bank.name} width={24} height={24} className="rounded-md object-contain shrink-0" />
+                <span className="font-medium text-[10px] truncate">{bank.name}</span>
+              </div>
+            ))}
           </div>
 
           <p className="text-[10px] text-foreground-muted text-center leading-relaxed">
-            We use bank-level encryption to keep your data safe. 
-            Your credentials are never stored on our servers.
+            We use bank-level 256-bit encryption to keep your data safe.
           </p>
         </div>
       </Modal>
