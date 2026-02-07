@@ -1,0 +1,55 @@
+.container {
+    min-height: 100vh;
+    padding: 2rem 1rem 2.5rem;
+    max-width: 520px;
+    margin: 0 auto;
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.container h1 {
+    margin: 0;
+    font-size: 2rem;
+    letter-spacing: -0.03em;
+}
+
+.container p {
+    margin: 0;
+    color: var(--text-muted);
+}
+
+.form {
+    margin-top: 1.25rem;
+    display: grid;
+    gap: 1rem;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 1rem;
+    background: #ffffffd8;
+    box-shadow: var(--shadow-sm);
+}
+
+.form input[type='file'] {
+    border: 1px solid #d1d5db;
+    border-radius: 12px;
+    padding: 0.9rem;
+    background: #f9fafb;
+}
+
+.form button {
+    border: 1px solid #111827;
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+    background: #111827;
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.form button:disabled {
+    opacity: 0.6;
+    border-color: #9ca3af;
+    background: #9ca3af;
+}
