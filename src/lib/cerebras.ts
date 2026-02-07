@@ -12,14 +12,15 @@ export const cerebras = new OpenAI({
  */
 export async function generateChatResponse(
     messages: { role: 'system' | 'user' | 'assistant'; content: string }[],
-    model: string = 'llama3.1-8b'
+    model: string = 'llama3.1-8b',
+    maxTokens: number = 1024,
 ): Promise<string> {
     try {
         const response = await cerebras.chat.completions.create({
             model,
             messages,
             temperature: 0.7,
-            max_tokens: 1024,
+            max_tokens: maxTokens,
         });
 
         return response.choices[0]?.message?.content || '';

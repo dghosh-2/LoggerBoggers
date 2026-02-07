@@ -33,26 +33,184 @@ const SUGGESTED_PROMPTS = [
   "Analyze my portfolio risk",
 ];
 
-// Audio wave visualization bars
-const AudioWave = ({ isActive, intensity = 1 }: { isActive: boolean; intensity?: number }) => {
-  const bars = 12;
+// Animated blob entity for call mode
+const BlobEntity = ({ status }: { status: string }) => {
+  const isActive = status === 'speaking' || status === 'listening';
+  const isSpeaking = status === 'speaking';
+  const isThinking = status === 'thinking';
+
+  // Color palette based on status
+  const colors = {
+    speaking: { primary: '#3B82F6', secondary: '#60A5FA', glow: 'rgba(59,130,246,0.4)' },
+    listening: { primary: '#22C55E', secondary: '#4ADE80', glow: 'rgba(34,197,94,0.4)' },
+    thinking: { primary: '#F59E0B', secondary: '#FBBF24', glow: 'rgba(245,158,11,0.4)' },
+    idle: { primary: '#64748B', secondary: '#94A3B8', glow: 'rgba(100,116,139,0.3)' },
+    connecting: { primary: '#64748B', secondary: '#94A3B8', glow: 'rgba(100,116,139,0.3)' },
+  };
+
+  const c = colors[status as keyof typeof colors] || colors.idle;
+
   return (
-    <div className="flex items-center justify-center gap-[3px] h-16">
-      {Array.from({ length: bars }).map((_, i) => (
-        <motion.div
-          key={i}
-          className="w-1 rounded-full bg-white"
-          animate={isActive ? {
-            height: [8, 20 + Math.random() * 40 * intensity, 12, 30 + Math.random() * 30 * intensity, 8],
-          } : { height: 8 }}
-          transition={{
-            duration: 0.8 + Math.random() * 0.4,
-            repeat: isActive ? Infinity : 0,
-            ease: "easeInOut",
-            delay: i * 0.05,
-          }}
-        />
-      ))}
+    <div className="relative w-48 h-48 flex items-center justify-center">
+      {/* Outer ambient glow */}
+      <motion.div
+        className="absolute rounded-full"
+        style={{
+          width: 280,
+          height: 280,
+          background: `radial-gradient(circle, ${c.glow} 0%, transparent 70%)`,
+        }}
+        animate={{
+          scale: isActive ? [1, 1.2, 1] : [1, 1.05, 1],
+          opacity: isActive ? [0.6, 1, 0.6] : [0.3, 0.5, 0.3],
+        }}
+        transition={{ duration: isActive ? 1.5 : 3, repeat: Infinity, ease: "easeInOut" }}
+      />
+
+      {/* Blob layer 3 (outermost) */}
+      <motion.div
+        className="absolute"
+        style={{ width: 180, height: 180 }}
+        animate={{
+          scale: isSpeaking ? [1, 1.15, 0.95, 1.1, 1] : isThinking ? [1, 1.05, 1] : [1, 1.08, 1],
+          rotate: isThinking ? [0, 360] : isSpeaking ? [0, 10, -10, 5, 0] : [0, 5, -5, 0],
+        }}
+        transition={{
+          duration: isSpeaking ? 0.8 : isThinking ? 4 : 3,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+      >
+        <svg viewBox="0 0 200 200" className="w-full h-full">
+          <motion.path
+            fill={c.secondary}
+            fillOpacity={0.3}
+            animate={{
+              d: isActive ? [
+                "M 100 30 C 140 30, 170 60, 170 100 C 170 140, 140 170, 100 170 C 60 170, 30 140, 30 100 C 30 60, 60 30, 100 30",
+                "M 100 25 C 150 35, 175 55, 175 100 C 175 145, 145 175, 100 175 C 55 175, 25 145, 25 100 C 25 55, 50 25, 100 25",
+                "M 100 35 C 135 25, 165 65, 170 100 C 175 135, 145 170, 100 165 C 55 160, 35 135, 30 100 C 25 65, 65 35, 100 35",
+                "M 100 30 C 140 30, 170 60, 170 100 C 170 140, 140 170, 100 170 C 60 170, 30 140, 30 100 C 30 60, 60 30, 100 30",
+              ] : [
+                "M 100 30 C 140 30, 170 60, 170 100 C 170 140, 140 170, 100 170 C 60 170, 30 140, 30 100 C 30 60, 60 30, 100 30",
+                "M 100 35 C 138 32, 168 62, 168 100 C 168 138, 138 168, 100 168 C 62 168, 32 138, 32 100 C 32 62, 62 35, 100 35",
+                "M 100 30 C 140 30, 170 60, 170 100 C 170 140, 140 170, 100 170 C 60 170, 30 140, 30 100 C 30 60, 60 30, 100 30",
+              ],
+            }}
+            transition={{ duration: isActive ? 1.2 : 4, repeat: Infinity, ease: "easeInOut" }}
+          />
+        </svg>
+      </motion.div>
+
+      {/* Blob layer 2 (middle) */}
+      <motion.div
+        className="absolute"
+        style={{ width: 150, height: 150 }}
+        animate={{
+          scale: isSpeaking ? [1, 1.2, 0.9, 1.15, 1] : isThinking ? [1, 1.08, 1] : [1, 1.05, 1],
+          rotate: isThinking ? [0, -180] : isSpeaking ? [0, -8, 12, -5, 0] : [0, -3, 3, 0],
+          y: isActive ? [0, -6, 4, -3, 0] : [0, -3, 0],
+        }}
+        transition={{
+          duration: isSpeaking ? 0.7 : isThinking ? 3 : 4,
+          repeat: Infinity,
+          ease: "easeInOut",
+          delay: 0.1,
+        }}
+      >
+        <svg viewBox="0 0 200 200" className="w-full h-full">
+          <motion.path
+            fill={c.primary}
+            fillOpacity={0.5}
+            animate={{
+              d: isActive ? [
+                "M 100 35 C 135 35, 165 65, 165 100 C 165 135, 135 165, 100 165 C 65 165, 35 135, 35 100 C 35 65, 65 35, 100 35",
+                "M 100 30 C 145 40, 170 60, 168 100 C 166 140, 140 172, 100 170 C 60 168, 32 140, 30 100 C 28 60, 55 30, 100 30",
+                "M 100 40 C 130 28, 162 68, 165 100 C 168 132, 142 165, 100 162 C 58 159, 38 130, 35 100 C 32 70, 70 40, 100 40",
+                "M 100 35 C 135 35, 165 65, 165 100 C 165 135, 135 165, 100 165 C 65 165, 35 135, 35 100 C 35 65, 65 35, 100 35",
+              ] : [
+                "M 100 35 C 135 35, 165 65, 165 100 C 165 135, 135 165, 100 165 C 65 165, 35 135, 35 100 C 35 65, 65 35, 100 35",
+                "M 100 38 C 133 36, 163 66, 163 100 C 163 134, 133 163, 100 163 C 67 163, 37 134, 37 100 C 37 66, 67 38, 100 38",
+                "M 100 35 C 135 35, 165 65, 165 100 C 165 135, 135 165, 100 165 C 65 165, 35 135, 35 100 C 35 65, 65 35, 100 35",
+              ],
+            }}
+            transition={{ duration: isActive ? 1 : 5, repeat: Infinity, ease: "easeInOut", delay: 0.15 }}
+          />
+        </svg>
+      </motion.div>
+
+      {/* Blob layer 1 (innermost / core) */}
+      <motion.div
+        className="absolute"
+        style={{ width: 110, height: 110 }}
+        animate={{
+          scale: isSpeaking ? [1, 1.25, 0.85, 1.2, 1] : isThinking ? [1, 1.1, 1] : [1, 1.03, 1],
+          rotate: isThinking ? [0, 120] : isSpeaking ? [0, 15, -15, 8, 0] : [0, 2, -2, 0],
+          x: isActive ? [0, 3, -3, 2, 0] : [0],
+          y: isActive ? [0, -4, 5, -2, 0] : [0, -2, 0],
+        }}
+        transition={{
+          duration: isSpeaking ? 0.6 : isThinking ? 2.5 : 5,
+          repeat: Infinity,
+          ease: "easeInOut",
+          delay: 0.2,
+        }}
+      >
+        <svg viewBox="0 0 200 200" className="w-full h-full">
+          <defs>
+            <radialGradient id="blobGradient" cx="40%" cy="40%">
+              <stop offset="0%" stopColor="#fff" stopOpacity="0.3" />
+              <stop offset="100%" stopColor={c.primary} stopOpacity="0.9" />
+            </radialGradient>
+          </defs>
+          <motion.path
+            fill="url(#blobGradient)"
+            animate={{
+              d: isActive ? [
+                "M 100 40 C 130 40, 160 70, 160 100 C 160 130, 130 160, 100 160 C 70 160, 40 130, 40 100 C 40 70, 70 40, 100 40",
+                "M 100 35 C 140 45, 165 65, 162 100 C 159 135, 135 168, 100 165 C 65 162, 38 135, 35 100 C 32 65, 60 35, 100 35",
+                "M 100 45 C 125 32, 158 72, 160 100 C 162 128, 138 162, 100 158 C 62 154, 42 128, 40 100 C 38 72, 75 45, 100 45",
+                "M 100 40 C 130 40, 160 70, 160 100 C 160 130, 130 160, 100 160 C 70 160, 40 130, 40 100 C 40 70, 70 40, 100 40",
+              ] : [
+                "M 100 40 C 130 40, 160 70, 160 100 C 160 130, 130 160, 100 160 C 70 160, 40 130, 40 100 C 40 70, 70 40, 100 40",
+                "M 100 42 C 128 41, 158 71, 158 100 C 158 129, 128 158, 100 158 C 72 158, 42 129, 42 100 C 42 71, 72 42, 100 42",
+                "M 100 40 C 130 40, 160 70, 160 100 C 160 130, 130 160, 100 160 C 70 160, 40 130, 40 100 C 40 70, 70 40, 100 40",
+              ],
+            }}
+            transition={{ duration: isActive ? 0.8 : 6, repeat: Infinity, ease: "easeInOut", delay: 0.25 }}
+          />
+        </svg>
+      </motion.div>
+
+      {/* Floating particles when active */}
+      {isActive && (
+        <>
+          {[...Array(6)].map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute w-1.5 h-1.5 rounded-full"
+              style={{ backgroundColor: c.secondary }}
+              initial={{
+                x: 0,
+                y: 0,
+                opacity: 0,
+              }}
+              animate={{
+                x: [0, Math.cos(i * 60 * Math.PI / 180) * (60 + Math.random() * 30), 0],
+                y: [0, Math.sin(i * 60 * Math.PI / 180) * (60 + Math.random() * 30), 0],
+                opacity: [0, 0.8, 0],
+                scale: [0.5, 1.2, 0.5],
+              }}
+              transition={{
+                duration: 2 + Math.random(),
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: i * 0.3,
+              }}
+            />
+          ))}
+        </>
+      )}
     </div>
   );
 };
@@ -76,57 +234,11 @@ export function ChatAssistant() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speechEnabled, setSpeechEnabled] = useState(true);
   const [callStatus, setCallStatus] = useState<'idle' | 'connecting' | 'listening' | 'thinking' | 'speaking'>('idle');
-  const [selectedVoice, setSelectedVoice] = useState<SpeechSynthesisVoice | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
   const continueListeningRef = useRef(false);
-
-  // Find the best available voice (prefer natural/premium voices)
-  useEffect(() => {
-    const loadVoices = () => {
-      const voices = window.speechSynthesis.getVoices();
-      if (voices.length === 0) return;
-
-      // Priority order for natural-sounding voices
-      const preferredVoices = [
-        // macOS premium voices
-        'Samantha', 'Karen', 'Daniel', 'Moira', 'Tessa',
-        // Google/Chrome voices
-        'Google US English', 'Google UK English Female',
-        // Microsoft voices
-        'Microsoft Zira', 'Microsoft David',
-        // Generic fallbacks
-        'English', 'en-US', 'en-GB'
-      ];
-
-      let bestVoice: SpeechSynthesisVoice | null = null;
-
-      for (const preferred of preferredVoices) {
-        const found = voices.find(v =>
-          v.name.includes(preferred) ||
-          v.lang.includes(preferred)
-        );
-        if (found) {
-          bestVoice = found;
-          break;
-        }
-      }
-
-      // Fallback to any English voice
-      if (!bestVoice) {
-        bestVoice = voices.find(v => v.lang.startsWith('en')) || voices[0];
-      }
-
-      setSelectedVoice(bestVoice);
-      console.log('Selected voice:', bestVoice?.name);
-    };
-
-    if (typeof window !== 'undefined') {
-      loadVoices();
-      window.speechSynthesis.onvoiceschanged = loadVoices;
-    }
-  }, []);
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Initialize speech recognition with continuous mode support
   useEffect(() => {
@@ -141,10 +253,7 @@ export function ChatAssistant() {
         recognitionRef.current.onresult = (event: any) => {
           const transcript = event.results[0][0].transcript;
           if (transcript.trim()) {
-            // Don't add to messages in call mode - keep it conversational
-            if (!continueListeningRef.current) {
-              addMessage("user", transcript.trim());
-            }
+            addMessage("user", transcript.trim());
             fetchResponseForCall(transcript.trim());
           }
         };
@@ -159,67 +268,115 @@ export function ChatAssistant() {
 
         recognitionRef.current.onend = () => {
           setIsListening(false);
-          // In call mode, restart listening after speaking ends (handled in speakText)
         };
       }
     }
   }, []);
 
-  const speakText = useCallback((text: string, onComplete?: () => void) => {
+  // Speak text using OpenAI TTS with browser SpeechSynthesis fallback
+  const speakText = useCallback(async (text: string, onComplete?: () => void) => {
     if (!speechEnabled || typeof window === 'undefined') {
       onComplete?.();
       return;
     }
 
+    // Stop any current audio
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+    }
     window.speechSynthesis.cancel();
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1.0; // Slightly slower for more natural sound
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
+    setIsSpeaking(true);
+    setCallStatus('speaking');
 
-    if (selectedVoice) {
-      utterance.voice = selectedVoice;
-    }
+    try {
+      const response = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
 
-    utterance.onstart = () => {
-      setIsSpeaking(true);
-      setCallStatus('speaking');
-    };
+      if (!response.ok) throw new Error('TTS failed');
 
-    utterance.onend = () => {
-      setIsSpeaking(false);
-      onComplete?.();
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      currentAudioRef.current = audio;
 
-      // In call mode, automatically start listening again
-      if (continueListeningRef.current && recognitionRef.current) {
-        setTimeout(() => {
-          if (continueListeningRef.current) {
-            try {
-              setCallStatus('listening');
-              setIsListening(true);
-              recognitionRef.current.start();
-            } catch (e) {
-              console.log('Could not restart recognition:', e);
+      audio.onended = () => {
+        setIsSpeaking(false);
+        currentAudioRef.current = null;
+        URL.revokeObjectURL(audioUrl);
+        onComplete?.();
+
+        // In call mode, automatically start listening again
+        if (continueListeningRef.current && recognitionRef.current) {
+          setTimeout(() => {
+            if (continueListeningRef.current) {
+              try {
+                setCallStatus('listening');
+                setIsListening(true);
+                recognitionRef.current.start();
+              } catch (e) {
+                console.log('Could not restart recognition:', e);
+              }
             }
-          }
-        }, 300); // Small delay before listening again
-      }
-    };
+          }, 300);
+        }
+      };
 
-    utterance.onerror = () => {
-      setIsSpeaking(false);
-      onComplete?.();
-    };
+      audio.onerror = () => {
+        setIsSpeaking(false);
+        currentAudioRef.current = null;
+        URL.revokeObjectURL(audioUrl);
+        onComplete?.();
+      };
 
-    window.speechSynthesis.speak(utterance);
-  }, [speechEnabled, selectedVoice]);
+      await audio.play();
+    } catch {
+      // Fallback to browser SpeechSynthesis
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.95;
+      utterance.pitch = 1.05;
+
+      utterance.onend = () => {
+        setIsSpeaking(false);
+        onComplete?.();
+
+        if (continueListeningRef.current && recognitionRef.current) {
+          setTimeout(() => {
+            if (continueListeningRef.current) {
+              try {
+                setCallStatus('listening');
+                setIsListening(true);
+                recognitionRef.current.start();
+              } catch (e) {
+                console.log('Could not restart recognition:', e);
+              }
+            }
+          }, 300);
+        }
+      };
+
+      utterance.onerror = () => {
+        setIsSpeaking(false);
+        onComplete?.();
+      };
+
+      window.speechSynthesis.speak(utterance);
+    }
+  }, [speechEnabled]);
 
   const stopSpeaking = () => {
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+    }
     if (typeof window !== 'undefined') {
       window.speechSynthesis.cancel();
-      setIsSpeaking(false);
     }
+    setIsSpeaking(false);
   };
 
   // Auto-scroll to latest message
@@ -245,7 +402,47 @@ export function ChatAssistant() {
     return msg;
   };
 
-  // Fetch response for call mode (continuous conversation)
+  // Play audio blob and manage call state
+  const playAudioBlob = useCallback((blob: Blob, onComplete?: () => void) => {
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    currentAudioRef.current = audio;
+    setIsSpeaking(true);
+    setCallStatus('speaking');
+
+    audio.onended = () => {
+      setIsSpeaking(false);
+      currentAudioRef.current = null;
+      URL.revokeObjectURL(url);
+      onComplete?.();
+
+      // In call mode, automatically start listening again
+      if (continueListeningRef.current && recognitionRef.current) {
+        setTimeout(() => {
+          if (continueListeningRef.current) {
+            try {
+              setCallStatus('listening');
+              setIsListening(true);
+              recognitionRef.current.start();
+            } catch (e) {
+              console.log('Could not restart recognition:', e);
+            }
+          }
+        }, 300);
+      }
+    };
+
+    audio.onerror = () => {
+      setIsSpeaking(false);
+      currentAudioRef.current = null;
+      URL.revokeObjectURL(url);
+      onComplete?.();
+    };
+
+    audio.play();
+  }, []);
+
+  // Fetch response for call mode — single server-side LLM+TTS call
   const fetchResponseForCall = async (userMessage: string) => {
     setCallStatus('thinking');
     setIsThinking(true);
@@ -253,7 +450,7 @@ export function ChatAssistant() {
     try {
       const conversationMessages = messages
         .filter(msg => msg.id !== 'welcome')
-        .slice(-10) // Keep last 10 messages for context
+        .slice(-6)
         .map(msg => ({
           role: msg.role,
           content: msg.content
@@ -264,7 +461,7 @@ export function ChatAssistant() {
         content: userMessage
       });
 
-      const response = await fetch('/api/chat', {
+      const response = await fetch('/api/voice-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: conversationMessages }),
@@ -272,22 +469,22 @@ export function ChatAssistant() {
 
       if (!response.ok) throw new Error('Failed to get response');
 
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let assistantMessage = '';
+      setIsThinking(false);
 
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          assistantMessage += decoder.decode(value);
-        }
+      const contentType = response.headers.get('Content-Type') || '';
 
-        setIsThinking(false);
-
-        // Speak the response
-        if (assistantMessage) {
-          speakText(assistantMessage);
+      if (contentType.startsWith('audio/')) {
+        // Got audio directly — play it
+        const responseText = decodeURIComponent(response.headers.get('X-Response-Text') || '');
+        if (responseText) addMessage('assistant', responseText);
+        const audioBlob = await response.blob();
+        playAudioBlob(audioBlob);
+      } else {
+        // JSON fallback (no Hume key) — use browser TTS
+        const data = await response.json();
+        if (data.text) {
+          addMessage('assistant', data.text);
+          speakText(data.text);
         }
       }
     } catch (error) {
@@ -388,7 +585,6 @@ export function ChatAssistant() {
       setIsCallMode(true);
       setCallStatus('connecting');
 
-      // Greet and start listening
       setTimeout(() => {
         continueListeningRef.current = true;
         speakText("Hi! What would you like to know about your finances?", () => {
@@ -423,79 +619,37 @@ export function ChatAssistant() {
 
   return (
     <>
-      {/* Call Mode - Full Screen Bubble Interface */}
+      {/* Call Mode - Full Screen Blob Interface */}
       <AnimatePresence>
         {isCallMode && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center"
+            className="fixed inset-0 z-[100] bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 flex flex-col items-center justify-center"
           >
-            {/* Background glow effect */}
-            <div className="absolute inset-0 overflow-hidden">
+            {/* Background glow */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
               <motion.div
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full"
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full"
                 style={{
                   background: callStatus === 'speaking'
-                    ? 'radial-gradient(circle, rgba(59,130,246,0.3) 0%, transparent 70%)'
+                    ? 'radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)'
                     : callStatus === 'listening'
-                    ? 'radial-gradient(circle, rgba(34,197,94,0.3) 0%, transparent 70%)'
-                    : 'radial-gradient(circle, rgba(148,163,184,0.2) 0%, transparent 70%)'
+                    ? 'radial-gradient(circle, rgba(34,197,94,0.15) 0%, transparent 70%)'
+                    : 'radial-gradient(circle, rgba(148,163,184,0.1) 0%, transparent 70%)'
                 }}
-                animate={{
-                  scale: callStatus === 'idle' ? 1 : [1, 1.1, 1],
-                }}
-                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                animate={{ scale: [1, 1.15, 1] }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
               />
             </div>
 
-            {/* Main Bubble */}
-            <motion.div
-              className={cn(
-                "relative w-40 h-40 rounded-full flex items-center justify-center",
-                callStatus === 'speaking' ? "bg-blue-500" :
-                callStatus === 'listening' ? "bg-green-500" :
-                callStatus === 'thinking' ? "bg-amber-500" :
-                "bg-slate-600"
-              )}
-              animate={{
-                scale: callStatus === 'speaking' || callStatus === 'listening' ? [1, 1.05, 1] : 1,
-              }}
-              transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-            >
-              {/* Outer pulse rings */}
-              {(callStatus === 'speaking' || callStatus === 'listening') && (
-                <>
-                  <motion.div
-                    className={cn(
-                      "absolute inset-0 rounded-full",
-                      callStatus === 'speaking' ? "bg-blue-500" : "bg-green-500"
-                    )}
-                    animate={{ scale: [1, 1.5], opacity: [0.5, 0] }}
-                    transition={{ duration: 1.5, repeat: Infinity, ease: "easeOut" }}
-                  />
-                  <motion.div
-                    className={cn(
-                      "absolute inset-0 rounded-full",
-                      callStatus === 'speaking' ? "bg-blue-500" : "bg-green-500"
-                    )}
-                    animate={{ scale: [1, 1.8], opacity: [0.3, 0] }}
-                    transition={{ duration: 1.5, repeat: Infinity, ease: "easeOut", delay: 0.3 }}
-                  />
-                </>
-              )}
-
-              {/* Audio wave visualization */}
-              <AudioWave
-                isActive={callStatus === 'speaking' || callStatus === 'listening'}
-                intensity={callStatus === 'speaking' ? 1.2 : 0.8}
-              />
-            </motion.div>
+            {/* Animated Blob Entity */}
+            <BlobEntity status={callStatus} />
 
             {/* Status Text */}
             <motion.p
-              className="mt-8 text-xl font-medium text-white"
+              className="mt-6 text-lg font-medium text-white/90"
               key={callStatus}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -507,7 +661,7 @@ export function ChatAssistant() {
               {callStatus === 'idle' && 'Ready'}
             </motion.p>
 
-            <p className="mt-2 text-sm text-slate-400">
+            <p className="mt-1.5 text-sm text-slate-500">
               {callStatus === 'listening' && 'Speak your question'}
               {callStatus === 'speaking' && 'Speaking...'}
               {callStatus === 'thinking' && 'Processing your request'}
@@ -516,20 +670,20 @@ export function ChatAssistant() {
             {/* End Call Button */}
             <motion.button
               onClick={toggleCallMode}
-              className="mt-12 w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-lg transition-colors cursor-pointer"
+              className="mt-10 w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-lg shadow-red-500/20 transition-colors cursor-pointer"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
               <PhoneOff className="w-6 h-6 text-white" />
             </motion.button>
-            <p className="mt-3 text-sm text-slate-500">Tap to end call</p>
+            <p className="mt-3 text-xs text-slate-600">Tap to end call</p>
 
             {/* Mute button */}
             <button
               onClick={() => { stopSpeaking(); setSpeechEnabled(!speechEnabled); }}
-              className="absolute top-6 right-6 p-3 rounded-full bg-slate-700/50 hover:bg-slate-700 transition-colors"
+              className="absolute top-6 right-6 p-3 rounded-full bg-slate-800/60 hover:bg-slate-700 transition-colors cursor-pointer"
             >
-              {speechEnabled ? <Volume2 className="w-5 h-5 text-white" /> : <VolumeX className="w-5 h-5 text-white" />}
+              {speechEnabled ? <Volume2 className="w-5 h-5 text-white/70" /> : <VolumeX className="w-5 h-5 text-white/70" />}
             </button>
           </motion.div>
         )}
