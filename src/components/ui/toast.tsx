@@ -23,7 +23,7 @@ export const useToastStore = create<ToastStore>((set) => ({
   addToast: (message, type = "info") => {
     const id = Math.random().toString(36).substring(7);
     set((state) => ({ toasts: [...state.toasts, { id, message, type }] }));
-    
+
     setTimeout(() => {
       set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) }));
     }, 4000);

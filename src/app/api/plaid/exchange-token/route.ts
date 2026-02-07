@@ -9,8 +9,9 @@ export async function POST(request: NextRequest) {
         const userId = await getUserIdFromRequest(request);
         
         if (!userId) {
+            console.error('Authentication failed: No user ID found');
             return NextResponse.json(
-                { error: 'Authentication required' },
+                { error: 'Authentication required', details: 'No valid session found' },
                 { status: 401 }
             );
         }
@@ -18,11 +19,15 @@ export async function POST(request: NextRequest) {
         const { public_token, institution } = await request.json();
 
         if (!public_token) {
+            console.error('Missing public_token in request');
             return NextResponse.json(
                 { error: 'Public token is required' },
                 { status: 400 }
             );
         }
+
+        console.log('Attempting to exchange public token for user:', userId);
+        console.log('Institution:', institution?.name || 'Unknown');
 
         // Exchange public token for access token
         const response = await plaidClient.itemPublicTokenExchange({
@@ -31,6 +36,8 @@ export async function POST(request: NextRequest) {
 
         const accessToken = response.data.access_token;
         const itemId = response.data.item_id;
+
+        console.log('Successfully exchanged token. Item ID:', itemId);
 
         // Store the access token in Supabase (in production, encrypt this!)
         const { error: insertError } = await supabase.from('plaid_items').upsert({
@@ -49,7 +56,7 @@ export async function POST(request: NextRequest) {
         if (insertError) {
             console.error('Error storing access token:', insertError);
             return NextResponse.json(
-                { error: 'Failed to store access token' },
+                { error: 'Failed to store access token', details: insertError.message },
                 { status: 500 }
             );
         }
@@ -258,8 +265,11 @@ export async function POST(request: NextRequest) {
 
         } catch (syncError: any) {
             console.error('Error syncing data:', syncError);
+            console.error('Sync error details:', syncError.response?.data || syncError.message);
             // Don't fail the connection if sync fails - data can be synced later
         }
+
+        console.log('Account connected successfully for user:', userId);
 
         return NextResponse.json({ 
             success: true,
@@ -267,9 +277,32 @@ export async function POST(request: NextRequest) {
             message: 'Account connected and data synced successfully',
         });
     } catch (error: any) {
-        console.error('Error exchanging token:', error.response?.data || error.message);
+        console.error('Error exchanging token:', error);
+        console.error('Error details:', {
+            message: error.message,
+            response: error.response?.data,
+            statusCode: error.response?.status,
+        });
+        
+        // Provide more specific error messages
+        let errorMessage = 'Failed to exchange token';
+        let errorDetails = error.message;
+        
+        if (error.response?.data) {
+            errorDetails = JSON.stringify(error.response.data);
+            
+            // Check for common Plaid errors
+            if (error.response.data.error_code === 'INVALID_PUBLIC_TOKEN') {
+                errorMessage = 'Invalid or expired Plaid token';
+                errorDetails = 'Please try connecting your account again';
+            } else if (error.response.data.error_code === 'INVALID_CREDENTIALS') {
+                errorMessage = 'Invalid Plaid API credentials';
+                errorDetails = 'Please check your Plaid configuration';
+            }
+        }
+        
         return NextResponse.json(
-            { error: 'Failed to exchange token', details: error.response?.data || error.message },
+            { error: errorMessage, details: errorDetails },
             { status: 500 }
         );
     }
