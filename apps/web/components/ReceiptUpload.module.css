@@ -144,26 +144,7 @@
 
 .controls {
     display: grid;
-    gap: 0.9rem;
-}
-
-.meta {
-    margin: 0;
-    padding: 0.6rem;
-    border-radius: 10px;
-    border: 1px solid #d3dfd1;
-    background: #f7fbf7;
-    color: #486048;
-    font-size: 0.74rem;
-}
-
-.loadingState {
-    display: grid;
-    gap: 0.6rem;
-    padding: 0.85rem;
-    border-radius: 12px;
-    border: 1px solid #d2e0d2;
-    background: #f4faf4;
+    gap: 0.75rem;
 }
 
 .actions {

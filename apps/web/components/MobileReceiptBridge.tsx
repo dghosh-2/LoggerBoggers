@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Badge, CopyButton, Group, Progress, Text, ThemeIcon } from '@mantine/core';
+import { CopyButton } from '@mantine/core';
 import { ShadButton } from '@/components/ui/shadcn-button';
-import { ShadCard, ShadCardContent, ShadCardDescription, ShadCardHeader, ShadCardTitle } from '@/components/ui/shadcn-card';
+import { ShadCard, ShadCardContent } from '@/components/ui/shadcn-card';
 import styles from './MobileReceiptBridge.module.css';
 
 type SessionResponse = {
@@ -12,14 +12,6 @@ type SessionResponse = {
     status: 'waiting' | 'uploading' | 'processed' | 'error';
     receiptId: string | null;
     error: string | null;
-};
-
-const statusProgressMap: Record<'idle' | 'waiting' | 'uploading' | 'processed' | 'error', number> = {
-    idle: 10,
-    waiting: 42,
-    uploading: 74,
-    processed: 100,
-    error: 100,
 };
 
 export default function MobileReceiptBridge() {
@@ -30,6 +22,23 @@ export default function MobileReceiptBridge() {
 
     useEffect(() => {
         setOrigin(window.location.origin);
+    }, []);
+
+    const createSession = useCallback(async () => {
+        try {
+            setStatus('idle');
+            setError(null);
+            const res = await fetch('/api/mobile/sessions', { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error ?? 'Could not create mobile session');
+
+            setSessionId(data.sessionId);
+            setStatus('waiting');
+            setError(null);
+        } catch (err: any) {
+            setStatus('error');
+            setError(err.message ?? 'Could not create mobile session');
+        }
     }, []);
 
     const mobileLink = useMemo(() => {
@@ -43,33 +52,8 @@ export default function MobileReceiptBridge() {
     }, [mobileLink]);
 
     useEffect(() => {
-        let cancelled = false;
-
-        async function createSession() {
-            try {
-                const res = await fetch('/api/mobile/sessions', { method: 'POST' });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error ?? 'Could not create mobile session');
-
-                if (!cancelled) {
-                    setSessionId(data.sessionId);
-                    setStatus('waiting');
-                    setError(null);
-                }
-            } catch (err: any) {
-                if (!cancelled) {
-                    setStatus('error');
-                    setError(err.message ?? 'Could not create mobile session');
-                }
-            }
-        }
-
         createSession();
-
-        return () => {
-            cancelled = true;
-        };
-    }, []);
+    }, [createSession]);
 
     useEffect(() => {
         if (!sessionId || status === 'processed' || status === 'error') return;
@@ -105,51 +89,12 @@ export default function MobileReceiptBridge() {
 
     return (
         <ShadCard className={styles.card}>
-            <ShadCardHeader>
-                <ShadCardTitle>Phone Capture Bridge</ShadCardTitle>
-                <ShadCardDescription>Scan this QR with your phone camera and upload from mobile while this page waits.</ShadCardDescription>
-            </ShadCardHeader>
-
-            <ShadCardContent className={styles.layout}>
-                <div className={styles.content}>
-                    <Group justify="space-between" wrap="wrap">
-                        <Group gap="xs">
-                            <ThemeIcon radius="xl" variant="light" color="green">QR</ThemeIcon>
-                            <Text fw={600} size="sm">Session status</Text>
-                        </Group>
-                        <Badge variant="light" color={status === 'error' ? 'red' : status === 'processed' ? 'green' : 'teal'}>
-                            {status}
-                        </Badge>
-                    </Group>
-
-                    <Progress
-                        value={statusProgressMap[status]}
-                        animated={status !== 'processed' && status !== 'error'}
-                        color={status === 'error' ? 'red' : 'green'}
-                        radius="xl"
-                    />
-
-                    {mobileLink && (
-                        <div className={styles.linkWrap}>
-                            <code>{mobileLink}</code>
-                            <CopyButton value={mobileLink} timeout={1300}>
-                                {({ copied, copy }) => (
-                                    <ShadButton size="sm" variant="outline" onClick={copy}>
-                                        {copied ? 'Copied' : 'Copy Link'}
-                                    </ShadButton>
-                                )}
-                            </CopyButton>
-                        </div>
-                    )}
-
-                    {error && <p className={styles.error}>{error}</p>}
-                </div>
-
+            <ShadCardContent className={styles.simple}>
                 <motion.div
                     className={styles.qrWrap}
-                    initial={{ opacity: 0, scale: 0.96 }}
+                    initial={{ opacity: 0, scale: 0.98 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.28 }}
+                    transition={{ duration: 0.22 }}
                 >
                     {qrSrc ? (
                         <motion.img
@@ -162,6 +107,38 @@ export default function MobileReceiptBridge() {
                         <div className={styles.placeholder}>Generating QR...</div>
                     )}
                 </motion.div>
+
+                <div className={styles.actions}>
+                    <ShadButton
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                            if (!mobileLink) return;
+                            window.open(mobileLink, '_blank', 'noopener,noreferrer');
+                        }}
+                        disabled={!mobileLink}
+                    >
+                        Open Link
+                    </ShadButton>
+
+                    <CopyButton value={mobileLink || ''} timeout={1300}>
+                        {({ copied, copy }) => (
+                            <ShadButton size="sm" variant="outline" onClick={copy} disabled={!mobileLink}>
+                                {copied ? 'Copied' : 'Copy Link'}
+                            </ShadButton>
+                        )}
+                    </CopyButton>
+
+                    <ShadButton
+                        size="sm"
+                        variant="outline"
+                        onClick={() => createSession()}
+                    >
+                        New QR
+                    </ShadButton>
+                </div>
+
+                {error && <p className={styles.error}>{error}</p>}
             </ShadCardContent>
         </ShadCard>
     );

@@ -109,8 +109,8 @@ export default function ReceiptReviewPage() {
         date: string | null;
         items: number;
         total: number;
+        categoryTotals: Array<{ category: string; total: number }>;
     } | null>(null);
-    const confirmSuccessTimeoutRef = useRef<number | null>(null);
     const firstResultsRenderedRef = useRef(false);
     const pageLoadStartedAtRef = useRef<number>(Date.now());
     const totalsSnapshotRef = useRef<{
@@ -399,34 +399,39 @@ export default function ReceiptReviewPage() {
 
             const dateValue =
                 (corrections?.date ?? extractions?.date?.value ?? data?.transaction_date ?? null) as string | null;
+
+            const categorySums = new Map<string, number>();
+            for (const it of editableItems) {
+                const categoryRaw = (it?.category ?? '').toString().trim();
+                const category = categoryRaw || 'Uncategorized';
+                const qty = Number(it?.quantity || 0);
+                const unit = Number(it?.unitPrice || 0);
+                const line = qty * unit;
+                if (!Number.isFinite(line) || line <= 0) continue;
+                categorySums.set(category, (categorySums.get(category) ?? 0) + line);
+            }
+            const categoryTotals = Array.from(categorySums.entries())
+                .map(([category, total]) => ({ category, total }))
+                .sort((a, b) => b.total - a.total);
+
             setConfirmSuccessSummary({
                 merchant: merchantName,
                 date: dateValue ? String(dateValue) : null,
                 items: editableItems.length,
                 total: Number(finalTotalValue || 0),
+                categoryTotals,
             });
             setShowConfirmSuccess(true);
             setSubmitting(false);
 
-            if (confirmSuccessTimeoutRef.current) {
-                window.clearTimeout(confirmSuccessTimeoutRef.current);
-            }
-            confirmSuccessTimeoutRef.current = window.setTimeout(() => {
-                router.push('/insights');
-            }, 1400);
+            // Stay on the success popup until the user chooses an action.
         } catch (err: any) {
             setError(err.message);
             setSubmitting(false);
         }
     };
 
-    useEffect(() => {
-        return () => {
-            if (confirmSuccessTimeoutRef.current) {
-                window.clearTimeout(confirmSuccessTimeoutRef.current);
-            }
-        };
-    }, []);
+    // (intentionally no-op)
 
     const extraction = data?.receipt_extractions?.[0]?.extracted_json;
     const extractionReady = Boolean(extraction?.extractions);
@@ -1222,15 +1227,15 @@ export default function ReceiptReviewPage() {
                     aria-label="Receipt confirmed"
                     onClick={() => {
                         setShowConfirmSuccess(false);
-                        router.push('/insights');
+                        router.push('/imports');
                     }}
                 >
                     <div
                         className={styles.successCard}
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className={styles.successHeader}>
-                            <div className={styles.successIcon} aria-hidden="true">
+                            <div className={styles.successHeader}>
+                                <div className={styles.successIcon} aria-hidden="true">
                                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
                                     <path
                                         d="M20 7L10.5 16.5L4 10"
@@ -1242,8 +1247,8 @@ export default function ReceiptReviewPage() {
                                 </svg>
                             </div>
                             <div>
-                                <div className={styles.successTitle}>Saved to Insights</div>
-                                <div className={styles.successSubtitle}>Receipt confirmed and added to your totals.</div>
+                                <div className={styles.successTitle}>Receipt Saved</div>
+                                <div className={styles.successSubtitle}>Added to your graph. Returning to imports.</div>
                             </div>
                         </div>
 
@@ -1266,20 +1271,42 @@ export default function ReceiptReviewPage() {
                             </div>
                         </div>
 
+                        {confirmSuccessSummary.categoryTotals.length > 0 && (
+                            <div className={styles.successCategoryBlock}>
+                                <div className={styles.successCategoryHeader}>
+                                    <span>Category totals</span>
+                                    <span className={styles.successCategoryHint}>Added to your graph</span>
+                                </div>
+                                <div className={styles.successCategoryList}>
+                                    {confirmSuccessSummary.categoryTotals.slice(0, 6).map((row) => (
+                                        <div key={row.category} className={styles.successCategoryRow}>
+                                            <span className={styles.successCategoryName}>{row.category}</span>
+                                            <strong className={styles.successCategoryTotal}>{money(row.total)}</strong>
+                                        </div>
+                                    ))}
+                                    {confirmSuccessSummary.categoryTotals.length > 6 && (
+                                        <div className={styles.successCategoryMore}>
+                                            + {confirmSuccessSummary.categoryTotals.length - 6} more
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
                         <div className={styles.successActions}>
                             <button
                                 type="button"
                                 className={styles.successPrimary}
-                                onClick={() => router.push('/insights')}
+                                onClick={() => router.push('/imports')}
                             >
-                                View Insights now
+                                Back to Imports
                             </button>
                             <button
                                 type="button"
                                 className={styles.successSecondary}
                                 onClick={() => setShowConfirmSuccess(false)}
                             >
-                                Stay here
+                                Keep Reviewing
                             </button>
                         </div>
                     </div>

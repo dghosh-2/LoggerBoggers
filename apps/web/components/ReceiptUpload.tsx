@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Badge, Group, Loader, Progress, Text, ThemeIcon } from '@mantine/core';
+import { Text, ThemeIcon } from '@mantine/core';
 import { Dropzone, FileWithPath, IMAGE_MIME_TYPE } from '@mantine/dropzone';
 import { supabase } from '@repo/core';
 import { ShadButton } from '@/components/ui/shadcn-button';
@@ -42,7 +42,6 @@ export default function ReceiptUpload() {
     const [loading, setLoading] = useState(false);
     const [preparing, setPreparing] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [cropMessage, setCropMessage] = useState<string | null>(null);
     const [corners, setCorners] = useState<NormalizedQuad | null>(null);
     const [activeHandle, setActiveHandle] = useState<number | null>(null);
     const [overlayRect, setOverlayRect] = useState<OverlayRect | null>(null);
@@ -117,18 +116,11 @@ export default function ReceiptUpload() {
         };
     }, [activeHandle, overlayRect, corners]);
 
-    const selectedFileMeta = useMemo(() => {
-        if (!file) return null;
-        const sizeInMb = (file.size / (1024 * 1024)).toFixed(2);
-        return `${file.name} | ${sizeInMb} MB`;
-    }, [file]);
-
     const resetSelection = () => {
         if (preview) URL.revokeObjectURL(preview);
         setFile(null);
         setPreview(null);
         setError(null);
-        setCropMessage(null);
         setCorners(null);
         setActiveHandle(null);
         setOverlayRect(null);
@@ -138,11 +130,9 @@ export default function ReceiptUpload() {
         const detected = await detectReceiptCorners(selected);
         if (detected) {
             setCorners(detected);
-            setCropMessage('Corners auto-matched. Fine-tune if needed, then scan.');
             return;
         }
         setCorners(DEFAULT_CORNERS);
-        setCropMessage('Auto-match was low confidence. Adjust corners manually before scan.');
     };
 
     const handleDrop = async (files: FileWithPath[]) => {
@@ -151,7 +141,6 @@ export default function ReceiptUpload() {
 
         setPreparing(true);
         setError(null);
-        setCropMessage(null);
         setActiveHandle(null);
 
         if (preview) URL.revokeObjectURL(preview);
@@ -163,7 +152,6 @@ export default function ReceiptUpload() {
         } catch (err: any) {
             setCorners(DEFAULT_CORNERS);
             setError(err?.message ?? 'Could not detect corners automatically.');
-            setCropMessage('Set corners manually before scan.');
         } finally {
             setPreparing(false);
         }
@@ -198,7 +186,7 @@ export default function ReceiptUpload() {
                 if (flattened) {
                     fileForUpload = flattened;
                 } else {
-                    setCropMessage('Flattening failed; using original image.');
+                    // Keep going with the original image.
                 }
             }
 
@@ -266,7 +254,6 @@ export default function ReceiptUpload() {
                         <Dropzone
                             onDrop={handleDrop}
                             onReject={() => {
-                                setCropMessage(null);
                                 setError('Only image files are supported.');
                             }}
                             maxFiles={1}
@@ -383,36 +370,32 @@ export default function ReceiptUpload() {
                     </ShadCard>
 
                     <ShadCard>
-                        <ShadCardHeader>
-                            <ShadCardTitle>Ingestion Controls</ShadCardTitle>
-                            <ShadCardDescription>Auto-match corners, fine-tune manually, then flatten and process.</ShadCardDescription>
-                        </ShadCardHeader>
                         <ShadCardContent className={styles.controls}>
-                            <Group gap="xs">
-                                <Badge color="green" variant="light">Image Ready</Badge>
-                                {preparing && <Badge color="blue" variant="light">Matching Corners</Badge>}
-                                {loading && <Badge color="teal" variant="light">Processing</Badge>}
-                            </Group>
-
-                            {selectedFileMeta && <p className={styles.meta}>{selectedFileMeta}</p>}
-                            {cropMessage && <p className={styles.meta}>{cropMessage}</p>}
-                            <p className={styles.meta}>Drag the 4 corner dots to align the receipt edge precisely.</p>
-
-                            {loading || preparing ? (
-                                <div className={styles.loadingState}>
-                                    <Loader size="sm" color="green" />
-                                    <Text size="sm">
-                                        {preparing ? 'Auto-matching receipt corners...' : 'Flattening receipt and extracting structured values...'}
-                                    </Text>
-                                    <Progress value={92} animated color="green" radius="xl" />
-                                </div>
-                            ) : (
-                                <div className={styles.actions}>
-                                    <ShadButton onClick={handleUpload} size="lg" disabled={!file || preparing}>Flatten + Scan Receipt</ShadButton>
-                                    <ShadButton onClick={handleRedetect} variant="outline" size="lg" disabled={!file || preparing}>Re-Detect Corners</ShadButton>
-                                    <ShadButton onClick={resetSelection} variant="outline" size="lg">Choose Different Image</ShadButton>
-                                </div>
-                            )}
+                            <div className={styles.actions}>
+                                <ShadButton
+                                    onClick={handleUpload}
+                                    size="lg"
+                                    disabled={!file || preparing || loading}
+                                >
+                                    {preparing ? 'Matching Corners…' : loading ? 'Scanning…' : 'Flatten + Scan'}
+                                </ShadButton>
+                                <ShadButton
+                                    onClick={handleRedetect}
+                                    variant="outline"
+                                    size="lg"
+                                    disabled={!file || preparing || loading}
+                                >
+                                    Re-Detect Corners
+                                </ShadButton>
+                                <ShadButton
+                                    onClick={resetSelection}
+                                    variant="outline"
+                                    size="lg"
+                                    disabled={preparing || loading}
+                                >
+                                    Choose Different Image
+                                </ShadButton>
+                            </div>
 
                             {error && <p className={styles.error}>{error}</p>}
                         </ShadCardContent>
