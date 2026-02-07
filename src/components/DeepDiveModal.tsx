@@ -3,6 +3,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, FileText, Newspaper, Globe, TrendingUp, TrendingDown } from 'lucide-react';
+import { DogLoadingAnimation } from '@/components/ui/DogLoadingAnimation';
 
 interface DeepDiveModalProps {
     isOpen: boolean;
@@ -52,13 +53,11 @@ export default function DeepDiveModal({ isOpen, onClose, data, loading }: DeepDi
                     {/* Content */}
                     <div className="p-6 overflow-y-auto max-h-[calc(90vh-100px)]">
                         {loading ? (
-                            <div className="flex flex-col items-center justify-center py-20">
-                                <div className="relative w-20 h-20 mb-6">
-                                    <div className="absolute inset-0 rounded-full border-4 border-primary/20 animate-ping" />
-                                    <div className="absolute inset-0 rounded-full border-4 border-t-primary border-r-accent border-b-primary border-l-accent animate-spin" />
-                                </div>
-                                <p className="font-semibold">Analyzing price movement...</p>
-                                <p className="text-foreground-muted text-sm mt-2">Gathering news and market context</p>
+                            <div className="py-8">
+                                <DogLoadingAnimation 
+                                    message="Analyzing price movement and gathering market context..."
+                                    size="md"
+                                />
                             </div>
                         ) : data ? (
                             <div className="space-y-6">
