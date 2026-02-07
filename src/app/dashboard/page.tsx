@@ -172,22 +172,22 @@ export default function DashboardPage() {
 
   return (
     <PageTransition>
-      <div className="space-y-6">
-        {/* Header */}
+      <div className="space-y-4">
+        {/* Header - Compact */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-            <p className="text-foreground-muted text-sm mt-1">Your financial overview</p>
+            <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
+            <p className="text-foreground-muted text-xs">Your financial overview</p>
           </div>
           <div className="flex items-center gap-1">
             <button
-              className="p-2 rounded-md hover:bg-secondary transition-colors cursor-pointer"
+              className="p-1.5 rounded-md hover:bg-secondary transition-colors cursor-pointer"
               onClick={handleNotifications}
             >
               <Bell className="w-4 h-4 text-foreground-muted" />
             </button>
             <button
-              className="p-2 rounded-md hover:bg-secondary transition-colors cursor-pointer"
+              className="p-1.5 rounded-md hover:bg-secondary transition-colors cursor-pointer"
               onClick={handleCalendar}
             >
               <Calendar className="w-4 h-4 text-foreground-muted" />
@@ -195,41 +195,41 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Main Charts Grid - 2x2 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Main Charts Grid - 2x2 - Compact to fit without scrolling */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           
           {/* Income vs Spending Line Chart */}
-          <GlassCard delay={100}>
-            <div className="flex items-center justify-between mb-4">
+          <GlassCard delay={100} className="p-4">
+            <div className="flex items-center justify-between mb-2">
               <div>
                 <h2 className="text-sm font-semibold">Income vs Spending</h2>
-                <p className="text-xs text-foreground-muted mt-0.5">12-month trend</p>
+                <p className="text-[10px] text-foreground-muted">12-month trend</p>
               </div>
-              <div className="flex items-center gap-4 text-xs">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full bg-success" />
+              <div className="flex items-center gap-3 text-[10px]">
+                <div className="flex items-center gap-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-success" />
                   <span className="text-foreground-muted">Income</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full bg-destructive" />
+                <div className="flex items-center gap-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-destructive" />
                   <span className="text-foreground-muted">Spending</span>
                 </div>
               </div>
             </div>
-            <div className="h-[240px]">
+            <div className="h-[140px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={incomeVsSpendingData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                <LineChart data={incomeVsSpendingData} margin={{ top: 5, right: 5, left: -15, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                   <XAxis 
                     dataKey="month" 
                     axisLine={false} 
                     tickLine={false} 
-                    tick={{ fill: 'var(--foreground-muted)', fontSize: 10 }} 
+                    tick={{ fill: 'var(--foreground-muted)', fontSize: 9 }} 
                   />
                   <YAxis 
                     axisLine={false} 
                     tickLine={false} 
-                    tick={{ fill: 'var(--foreground-muted)', fontSize: 10 }}
+                    tick={{ fill: 'var(--foreground-muted)', fontSize: 9 }}
                     tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`}
                   />
                   <Tooltip content={<CustomTooltip />} />
@@ -237,37 +237,37 @@ export default function DashboardPage() {
                     type="monotone" 
                     dataKey="Income" 
                     stroke="var(--success)" 
-                    strokeWidth={2} 
+                    strokeWidth={1.5} 
                     dot={false}
-                    activeDot={{ r: 4, strokeWidth: 0 }}
+                    activeDot={{ r: 3, strokeWidth: 0 }}
                   />
                   <Line 
                     type="monotone" 
                     dataKey="Spending" 
                     stroke="var(--destructive)" 
-                    strokeWidth={2} 
+                    strokeWidth={1.5} 
                     dot={false}
-                    activeDot={{ r: 4, strokeWidth: 0 }}
+                    activeDot={{ r: 3, strokeWidth: 0 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
             </div>
-            {/* Bottom stats */}
-            <div className="flex gap-4 mt-4 pt-4 border-t border-border">
-              <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-secondary/50">
-                <div className="w-2 h-2 rounded-full bg-success" />
+            {/* Bottom stats - compact */}
+            <div className="flex gap-3 mt-2 pt-2 border-t border-border">
+              <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-secondary/50 flex-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-success" />
                 <div>
-                  <p className="text-xs text-foreground-muted">Monthly Income</p>
-                  <p className="text-sm font-semibold font-mono text-success">
+                  <p className="text-[9px] text-foreground-muted">Income</p>
+                  <p className="text-xs font-semibold font-mono text-success">
                     ${summary.monthly_income.toLocaleString()}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-secondary/50">
-                <div className="w-2 h-2 rounded-full bg-destructive" />
+              <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-secondary/50 flex-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-destructive" />
                 <div>
-                  <p className="text-xs text-foreground-muted">Monthly Spending</p>
-                  <p className="text-sm font-semibold font-mono text-destructive">
+                  <p className="text-[9px] text-foreground-muted">Spending</p>
+                  <p className="text-xs font-semibold font-mono text-destructive">
                     ${summary.monthly_spending.toLocaleString()}
                   </p>
                 </div>
@@ -276,22 +276,22 @@ export default function DashboardPage() {
           </GlassCard>
 
           {/* Savings Trend Area Chart */}
-          <GlassCard delay={150}>
-            <div className="flex items-center justify-between mb-4">
+          <GlassCard delay={150} className="p-4">
+            <div className="flex items-center justify-between mb-2">
               <div>
                 <h2 className="text-sm font-semibold">Monthly Savings</h2>
-                <p className="text-xs text-foreground-muted mt-0.5">Net savings over time</p>
+                <p className="text-[10px] text-foreground-muted">Net savings over time</p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-foreground-muted">Net Worth</p>
-                <p className={`text-lg font-bold font-mono ${summary.net_worth >= 0 ? 'text-success' : 'text-destructive'}`}>
+                <p className="text-[9px] text-foreground-muted">Net Worth</p>
+                <p className={`text-sm font-bold font-mono ${summary.net_worth >= 0 ? 'text-success' : 'text-destructive'}`}>
                   ${summary.net_worth.toLocaleString()}
                 </p>
               </div>
             </div>
-            <div className="h-[240px]">
+            <div className="h-[140px]">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={savingsData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                <AreaChart data={savingsData} margin={{ top: 5, right: 5, left: -15, bottom: 0 }}>
                   <defs>
                     <linearGradient id="savingsGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3} />
@@ -303,12 +303,12 @@ export default function DashboardPage() {
                     dataKey="month" 
                     axisLine={false} 
                     tickLine={false} 
-                    tick={{ fill: 'var(--foreground-muted)', fontSize: 10 }} 
+                    tick={{ fill: 'var(--foreground-muted)', fontSize: 9 }} 
                   />
                   <YAxis 
                     axisLine={false} 
                     tickLine={false} 
-                    tick={{ fill: 'var(--foreground-muted)', fontSize: 10 }}
+                    tick={{ fill: 'var(--foreground-muted)', fontSize: 9 }}
                     tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`}
                   />
                   <Tooltip content={<CustomTooltip />} />
@@ -317,23 +317,23 @@ export default function DashboardPage() {
                     dataKey="savings" 
                     name="Savings"
                     stroke="var(--primary)" 
-                    strokeWidth={2}
+                    strokeWidth={1.5}
                     fill="url(#savingsGradient)"
                   />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-            {/* Savings rate */}
-            <div className="mt-4 pt-4 border-t border-border">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-foreground-muted">Savings Rate</span>
-                <span className="text-xs font-semibold">
+            {/* Savings rate - compact */}
+            <div className="mt-2 pt-2 border-t border-border">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] text-foreground-muted">Savings Rate</span>
+                <span className="text-[10px] font-semibold">
                   {summary.monthly_income > 0 
                     ? Math.round(((summary.monthly_income - summary.monthly_spending) / summary.monthly_income) * 100)
                     : 0}%
                 </span>
               </div>
-              <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+              <div className="h-1 bg-secondary rounded-full overflow-hidden">
                 <motion.div
                   className="h-full bg-primary rounded-full"
                   initial={{ width: 0 }}
@@ -349,24 +349,25 @@ export default function DashboardPage() {
           </GlassCard>
 
           {/* Category Breakdown */}
-          <GlassCard delay={200}>
-            <div className="flex items-center justify-between mb-4">
+          <GlassCard delay={200} className="p-4">
+            <div className="flex items-center justify-between mb-2">
               <div>
                 <h2 className="text-sm font-semibold">Spending by Category</h2>
-                <p className="text-xs text-foreground-muted mt-0.5">This month's breakdown</p>
+                <p className="text-[10px] text-foreground-muted">This month</p>
               </div>
+              <span className="text-xs font-bold font-mono">${summary.monthly_spending.toLocaleString()}</span>
             </div>
-            <div className="flex items-center gap-6">
-              {/* Pie Chart */}
-              <div className="w-[160px] h-[160px] flex-shrink-0">
+            <div className="flex items-center gap-4">
+              {/* Pie Chart - smaller */}
+              <div className="w-[120px] h-[120px] flex-shrink-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={categoryData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={45}
-                      outerRadius={70}
+                      innerRadius={35}
+                      outerRadius={55}
                       paddingAngle={2}
                       dataKey="value"
                     >
@@ -380,8 +381,8 @@ export default function DashboardPage() {
                         const data = payload[0].payload;
                         return (
                           <div className="bg-card border border-border rounded-lg shadow-lg p-2">
-                            <p className="text-xs font-medium">{data.name}</p>
-                            <p className="text-xs font-mono">${data.value.toLocaleString()}</p>
+                            <p className="text-[10px] font-medium">{data.name}</p>
+                            <p className="text-[10px] font-mono">${data.value.toLocaleString()}</p>
                           </div>
                         );
                       }}
@@ -389,80 +390,75 @@ export default function DashboardPage() {
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              {/* Legend */}
-              <div className="flex-1 space-y-2">
+              {/* Legend - compact */}
+              <div className="flex-1 space-y-1 max-h-[140px] overflow-y-auto">
                 {categoryData.map((cat, index) => (
                   <motion.div
                     key={cat.name}
                     className="flex items-center justify-between"
                     initial={{ opacity: 0, x: 10 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.3 + index * 0.05 }}
+                    transition={{ delay: 0.3 + index * 0.03 }}
                   >
-                    <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: cat.color }} />
-                      <span className="text-xs text-foreground-muted">{cat.name}</span>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: cat.color }} />
+                      <span className="text-[10px] text-foreground-muted truncate max-w-[80px]">{cat.name}</span>
                     </div>
-                    <span className="text-xs font-mono font-medium">${cat.value.toLocaleString()}</span>
+                    <span className="text-[10px] font-mono font-medium">${cat.value.toLocaleString()}</span>
                   </motion.div>
                 ))}
               </div>
             </div>
-            {/* Total */}
-            <div className="mt-4 pt-4 border-t border-border flex items-center justify-between">
-              <span className="text-xs text-foreground-muted">Total Spending</span>
-              <span className="text-sm font-bold font-mono">${summary.monthly_spending.toLocaleString()}</span>
-            </div>
           </GlassCard>
 
           {/* Recent Transactions */}
-          <GlassCard delay={250}>
-            <div className="flex items-center justify-between mb-4">
+          <GlassCard delay={250} className="p-4">
+            <div className="flex items-center justify-between mb-2">
               <div>
                 <h2 className="text-sm font-semibold">Recent Transactions</h2>
-                <p className="text-xs text-foreground-muted mt-0.5">{transactions.length} transactions</p>
+                <p className="text-[10px] text-foreground-muted">{transactions.length} transactions</p>
               </div>
               <button
-                className="text-xs font-medium text-primary hover:text-primary/80 transition-colors cursor-pointer flex items-center gap-1"
+                className="text-[10px] font-medium text-primary hover:text-primary/80 transition-colors cursor-pointer flex items-center gap-0.5"
                 onClick={() => router.push('/receipts')}
               >
                 View all
-                <ArrowUpRight className="w-3 h-3" />
+                <ArrowUpRight className="w-2.5 h-2.5" />
               </button>
             </div>
-            <div className="space-y-1">
-              {transactions.slice(0, 6).map((tx, index) => (
+            <div className="space-y-0.5 max-h-[180px] overflow-y-auto">
+              {transactions.slice(0, 5).map((tx, index) => (
                 <motion.div
                   key={tx.id}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  transition={{ delay: 0.3 + index * 0.05 }}
-                  className="flex items-center justify-between py-2.5 px-2 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer group"
+                  transition={{ delay: 0.3 + index * 0.03 }}
+                  className="flex items-center justify-between py-1.5 px-1.5 rounded-md hover:bg-secondary/50 transition-colors cursor-pointer group"
                   onClick={() => setSelectedTransaction(tx)}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-7 h-7 rounded-md flex items-center justify-center ${
+                  <div className="flex items-center gap-2">
+                    <div className={`w-6 h-6 rounded-md flex items-center justify-center ${
                       tx.amount > 0 ? "bg-success/20" : "bg-secondary"
                     }`}>
                       {tx.amount > 0 ? (
-                        <TrendingUp className="w-3.5 h-3.5 text-success" />
+                        <TrendingUp className="w-3 h-3 text-success" />
                       ) : (
-                        <TrendingDown className="w-3.5 h-3.5 text-foreground-muted" />
+                        <TrendingDown className="w-3 h-3 text-foreground-muted" />
                       )}
                     </div>
                     <div>
-                      <p className="text-sm font-medium">{tx.description}</p>
-                      <p className="text-[10px] text-foreground-muted">{tx.category}</p>
+                      <p className="text-xs font-medium truncate max-w-[120px]">{tx.description}</p>
+                      <p className="text-[9px] text-foreground-muted">{tx.category}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
                     <div className="text-right">
-                      <p className={`text-sm font-mono font-medium ${tx.amount > 0 ? "text-success" : ""}`}>
+                      <p className={`text-xs font-mono font-medium ${tx.amount > 0 ? "text-success" : ""}`}>
                         {tx.amount > 0 ? "+" : ""}${Math.abs(tx.amount).toLocaleString()}
                       </p>
-                      <p className="text-[10px] text-foreground-muted">{tx.date}</p>
+                      <p className="text-[9px] text-foreground-muted">{tx.date}</p>
                     </div>
-                    <ChevronRight className="w-3.5 h-3.5 text-foreground-muted opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <ChevronRight className="w-3 h-3 text-foreground-muted opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                 </motion.div>
               ))}
