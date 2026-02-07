@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VoiceProvider, useVoice } from "@humeai/voice-react";
+import { useUIStore } from "@/stores/ui-store";
 
 interface Message {
   id: string;
@@ -555,6 +556,10 @@ function ChatAssistantContent() {
 }
 
 export function ChatAssistant() {
+  const { chatHidden } = useUIStore();
+
+  if (chatHidden) return null;
+
   return (
     <VoiceProvider>
       <ChatAssistantContent />

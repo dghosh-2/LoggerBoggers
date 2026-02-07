@@ -76,7 +76,7 @@ function FloatingCard({
 
 export default function Home() {
   const router = useRouter();
-  const { setNavbarHidden } = useUIStore();
+  const { setNavbarHidden, setChatHidden } = useUIStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<Record<string, string>>({
@@ -98,8 +98,12 @@ export default function Home() {
 
   useEffect(() => {
     setNavbarHidden(true);
-    return () => setNavbarHidden(false);
-  }, [setNavbarHidden]);
+    setChatHidden(true);
+    return () => {
+      setNavbarHidden(false);
+      setChatHidden(false);
+    };
+  }, [setNavbarHidden, setChatHidden]);
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!containerRef.current) return;
