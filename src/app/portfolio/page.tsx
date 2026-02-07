@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { 
-  TrendingUp, 
-  TrendingDown, 
+import {
+  TrendingUp,
+  TrendingDown,
   Building2,
   Wallet,
   PiggyBank,
@@ -57,11 +57,11 @@ import { PlaidLinkButton } from "@/components/PlaidLink";
 const generatePortfolioHistory = (netWorth: number) => {
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const currentMonth = new Date().getMonth();
-  
+
   // Generate a realistic growth pattern ending at current net worth
   const history = [];
   let baseValue = netWorth * 0.85; // Start at 85% of current value
-  
+
   for (let i = 0; i < 12; i++) {
     const monthIndex = (currentMonth - 11 + i + 12) % 12;
     // Add some variance but trend upward
@@ -69,13 +69,13 @@ const generatePortfolioHistory = (netWorth: number) => {
     const growth = 1 + (0.012 * (i + 1)) + variance; // ~1.2% monthly growth
     const value = Math.round(baseValue * growth);
     baseValue = value;
-    
+
     history.push({
       date: months[monthIndex],
       value: i === 11 ? netWorth : value, // Ensure last value is exact
     });
   }
-  
+
   return history;
 };
 
@@ -134,7 +134,7 @@ const loanTypeIcons: Record<string, typeof GraduationCap> = {
 
 export default function PortfolioPage() {
   const { holdings } = useUserStore();
-  
+
   // Use cached portfolio data
   const {
     institutions,
@@ -147,7 +147,7 @@ export default function PortfolioPage() {
     fetchData,
     invalidateAndRefetch,
   } = usePortfolioData();
-  
+
   const [syncingInstitutions, setSyncingInstitutions] = useState<Set<string>>(new Set());
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [showRecommendations, setShowRecommendations] = useState(false);
@@ -164,7 +164,7 @@ export default function PortfolioPage() {
     shares: h.shares,
     price: h.price,
   }));
-  
+
   const totalStockValue = portfolio.reduce((sum, h) => sum + h.value, 0);
 
   // Fetch data on mount (will use cache if available)
@@ -183,7 +183,7 @@ export default function PortfolioPage() {
   const handleSyncInstitution = async (institutionId: string) => {
     setSyncingInstitutions(prev => new Set([...prev, institutionId]));
     toast.info("Syncing account...");
-    
+
     try {
       await syncInstitution(institutionId);
       await invalidateAndRefetch();
@@ -203,7 +203,7 @@ export default function PortfolioPage() {
     const allIds = institutions.map(i => i.id);
     setSyncingInstitutions(new Set(allIds));
     toast.info("Syncing all accounts...");
-    
+
     try {
       await syncAllInstitutions();
       await invalidateAndRefetch();
@@ -218,7 +218,7 @@ export default function PortfolioPage() {
   const handleBankConnect = (bankName: string) => {
     toast.info(`Connecting to ${bankName}...`);
     setShowAddAccount(false);
-    
+
     // In production, this would open Plaid Link
     setTimeout(() => {
       toast.success(`${bankName} connected successfully!`);
@@ -262,8 +262,8 @@ export default function PortfolioPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <GlassButton 
-                variant="secondary" 
+              <GlassButton
+                variant="secondary"
                 size="sm"
                 onClick={handleSyncAll}
                 disabled={syncingInstitutions.size > 0}
@@ -271,7 +271,7 @@ export default function PortfolioPage() {
                 <RefreshCw className={`w-3.5 h-3.5 ${syncingInstitutions.size > 0 ? "animate-spin" : ""}`} />
                 Sync All
               </GlassButton>
-              <PlaidLinkButton 
+              <PlaidLinkButton
                 onSuccess={() => {
                   invalidateAndRefetch();
                 }}
@@ -291,7 +291,7 @@ export default function PortfolioPage() {
                   <p className="text-xs text-foreground-muted text-center mb-4 max-w-[300px]">
                     Connect your bank accounts via Plaid to see your financial data
                   </p>
-                  <PlaidLinkButton 
+                  <PlaidLinkButton
                     onSuccess={() => {
                       invalidateAndRefetch();
                     }}
@@ -304,7 +304,7 @@ export default function PortfolioPage() {
               const isSyncing = syncingInstitutions.has(institution.id);
               const accountCount = institution.accounts.length;
               const totalBalance = institution.accounts.reduce((sum, acc) => sum + acc.currentBalance, 0);
-              
+
               return (
                 <GlassCard key={institution.id}>
                   <div className="flex items-center justify-between">
@@ -312,7 +312,7 @@ export default function PortfolioPage() {
                       {bankLogoMap[institution.name] ? (
                         <Image src={bankLogoMap[institution.name]} alt={institution.name} width={36} height={36} className="rounded-lg object-contain shrink-0" />
                       ) : (
-                        <div 
+                        <div
                           className="w-9 h-9 rounded-lg flex items-center justify-center text-white font-bold text-sm"
                           style={{ backgroundColor: institution.primaryColor || '#6366f1' }}
                         >
@@ -329,9 +329,8 @@ export default function PortfolioPage() {
 
                     <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <div className={`flex items-center gap-1 ${
-                          institution.status === 'connected' ? 'text-success' : 'text-destructive'
-                        }`}>
+                        <div className={`flex items-center gap-1 ${institution.status === 'connected' ? 'text-success' : 'text-destructive'
+                          }`}>
                           {institution.status === 'connected' ? (
                             <CheckCircle className="w-3 h-3" />
                           ) : (
@@ -343,8 +342,8 @@ export default function PortfolioPage() {
                           ${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </p>
                       </div>
-                      
-                      <button 
+
+                      <button
                         onClick={() => handleSyncInstitution(institution.id)}
                         className="p-1.5 rounded-md hover:bg-secondary transition-colors duration-150 cursor-pointer"
                         disabled={isSyncing}
@@ -368,15 +367,14 @@ export default function PortfolioPage() {
               <p className="text-[11px] text-foreground-muted mb-1 uppercase tracking-wider">Total Net Worth</p>
               <div className="flex items-baseline gap-3">
                 <h1 className="text-3xl font-semibold tabular-nums">
-                  ${summary?.netWorth.toLocaleString(undefined, { 
-                    minimumFractionDigits: 2, 
-                    maximumFractionDigits: 2 
+                  ${summary?.netWorth.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
                   })}
                 </h1>
-                {summary?.netWorth > 0 && (
-                  <div className={`flex items-center gap-1 text-sm font-medium ${
-                    isPositive ? "text-success" : "text-destructive"
-                  }`}>
+                {(summary?.netWorth ?? 0) > 0 && (
+                  <div className={`flex items-center gap-1 text-sm font-medium ${isPositive ? "text-success" : "text-destructive"
+                    }`}>
                     {isPositive ? (
                       <TrendingUp className="w-4 h-4" />
                     ) : (
@@ -386,7 +384,7 @@ export default function PortfolioPage() {
                   </div>
                 )}
               </div>
-              {summary?.netWorth > 0 && (
+              {(summary?.netWorth ?? 0) > 0 && (
                 <p className="text-[11px] text-foreground-muted mt-1">
                   {totalChange >= 0 ? '+' : ''}${Math.abs(totalChange).toLocaleString(undefined, { maximumFractionDigits: 0 })} this month
                 </p>
@@ -455,17 +453,17 @@ export default function PortfolioPage() {
                 <p className="text-[11px] text-foreground-muted">Portfolio analysis</p>
               </div>
             </div>
-            
-            {summary?.netWorth > 0 ? (
+
+            {summary && (summary.netWorth ?? 0) > 0 ? (
               <>
                 <p className="text-xs text-foreground-muted leading-relaxed mb-4">
-                  {summary.totalCash > 0 && summary.bankAccountsCount > 0 
+                  {(summary.totalCash ?? 0) > 0 && (summary.bankAccountsCount ?? 0) > 0
                     ? `You have $${summary.totalCash.toLocaleString()} in cash across ${summary.bankAccountsCount} account${summary.bankAccountsCount !== 1 ? 's' : ''}. `
                     : ''}
-                  {summary.totalInvestments > 0 
+                  {(summary.totalInvestments ?? 0) > 0
                     ? `Your investments total $${summary.totalInvestments.toLocaleString()}. `
                     : ''}
-                  {summary.totalLoans > 0 
+                  {(summary.totalLoans ?? 0) > 0
                     ? `You have $${summary.totalLoans.toLocaleString()} in outstanding loans.`
                     : 'You have no outstanding loans - great job!'}
                 </p>
@@ -473,33 +471,32 @@ export default function PortfolioPage() {
                 <div className="space-y-2.5">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-foreground-muted">Risk Level</span>
-                    <span className={`font-medium ${summary.totalLoans > summary.totalCash ? 'text-destructive' : summary.totalLoans > 0 ? 'text-warning' : 'text-success'}`}>
-                      {summary.totalLoans > summary.totalCash ? 'High' : summary.totalLoans > 0 ? 'Moderate' : 'Low'}
+                    <span className={`font-medium ${(summary.totalLoans ?? 0) > (summary.totalCash ?? 0) ? 'text-destructive' : (summary.totalLoans ?? 0) > 0 ? 'text-warning' : 'text-success'}`}>
+                      {(summary.totalLoans ?? 0) > (summary.totalCash ?? 0) ? 'High' : (summary.totalLoans ?? 0) > 0 ? 'Moderate' : 'Low'}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-foreground-muted">Diversification</span>
-                    <span className={`font-medium ${summary.investmentAccountsCount > 1 ? 'text-success' : summary.investmentAccountsCount === 1 ? 'text-warning' : 'text-foreground-muted'}`}>
-                      {summary.investmentAccountsCount > 1 ? 'Good' : summary.investmentAccountsCount === 1 ? 'Fair' : 'N/A'}
+                    <span className={`font-medium ${(summary.investmentAccountsCount ?? 0) > 1 ? 'text-success' : (summary.investmentAccountsCount ?? 0) === 1 ? 'text-warning' : 'text-foreground-muted'}`}>
+                      {(summary.investmentAccountsCount ?? 0) > 1 ? 'Good' : (summary.investmentAccountsCount ?? 0) === 1 ? 'Fair' : 'N/A'}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-foreground-muted">Debt-to-Asset</span>
-                    <span className={`font-medium tabular-nums ${
-                      summary.netWorth > 0 
-                        ? (summary.totalLoans / (summary.totalCash + summary.totalInvestments)) * 100 < 20 
-                          ? 'text-success' 
-                          : 'text-warning'
-                        : 'text-foreground-muted'
-                    }`}>
-                      {summary.totalCash + summary.totalInvestments > 0 
-                        ? `${((summary.totalLoans / (summary.totalCash + summary.totalInvestments)) * 100).toFixed(1)}%`
+                    <span className={`font-medium tabular-nums ${(summary.netWorth ?? 0) > 0
+                      ? ((summary.totalLoans ?? 0) / ((summary.totalCash ?? 0) + (summary.totalInvestments ?? 0))) * 100 < 20
+                        ? 'text-success'
+                        : 'text-warning'
+                      : 'text-foreground-muted'
+                      }`}>
+                      {(summary.totalCash ?? 0) + (summary.totalInvestments ?? 0) > 0
+                        ? `${(((summary.totalLoans ?? 0) / ((summary.totalCash ?? 0) + (summary.totalInvestments ?? 0))) * 100).toFixed(1)}%`
                         : 'N/A'}
                     </span>
                   </div>
                 </div>
 
-                <button 
+                <button
                   onClick={() => setShowRecommendations(true)}
                   className="mt-4 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-secondary text-xs font-medium hover:bg-background-tertiary transition-colors duration-150 cursor-pointer"
                 >
@@ -512,7 +509,7 @@ export default function PortfolioPage() {
                 <p className="text-xs text-foreground-muted mb-3">
                   Connect your accounts to see AI-powered insights about your portfolio.
                 </p>
-                <PlaidLinkButton 
+                <PlaidLinkButton
                   onSuccess={() => {
                     invalidateAndRefetch();
                   }}
@@ -582,7 +579,7 @@ export default function PortfolioPage() {
           <div className="space-y-3">
             {investmentAccounts.map((account) => {
               const accountHoldings = plaidHoldings.filter(h => h.accountId === account.id);
-              
+
               return (
                 <GlassCard key={account.id}>
                   <div className="flex items-center justify-between mb-3">
@@ -611,7 +608,7 @@ export default function PortfolioPage() {
                       <p className="text-[11px] font-medium text-foreground-muted mb-2">Holdings</p>
                       <div className="space-y-1.5">
                         {accountHoldings.map((holding) => (
-                          <div 
+                          <div
                             key={holding.id}
                             className="flex items-center justify-between p-2.5 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors duration-150"
                           >
@@ -659,7 +656,7 @@ export default function PortfolioPage() {
               const LoanIcon = loanTypeIcons[loan.type] || DollarSign;
               const paidOff = loan.originalPrincipal - loan.currentBalance;
               const paidOffPercent = (paidOff / loan.originalPrincipal) * 100;
-              
+
               return (
                 <GlassCard key={loan.id}>
                   <div className="flex items-start justify-between mb-3">
@@ -692,7 +689,7 @@ export default function PortfolioPage() {
                       <span className="tabular-nums">${paidOff.toLocaleString()} paid</span>
                     </div>
                     <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-success rounded-full transition-all duration-500"
                         style={{ width: `${paidOffPercent}%` }}
                       />
@@ -720,7 +717,7 @@ export default function PortfolioPage() {
                       <div>
                         <p className="text-[10px] text-foreground-muted">Next Due</p>
                         <p className="text-xs font-medium">
-                          {loan.nextPaymentDueDate 
+                          {loan.nextPaymentDueDate
                             ? new Date(loan.nextPaymentDueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                             : 'N/A'
                           }
@@ -757,22 +754,20 @@ export default function PortfolioPage() {
               <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-secondary">
                 <button
                   onClick={() => setSelectedView("holdings")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 cursor-pointer ${
-                    selectedView === "holdings"
-                      ? "bg-card text-foreground shadow-sm"
-                      : "text-foreground-muted hover:text-foreground"
-                  }`}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 cursor-pointer ${selectedView === "holdings"
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-foreground-muted hover:text-foreground"
+                    }`}
                 >
                   <BarChart3 className="w-3.5 h-3.5" />
                   Holdings
                 </button>
                 <button
                   onClick={() => setSelectedView("allocation")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 cursor-pointer ${
-                    selectedView === "allocation"
-                      ? "bg-card text-foreground shadow-sm"
-                      : "text-foreground-muted hover:text-foreground"
-                  }`}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 cursor-pointer ${selectedView === "allocation"
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-foreground-muted hover:text-foreground"
+                    }`}
                 >
                   <PieChart className="w-3.5 h-3.5" />
                   Allocation
@@ -783,8 +778,8 @@ export default function PortfolioPage() {
             {selectedView === "holdings" ? (
               <div className="space-y-2">
                 {portfolio.map((holding) => (
-                  <div 
-                    key={holding.id} 
+                  <div
+                    key={holding.id}
                     onClick={() => setSelectedHolding(holding)}
                     className="cursor-pointer"
                   >
@@ -810,7 +805,7 @@ export default function PortfolioPage() {
                           const previousPercentages = portfolio
                             .slice(0, index)
                             .reduce((sum, h) => sum + (h.value / totalStockValue) * 100, 0);
-                          
+
                           const colors = [
                             'var(--primary)',
                             'var(--success)',
@@ -819,11 +814,11 @@ export default function PortfolioPage() {
                             '#8b5cf6',
                             '#ec4899',
                           ];
-                          
+
                           const circumference = 2 * Math.PI * 40;
                           const strokeDasharray = `${(percentage / 100) * circumference} ${circumference}`;
                           const strokeDashoffset = -((previousPercentages / 100) * circumference);
-                          
+
                           acc.push(
                             <circle
                               key={holding.id}
@@ -854,7 +849,7 @@ export default function PortfolioPage() {
                     {portfolio.map((holding, index) => {
                       const percentage = (holding.value / totalStockValue) * 100;
                       const colors = ['bg-primary', 'bg-success', 'bg-warning', 'bg-destructive', 'bg-violet-500', 'bg-pink-500'];
-                      
+
                       return (
                         <motion.div
                           key={holding.id}
@@ -918,13 +913,13 @@ export default function PortfolioPage() {
                 Click below to securely link your bank, investment, or loan accounts
               </p>
             </div>
-            
-            <PlaidLinkButton 
+
+            <PlaidLinkButton
               onSuccess={() => {
                 setShowAddAccount(false);
                 invalidateAndRefetch();
               }}
-              onExit={() => {}}
+              onExit={() => { }}
               buttonText="Connect with Plaid"
               buttonSize="md"
             />
@@ -979,31 +974,28 @@ export default function PortfolioPage() {
                 className="p-4 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors duration-150"
               >
                 <div className="flex items-start gap-3">
-                  <div className={`p-2 rounded-lg ${
-                    rec.priority === "high" 
-                      ? "bg-destructive-soft" 
-                      : rec.priority === "medium"
+                  <div className={`p-2 rounded-lg ${rec.priority === "high"
+                    ? "bg-destructive-soft"
+                    : rec.priority === "medium"
                       ? "bg-warning-soft"
                       : "bg-primary-soft"
-                  }`}>
-                    <Icon className={`w-4 h-4 ${
-                      rec.priority === "high" 
-                        ? "text-destructive" 
-                        : rec.priority === "medium"
+                    }`}>
+                    <Icon className={`w-4 h-4 ${rec.priority === "high"
+                      ? "text-destructive"
+                      : rec.priority === "medium"
                         ? "text-warning"
                         : "text-primary"
-                    }`} />
+                      }`} />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <h4 className="text-sm font-semibold">{rec.title}</h4>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${
-                        rec.priority === "high" 
-                          ? "bg-destructive-soft text-destructive" 
-                          : rec.priority === "medium"
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${rec.priority === "high"
+                        ? "bg-destructive-soft text-destructive"
+                        : rec.priority === "medium"
                           ? "bg-warning-soft text-warning"
                           : "bg-primary-soft text-primary"
-                      }`}>
+                        }`}>
                         {rec.priority}
                       </span>
                     </div>
@@ -1055,9 +1047,8 @@ export default function PortfolioPage() {
                   ${selectedHolding.value.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </p>
               </div>
-              <div className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs ${
-                selectedHolding.change >= 0 ? "bg-success-soft text-success" : "bg-destructive-soft text-destructive"
-              }`}>
+              <div className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs ${selectedHolding.change >= 0 ? "bg-success-soft text-success" : "bg-destructive-soft text-destructive"
+                }`}>
                 {selectedHolding.change >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                 <span className="font-medium tabular-nums">{selectedHolding.change >= 0 ? "+" : ""}{selectedHolding.change.toFixed(2)}%</span>
               </div>

@@ -16,6 +16,7 @@ import {
   ChevronDown,
   UserCircle,
   Globe,
+  Target,
 } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
 import { useUIStore } from "@/stores/ui-store";
@@ -24,6 +25,7 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Budget", href: "/budget", icon: Target },
   { name: "Studio", href: "/studio", icon: Sparkles },
   { name: "Insights", href: "/insights", icon: TrendingUp },
   { name: "Globe", href: "/globe", icon: Globe },
