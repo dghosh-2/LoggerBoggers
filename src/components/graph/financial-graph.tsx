@@ -53,26 +53,21 @@ export function FinancialGraph() {
       let amount = node.data.amount; // Default static
 
       if (node.id === 'root-income') {
-        amount = totalIncome;
+        amount = `$${totalIncome.toLocaleString()}`;
       } else if (node.id === 'root-account') {
-        amount = totalIncome; // Simplified flow
+        amount = `$${totalIncome.toLocaleString()}`; // Simplified flow
       } else if (node.id === 'group-expenses') {
-        amount = totalExpenses;
+        amount = `$${totalExpenses.toLocaleString()}`;
       } else if (categoryTotals[node.data.label]) {
-        amount = categoryTotals[node.data.label];
+        amount = `$${categoryTotals[node.data.label].toLocaleString()}`;
       } else if (node.data.type === 'expense' && !categoryTotals[node.data.label]) {
         // If filtering removes all txns for a category, set to 0
-        amount = 0;
+        amount = '$0';
       }
-
-      // Fix float precision (e.g. 896.900001 -> 896.90) and consistent string format
-      const formattedAmount = typeof amount === 'number'
-        ? `$${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-        : amount;
 
       return {
         ...node,
-        data: { ...node.data, amount: formattedAmount }
+        data: { ...node.data, amount: amount }
       };
     });
 

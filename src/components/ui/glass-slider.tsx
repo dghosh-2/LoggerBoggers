@@ -56,41 +56,30 @@ export function GlassSlider({
   };
 
   return (
-    <div className={cn("space-y-3", className)}>
+    <div className={cn("space-y-2", className)}>
       <div className="flex items-center justify-between">
         {label && (
-          <span className="text-sm font-medium text-foreground-muted">{label}</span>
+          <span className="text-xs text-foreground-muted">{label}</span>
         )}
-        <motion.span
-          key={value}
-          initial={{ opacity: 0, y: -5 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-sm font-semibold text-primary"
-        >
+        <span className="text-xs font-medium font-mono tabular-nums text-foreground">
           {formatValue(value)}
-        </motion.span>
+        </span>
       </div>
       <div
         ref={trackRef}
-        className="relative h-2 bg-secondary rounded-full cursor-pointer"
+        className="relative h-1 bg-border rounded-full cursor-pointer"
         onMouseDown={handleMouseDown}
       >
-        {/* Filled track */}
         <motion.div
-          className="absolute inset-y-0 left-0 rounded-full bg-primary"
+          className="absolute inset-y-0 left-0 rounded-full bg-foreground"
           style={{ width: `${percentage}%` }}
           initial={false}
-          animate={{ opacity: isDragging ? 1 : 0.7 }}
         />
-
-        {/* Thumb */}
         <motion.div
-          className="absolute top-1/2 w-4 h-4 -translate-y-1/2 -translate-x-1/2 rounded-full bg-primary shadow-md"
+          className="absolute top-1/2 w-3 h-3 -translate-y-1/2 -translate-x-1/2 rounded-full bg-foreground border-2 border-background"
           style={{ left: `${percentage}%` }}
-          animate={{ 
-            scale: isDragging ? 1.15 : 1,
-          }}
-          transition={{ duration: 0.15 }}
+          animate={{ scale: isDragging ? 1.2 : 1 }}
+          transition={{ duration: 0.1 }}
         />
       </div>
     </div>

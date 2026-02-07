@@ -13,14 +13,14 @@ const variants = {
   primary: "btn-primary",
   secondary: "btn-secondary",
   ghost: "btn-ghost",
-  success: "bg-success/10 text-success border border-success/20 hover:bg-success/20",
-  danger: "bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/20",
+  success: "bg-success text-white hover:opacity-85",
+  danger: "bg-destructive text-white hover:opacity-85",
 };
 
 const sizes = {
-  sm: "px-3 py-1.5 text-sm",
+  sm: "px-3 py-1.5 text-xs",
   md: "px-4 py-2 text-sm",
-  lg: "px-6 py-3 text-base",
+  lg: "px-5 py-2.5 text-sm",
 };
 
 export function GlassButton({
@@ -32,10 +32,9 @@ export function GlassButton({
 }: GlassButtonProps) {
   return (
     <motion.button
-      whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       className={cn(
-        "inline-flex items-center justify-center gap-2 font-medium transition-all duration-200 rounded-lg",
+        "inline-flex items-center justify-center gap-2 font-medium transition-all duration-100 rounded-md cursor-pointer",
         variants[variant],
         sizes[size],
         className

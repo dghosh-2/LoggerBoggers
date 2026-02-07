@@ -8,23 +8,23 @@ import { MOCK_TRANSACTIONS } from '@/lib/mock-data';
 import { useInsightsStore } from '@/stores/insights-store';
 import { useThemeStore } from '@/stores/theme-store';
 
-// Minimalistic gold/amber palette
+// Monochrome + accent palette
 const LIGHT_COLORS = [
-    '#b8860b', // primary gold
-    '#d4a017', // lighter gold
-    '#8b6914', // darker gold
-    '#c9a227', // warm gold
-    '#a67c00', // deep gold
-    '#9ca3af', // gray for "Other"
+    '#18181B', // primary black
+    '#6366F1', // indigo accent
+    '#3F3F46', // zinc dark
+    '#16A34A', // green
+    '#71717A', // zinc mid
+    '#A1A1AA', // zinc light
 ];
 
 const DARK_COLORS = [
-    '#d4a017', // primary gold
-    '#e6be44', // lighter gold
-    '#b8860b', // medium gold
-    '#f0d060', // pale gold
-    '#a67c00', // deep gold
-    '#6b7280', // gray for "Other"
+    '#FAFAFA', // primary white
+    '#818CF8', // indigo accent
+    '#A1A1AA', // zinc light
+    '#4ADE80', // green
+    '#71717A', // zinc mid
+    '#52525B', // zinc dark
 ];
 
 export function AnalysisView() {

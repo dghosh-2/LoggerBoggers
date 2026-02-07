@@ -8,7 +8,7 @@ export const CATEGORIES = [
 
 // Generator for realistic transaction history
 const generateTransactions = () => {
-    const transactions = [];
+    const transactions: any[] = [];
     const endDate = new Date('2026-02-01');
     const startDate = new Date('2025-01-01');
 

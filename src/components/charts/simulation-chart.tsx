@@ -147,7 +147,7 @@ export function SimulationChart({
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="bg-popover/95 backdrop-blur-sm border border-border rounded-xl p-3 shadow-xl">
+        <div className="bg-card border border-border rounded-lg p-2.5 shadow-md">
           <div className="flex items-center gap-2 mb-2">
             <p className="font-semibold text-foreground">{label}</p>
             {data.hasBonus && (
@@ -228,33 +228,33 @@ export function SimulationChart({
           >
             <defs>
               <linearGradient id="cumulativeGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={isDark ? '#d4a017' : '#b8860b'} stopOpacity={0.3} />
-                <stop offset="95%" stopColor={isDark ? '#d4a017' : '#b8860b'} stopOpacity={0} />
+                <stop offset="5%" stopColor={isDark ? '#818CF8' : '#6366F1'} stopOpacity={0.15} />
+                <stop offset="95%" stopColor={isDark ? '#818CF8' : '#6366F1'} stopOpacity={0} />
               </linearGradient>
               <linearGradient id="savingsGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={isDark ? '#34d399' : '#059669'} stopOpacity={0.2} />
-                <stop offset="95%" stopColor={isDark ? '#34d399' : '#059669'} stopOpacity={0} />
+                <stop offset="5%" stopColor={isDark ? '#34d399' : '#10B981'} stopOpacity={0.15} />
+                <stop offset="95%" stopColor={isDark ? '#34d399' : '#10B981'} stopOpacity={0} />
               </linearGradient>
               <linearGradient id="confidenceGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={isDark ? '#d4a017' : '#b8860b'} stopOpacity={0.1} />
-                <stop offset="100%" stopColor={isDark ? '#d4a017' : '#b8860b'} stopOpacity={0.05} />
+                <stop offset="0%" stopColor={isDark ? '#818CF8' : '#6366F1'} stopOpacity={0.06} />
+                <stop offset="100%" stopColor={isDark ? '#818CF8' : '#6366F1'} stopOpacity={0.02} />
               </linearGradient>
             </defs>
             <CartesianGrid 
               strokeDasharray="3 3" 
-              stroke={isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'} 
+              stroke={isDark ? '#27272A' : '#E4E4E7'} 
               vertical={false} 
             />
             <XAxis
               dataKey="month"
-              stroke={isDark ? '#8a8780' : '#6b6860'}
+              stroke={isDark ? '#52525B' : '#71717A'}
               fontSize={11}
               tickLine={false}
               axisLine={false}
               dy={5}
             />
             <YAxis
-              stroke={isDark ? '#8a8780' : '#6b6860'}
+              stroke={isDark ? '#52525B' : '#71717A'}
               fontSize={11}
               tickLine={false}
               axisLine={false}
@@ -262,7 +262,7 @@ export function SimulationChart({
               dx={-5}
             />
             <Tooltip content={<CustomTooltip />} />
-            <ReferenceLine y={0} stroke={isDark ? '#6b6860' : '#9ca3af'} strokeDasharray="3 3" />
+            <ReferenceLine y={0} stroke={isDark ? '#3F3F46' : '#D4D4D8'} strokeDasharray="3 3" />
             {/* Confidence band - high range */}
             <Area
               type="monotone"
@@ -276,7 +276,7 @@ export function SimulationChart({
             <Area
               type="monotone"
               dataKey="cumulativeLow"
-              stroke={isDark ? 'rgba(212, 160, 23, 0.2)' : 'rgba(184, 134, 11, 0.2)'}
+              stroke={isDark ? 'rgba(129, 140, 248, 0.15)' : 'rgba(99, 102, 241, 0.15)'}
               strokeWidth={1}
               strokeDasharray="4 4"
               fill="none"
@@ -287,21 +287,21 @@ export function SimulationChart({
             <Area
               type="monotone"
               dataKey="cumulative"
-              stroke={isDark ? '#d4a017' : '#b8860b'}
-              strokeWidth={2.5}
+              stroke={isDark ? '#818CF8' : '#6366F1'}
+              strokeWidth={2}
               fill="url(#cumulativeGradient)"
               dot={false}
-              activeDot={{ r: 5, fill: isDark ? '#d4a017' : '#b8860b', strokeWidth: 0 }}
+              activeDot={{ r: 4, fill: isDark ? '#818CF8' : '#6366F1', strokeWidth: 0 }}
             />
             {/* Monthly savings */}
             <Area
               type="monotone"
               dataKey="savings"
-              stroke={isDark ? '#34d399' : '#059669'}
+              stroke={isDark ? '#34d399' : '#10B981'}
               strokeWidth={1.5}
               fill="url(#savingsGradient)"
               dot={false}
-              activeDot={{ r: 4, fill: isDark ? '#34d399' : '#059669', strokeWidth: 0 }}
+              activeDot={{ r: 3, fill: isDark ? '#34d399' : '#10B981', strokeWidth: 0 }}
             />
           </AreaChart>
         </ResponsiveContainer>

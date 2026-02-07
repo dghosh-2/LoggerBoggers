@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MoneyPad - Personal Finance Digital Twin",
+  title: "Scotty's Ledger - Personal Finance Digital Twin",
   description: "Your financial life visualized as an interactive graph",
 };
 
@@ -35,8 +35,10 @@ export default function RootLayout({
         <ThemeProvider>
           <AmbientBackground />
           <Navbar />
-          <main className="relative z-10 pt-24 px-6 pb-8 max-w-7xl mx-auto">
-            {children}
+          <main className="relative z-10 md:ml-[200px] px-6 md:px-8 py-6 md:py-8 pb-20 md:pb-8 min-h-screen">
+            <div className="max-w-6xl mx-auto">
+              {children}
+            </div>
           </main>
           <DemoMode />
           <ToastContainer />

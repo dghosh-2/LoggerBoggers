@@ -34,9 +34,9 @@ export function TrendCard({
 
   useEffect(() => {
     const controls = animate(count, value, {
-      duration: 1.5,
+      duration: 1,
       delay: delay / 1000,
-      ease: [0.22, 1, 0.36, 1],
+      ease: [0.25, 0.1, 0.25, 1],
     });
     return controls.stop;
   }, [count, value, delay]);
@@ -44,36 +44,29 @@ export function TrendCard({
   const isPositive = change >= 0;
 
   return (
-    <GlassCard delay={delay} className="relative overflow-hidden">
-      <div className="flex items-start justify-between mb-3">
-        <span className="text-sm font-medium text-foreground-muted">{title}</span>
-        {icon && (
-          <div className="p-2 rounded-lg bg-secondary">
-            {icon}
-          </div>
-        )}
+    <GlassCard delay={delay}>
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-xs text-foreground-muted">{title}</span>
+        {icon}
       </div>
       
-      <motion.div className="text-3xl font-semibold tracking-tight">
+      <motion.div className="text-2xl font-semibold tracking-tight tabular-nums font-mono">
         {rounded}
       </motion.div>
       
-      <motion.div
-        className={`flex items-center gap-1 mt-2 text-sm font-medium ${
+      <div
+        className={`flex items-center gap-1.5 mt-2 text-xs ${
           isPositive ? "text-success" : "text-destructive"
         }`}
-        initial={{ opacity: 0, x: -10 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: delay / 1000 + 0.3, duration: 0.4 }}
       >
         {isPositive ? (
-          <TrendingUp className="w-4 h-4" />
+          <TrendingUp className="w-3.5 h-3.5" />
         ) : (
-          <TrendingDown className="w-4 h-4" />
+          <TrendingDown className="w-3.5 h-3.5" />
         )}
-        <span>{isPositive ? "+" : ""}{change}%</span>
-        <span className="text-foreground-muted font-normal">vs last month</span>
-      </motion.div>
+        <span className="font-medium tabular-nums">{isPositive ? "+" : ""}{change}%</span>
+        <span className="text-foreground-muted">vs last month</span>
+      </div>
     </GlassCard>
   );
 }

@@ -27,23 +27,20 @@ export function HoldingCard({
     <GlassCard delay={delay} interactive>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <motion.div 
-            className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center"
-            whileHover={{ scale: 1.1 }}
-          >
-            <span className="text-sm font-bold text-primary">{symbol.slice(0, 2)}</span>
-          </motion.div>
+          <div className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center">
+            <span className="text-xs font-bold text-primary">{symbol.slice(0, 2)}</span>
+          </div>
           <div>
-            <h4 className="font-semibold">{symbol}</h4>
-            <p className="text-sm text-foreground-muted">{name}</p>
+            <h4 className="text-sm font-semibold">{symbol}</h4>
+            <p className="text-xs text-foreground-muted">{name}</p>
           </div>
         </div>
 
         <div className="text-right">
-          <p className="font-semibold">
+          <p className="text-sm font-semibold tabular-nums">
             ${value.toLocaleString()}
           </p>
-          <div className={`flex items-center justify-end gap-1 text-sm ${
+          <div className={`flex items-center justify-end gap-1 text-xs ${
             isPositive ? "text-success" : "text-destructive"
           }`}>
             {isPositive ? (
@@ -51,23 +48,23 @@ export function HoldingCard({
             ) : (
               <TrendingDown className="w-3 h-3" />
             )}
-            <span>{isPositive ? "+" : ""}{change}%</span>
+            <span className="tabular-nums">{isPositive ? "+" : ""}{change}%</span>
           </div>
         </div>
       </div>
 
       {/* Portfolio percentage bar */}
-      <div className="mt-4">
-        <div className="flex justify-between text-xs text-foreground-muted mb-1.5">
-          <span>Portfolio allocation</span>
-          <span>{percentage}%</span>
+      <div className="mt-3.5">
+        <div className="flex justify-between text-[11px] text-foreground-muted mb-1">
+          <span>Allocation</span>
+          <span className="tabular-nums">{percentage}%</span>
         </div>
-        <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+        <div className="h-1 bg-secondary rounded-full overflow-hidden">
           <motion.div
             className="h-full rounded-full bg-primary"
             initial={{ width: 0 }}
             animate={{ width: `${percentage}%` }}
-            transition={{ delay: delay / 1000 + 0.2, duration: 0.8, ease: "easeOut" }}
+            transition={{ delay: delay / 1000 + 0.2, duration: 0.6, ease: "easeOut" }}
           />
         </div>
       </div>

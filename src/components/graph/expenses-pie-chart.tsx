@@ -6,23 +6,23 @@ import { MOCK_TRANSACTIONS } from '@/lib/mock-data';
 import { useInsightsStore } from '@/stores/insights-store';
 import { useThemeStore } from '@/stores/theme-store';
 
-// Minimalistic monochromatic palette based on primary gold
+// Monochrome + accent palette
 const LIGHT_COLORS = [
-    '#b8860b', // primary gold
-    '#d4a017', // lighter gold
-    '#8b6914', // darker gold
-    '#c9a227', // warm gold
-    '#a67c00', // deep gold
-    '#e6be44', // pale gold
+    '#18181B', // primary
+    '#6366F1', // indigo
+    '#3F3F46', // zinc dark
+    '#16A34A', // green
+    '#71717A', // zinc mid
+    '#A1A1AA', // zinc light
 ];
 
 const DARK_COLORS = [
-    '#d4a017', // primary gold
-    '#e6be44', // lighter gold
-    '#b8860b', // medium gold
-    '#f0d060', // pale gold
-    '#a67c00', // deep gold
-    '#c9a227', // warm gold
+    '#FAFAFA', // primary
+    '#818CF8', // indigo
+    '#A1A1AA', // zinc light
+    '#4ADE80', // green
+    '#71717A', // zinc mid
+    '#52525B', // zinc dark
 ];
 
 interface CategoryData {

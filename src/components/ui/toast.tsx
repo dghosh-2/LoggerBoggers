@@ -24,7 +24,6 @@ export const useToastStore = create<ToastStore>((set) => ({
     const id = Math.random().toString(36).substring(7);
     set((state) => ({ toasts: [...state.toasts, { id, message, type }] }));
     
-    // Auto-remove after 4 seconds
     setTimeout(() => {
       set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) }));
     }, 4000);
@@ -41,9 +40,9 @@ const iconMap = {
 };
 
 const colorMap = {
-  success: "text-success bg-success/10 border-success/20",
-  error: "text-destructive bg-destructive/10 border-destructive/20",
-  info: "text-accent bg-accent/10 border-accent/20",
+  success: "text-success",
+  error: "text-destructive",
+  info: "text-foreground-muted",
 };
 
 export function ToastContainer() {
@@ -57,21 +56,19 @@ export function ToastContainer() {
           return (
             <motion.div
               key={toast.id}
-              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              initial={{ opacity: 0, y: 8, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, x: 100, scale: 0.95 }}
-              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg card-elevated min-w-[280px] max-w-[400px]`}
+              exit={{ opacity: 0, x: 50 }}
+              transition={{ duration: 0.15 }}
+              className="flex items-center gap-3 px-4 py-3 rounded-md border border-border bg-card min-w-[280px] max-w-[400px]"
             >
-              <div className={`p-1.5 rounded-lg ${colorMap[toast.type]}`}>
-                <Icon className="w-4 h-4" />
-              </div>
-              <p className="flex-1 text-sm font-medium">{toast.message}</p>
+              <Icon className={`w-4 h-4 shrink-0 ${colorMap[toast.type]}`} />
+              <p className="flex-1 text-sm">{toast.message}</p>
               <button
                 onClick={() => removeToast(toast.id)}
-                className="p-1 rounded hover:bg-secondary transition-colors"
+                className="p-0.5 rounded hover:bg-secondary transition-colors cursor-pointer"
               >
-                <X className="w-4 h-4 text-foreground-muted" />
+                <X className="w-3.5 h-3.5 text-foreground-muted" />
               </button>
             </motion.div>
           );

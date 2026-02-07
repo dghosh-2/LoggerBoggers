@@ -54,7 +54,6 @@ export default function StocksPage() {
         setRiskData([]);
 
         try {
-            // Step 1: Orchestrate the query with expanded schema
             const orchestratorResponse = await fetch('/api/stocks/orchestrator', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -70,7 +69,6 @@ export default function StocksPage() {
             console.log('Orchestrator output:', orchestratorData);
             setOrchestratorOutput(orchestratorData);
 
-            // Step 2: Fetch stock data
             const dataResponse = await fetch('/api/stocks/data-fetcher', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -87,12 +85,10 @@ export default function StocksPage() {
             const dataResult = await dataResponse.json();
             setStocksData(dataResult.stocks);
 
-            // Step 3: Get recommendations (if enabled)
             if (orchestratorData.features.showRecommendations) {
                 fetchRecommendations(query, dataResult.stocks);
             }
 
-            // Step 4: Get risk analysis (if enabled)
             if (orchestratorData.features.showRiskMetrics) {
                 fetchRiskAnalysis(dataResult.stocks);
             }
@@ -106,7 +102,6 @@ export default function StocksPage() {
         }
     };
 
-    // Fetch recommendations in background
     const fetchRecommendations = async (query: string, stocks: StockData[]) => {
         try {
             const response = await fetch('/api/stocks/recommendations', {
@@ -123,7 +118,6 @@ export default function StocksPage() {
         }
     };
 
-    // Fetch risk analysis in background
     const fetchRiskAnalysis = async (stocks: StockData[]) => {
         try {
             const response = await fetch('/api/stocks/risk-analysis', {
@@ -140,7 +134,6 @@ export default function StocksPage() {
         }
     };
 
-    // Handle deep dive
     const handleDeepDive = async (date: string, symbol: string, priceData: any) => {
         if (!orchestratorOutput?.features.enableDeepDive) return;
         
@@ -169,7 +162,6 @@ export default function StocksPage() {
         }
     };
 
-    // Calculate statistics for display
     const calculateStats = () => {
         if (!stocksData || stocksData.length === 0) return [];
         
@@ -191,14 +183,12 @@ export default function StocksPage() {
         });
     };
 
-    // Render layout based on orchestrator output
     const renderLayout = () => {
         if (!stocksData || !orchestratorOutput) return null;
 
         const { layout, charts, riskLayout, features } = orchestratorOutput;
         const stats = calculateStats();
 
-        // Determine grid columns based on layout type
         const getGridClass = () => {
             switch (layout.type) {
                 case 'split':
@@ -215,32 +205,32 @@ export default function StocksPage() {
         };
 
         return (
-            <div className="space-y-6">
-                {/* Query Summary - Liquid Glass */}
+            <div className="space-y-4">
+                {/* Query Summary */}
                 <motion.div 
-                    className="liquid-glass py-4 px-5 rounded-3xl"
-                    initial={{ opacity: 0, y: 15 }}
+                    className="bg-card border border-border rounded-xl py-3.5 px-4"
+                    initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: 0.1 }}
+                    transition={{ duration: 0.3, delay: 0.1 }}
                 >
-                    <div className="flex items-center justify-between flex-wrap gap-3 relative z-10">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-primary/10">
-                                <Search className="w-4 h-4 text-primary" />
+                    <div className="flex items-center justify-between flex-wrap gap-3">
+                        <div className="flex items-center gap-2.5">
+                            <div className="p-1.5 rounded-md bg-secondary">
+                                <Search className="w-3.5 h-3.5 text-primary" />
                             </div>
                             <div>
                                 <p className="text-sm font-medium">{orchestratorOutput.intent}</p>
-                                <p className="text-xs text-foreground-muted">
-                                    {stocksData.length} stock(s) • {orchestratorOutput.timeRange.period} period
+                                <p className="text-[11px] text-foreground-muted">
+                                    {stocksData.length} stock(s) &middot; {orchestratorOutput.timeRange.period} period
                                 </p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs px-2 py-1 rounded-full bg-secondary">
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] px-2 py-0.5 rounded-md bg-secondary font-medium">
                                 {orchestratorOutput.queryType.replace('_', ' ')}
                             </span>
-                            <span className="text-xs px-2 py-1 rounded-full bg-secondary">
-                                {layout.type} layout
+                            <span className="text-[11px] px-2 py-0.5 rounded-md bg-secondary font-medium">
+                                {layout.type}
                             </span>
                         </div>
                     </div>
@@ -271,7 +261,7 @@ export default function StocksPage() {
                 )}
 
                 {/* Charts Grid */}
-                <div className={`grid ${getGridClass()} gap-6`}>
+                <div className={`grid ${getGridClass()} gap-4`}>
                     {charts.map((chartConfig, idx) => (
                         <FlexibleChart
                             key={chartConfig.id}
@@ -285,8 +275,7 @@ export default function StocksPage() {
 
                 {/* Risk and Recommendations Row */}
                 {(features.showRiskMetrics || features.showRecommendations) && (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {/* Risk Panel - 2 columns */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                         {features.showRiskMetrics && riskData.length > 0 && (
                             <div className="lg:col-span-2">
                                 <RiskPanel
@@ -297,7 +286,6 @@ export default function StocksPage() {
                             </div>
                         )}
 
-                        {/* AI Recommendations - 1 column */}
                         {features.showRecommendations && (
                             <div className="lg:col-span-1">
                                 <AIRecommendations
@@ -315,40 +303,35 @@ export default function StocksPage() {
 
     return (
         <PageTransition>
-            <div className="space-y-8">
+            <div className="space-y-6">
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-3xl font-semibold tracking-tight">Stock Research</h1>
-                        <p className="text-foreground-muted mt-1">
+                        <h1 className="text-2xl font-semibold tracking-tight">Stock Research</h1>
+                        <p className="text-foreground-muted text-sm mt-1">
                             AI-powered natural language stock analysis
                         </p>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <motion.div
-                            className="p-2.5 rounded-xl bg-secondary border border-border"
-                            whileHover={{ scale: 1.05 }}
-                        >
-                            <LineChart className="w-5 h-5 text-primary" />
-                        </motion.div>
+                    <div className="p-2 rounded-lg bg-secondary">
+                        <LineChart className="w-4 h-4 text-primary" />
                     </div>
                 </div>
 
                 {/* Search Bar */}
-                <GlassCard delay={100}>
+                <GlassCard delay={50}>
                     <SearchBar onSearch={handleSearch} loading={loading} />
                 </GlassCard>
 
                 {/* Loading State */}
                 {loading && (
-                    <GlassCard delay={200} className="py-16">
+                    <GlassCard delay={100} className="py-14">
                         <div className="flex flex-col items-center justify-center">
-                            <div className="relative w-20 h-20 mb-6">
-                                <div className="absolute inset-0 rounded-full border-4 border-primary/20 animate-ping" />
-                                <div className="absolute inset-0 rounded-full border-4 border-t-primary border-r-accent border-b-primary border-l-accent animate-spin" />
+                            <div className="relative w-12 h-12 mb-4">
+                                <div className="absolute inset-0 rounded-full border-2 border-primary/20 animate-ping" />
+                                <div className="absolute inset-0 rounded-full border-2 border-t-primary border-r-transparent border-b-transparent border-l-transparent animate-spin" />
                             </div>
-                            <p className="text-foreground font-semibold text-lg">Processing your request...</p>
-                            <p className="text-foreground-muted text-sm mt-2">Analyzing markets with AI</p>
+                            <p className="text-sm font-medium">Processing your request...</p>
+                            <p className="text-xs text-foreground-muted mt-1">Analyzing markets with AI</p>
                         </div>
                     </GlassCard>
                 )}
@@ -358,22 +341,21 @@ export default function StocksPage() {
 
                 {/* Empty State */}
                 {!loading && !stocksData && (
-                    <GlassCard delay={200} className="py-16">
+                    <GlassCard delay={100} className="py-14">
                         <div className="text-center">
                             <motion.div
-                                className="w-20 h-20 mx-auto mb-6 bg-primary/10 rounded-2xl flex items-center justify-center"
-                                initial={{ scale: 0.8, opacity: 0 }}
+                                className="w-14 h-14 mx-auto mb-4 bg-secondary rounded-xl flex items-center justify-center"
+                                initial={{ scale: 0.9, opacity: 0 }}
                                 animate={{ scale: 1, opacity: 1 }}
-                                transition={{ delay: 0.3 }}
+                                transition={{ delay: 0.2 }}
                             >
-                                <TrendingUp className="w-10 h-10 text-primary" />
+                                <TrendingUp className="w-7 h-7 text-primary" />
                             </motion.div>
-                            <h2 className="text-2xl font-semibold mb-2">Start Exploring</h2>
-                            <p className="text-foreground-muted max-w-md mx-auto mb-6">
+                            <h2 className="text-lg font-semibold mb-1">Start Exploring</h2>
+                            <p className="text-sm text-foreground-muted max-w-md mx-auto mb-5">
                                 Use natural language to ask about any stocks. Try comparing companies, analyzing trends, or exploring market performance.
                             </p>
                             
-                            {/* Example queries */}
                             <div className="flex flex-wrap justify-center gap-2 max-w-2xl mx-auto">
                                 {[
                                     'Compare Apple and Google over 5 years',
@@ -383,12 +365,11 @@ export default function StocksPage() {
                                 ].map((example, idx) => (
                                     <motion.button
                                         key={idx}
-                                        className="px-3 py-2 text-sm bg-secondary border border-border rounded-lg hover:border-primary hover:bg-primary/5 transition-all"
+                                        className="px-3 py-1.5 text-xs bg-secondary border border-border rounded-lg hover:border-border-strong hover:bg-secondary transition-all duration-150 cursor-pointer"
                                         onClick={() => handleSearch(example)}
-                                        initial={{ opacity: 0, y: 10 }}
+                                        initial={{ opacity: 0, y: 6 }}
                                         animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: 0.4 + idx * 0.1 }}
-                                        whileHover={{ scale: 1.02 }}
+                                        transition={{ delay: 0.3 + idx * 0.05 }}
                                     >
                                         {example}
                                     </motion.button>
