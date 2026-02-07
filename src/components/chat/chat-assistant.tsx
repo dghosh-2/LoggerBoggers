@@ -200,22 +200,54 @@ export function ChatAssistant() {
   const continueListeningRef = useRef(false);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
+  const pendingTranscriptRef = useRef('');
+  const sendTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isFetchingRef = useRef(false);
 
-  // Initialize speech recognition with continuous mode support
+  // Initialize speech recognition — continuous mode with debounced send
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SpeechRecognition) {
         recognitionRef.current = new SpeechRecognition();
-        recognitionRef.current.continuous = false;
-        recognitionRef.current.interimResults = false;
+        recognitionRef.current.continuous = true;
+        recognitionRef.current.interimResults = true;
         recognitionRef.current.lang = 'en-US';
 
         recognitionRef.current.onresult = (event: any) => {
-          const transcript = event.results[0][0].transcript;
-          if (transcript.trim()) {
-            addMessage("user", transcript.trim());
-            fetchResponseForCall(transcript.trim());
+          // Build full transcript from all results
+          let finalTranscript = '';
+          let interimTranscript = '';
+          for (let i = 0; i < event.results.length; i++) {
+            const result = event.results[i];
+            if (result.isFinal) {
+              finalTranscript += result[0].transcript;
+            } else {
+              interimTranscript += result[0].transcript;
+            }
+          }
+
+          const fullText = (finalTranscript + interimTranscript).trim();
+          if (!fullText) return;
+
+          pendingTranscriptRef.current = fullText;
+
+          // Reset the debounce timer — send after 1.4s of silence
+          if (sendTimerRef.current) clearTimeout(sendTimerRef.current);
+
+          // Only auto-send in call mode when we have final results
+          if (continueListeningRef.current && finalTranscript.trim()) {
+            sendTimerRef.current = setTimeout(() => {
+              const text = pendingTranscriptRef.current.trim();
+              if (text && !isFetchingRef.current) {
+                pendingTranscriptRef.current = '';
+                // Stop recognition while processing
+                try { recognitionRef.current?.stop(); } catch (e) { /* ignore */ }
+                setIsListening(false);
+                addMessage("user", text);
+                fetchResponseForCall(text);
+              }
+            }, 1400);
           }
         };
 
@@ -228,7 +260,22 @@ export function ChatAssistant() {
         };
 
         recognitionRef.current.onend = () => {
-          setIsListening(false);
+          // In call mode, auto-restart listening if not currently fetching
+          if (continueListeningRef.current && !isFetchingRef.current) {
+            setTimeout(() => {
+              if (continueListeningRef.current && recognitionRef.current && !isFetchingRef.current) {
+                try {
+                  setCallStatus('listening');
+                  setIsListening(true);
+                  recognitionRef.current.start();
+                } catch (e) {
+                  // already running, ignore
+                }
+              }
+            }, 200);
+          } else if (!continueListeningRef.current) {
+            setIsListening(false);
+          }
         };
       }
     }
@@ -404,8 +451,11 @@ export function ChatAssistant() {
     audio.play();
   }, []);
 
-  // Fetch response for call mode — single server-side LLM+TTS call
+  // Fetch response for call mode — single server-side LLM+TTS call (with concurrency lock)
   const fetchResponseForCall = async (userMessage: string) => {
+    if (isFetchingRef.current) return; // prevent overlapping calls
+    isFetchingRef.current = true;
+
     setCallStatus('thinking');
     setIsThinking(true);
 
@@ -426,6 +476,7 @@ export function ChatAssistant() {
       const response = await fetch('/api/voice-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ messages: conversationMessages }),
       });
 
@@ -453,6 +504,8 @@ export function ChatAssistant() {
       console.error('Error fetching response:', error);
       speakText("Sorry, I couldn't process that. Try again.");
       setIsThinking(false);
+    } finally {
+      isFetchingRef.current = false;
     }
   };
 
@@ -469,6 +522,7 @@ export function ChatAssistant() {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ messages: conversationMessages }),
       });
 
@@ -529,8 +583,11 @@ export function ChatAssistant() {
   // Start/end call mode
   const toggleCallMode = () => {
     if (isCallMode) {
-      // End call
+      // End call — clean up everything
       continueListeningRef.current = false;
+      if (sendTimerRef.current) { clearTimeout(sendTimerRef.current); sendTimerRef.current = null; }
+      pendingTranscriptRef.current = '';
+      isFetchingRef.current = false;
       stopSpeaking();
       if (recognitionRef.current) {
         try { recognitionRef.current.stop(); } catch (e) {}
@@ -565,8 +622,17 @@ export function ChatAssistant() {
     if (isListening) {
       recognitionRef.current.stop();
       setIsListening(false);
+      // Send accumulated transcript as a text chat message
+      const pending = pendingTranscriptRef.current.trim();
+      if (pending && !isCallMode) {
+        pendingTranscriptRef.current = '';
+        if (sendTimerRef.current) { clearTimeout(sendTimerRef.current); sendTimerRef.current = null; }
+        addMessage("user", pending);
+        fetchResponse(pending);
+      }
     } else {
       stopSpeaking();
+      pendingTranscriptRef.current = '';
       recognitionRef.current.start();
       setIsListening(true);
     }
@@ -621,50 +687,66 @@ export function ChatAssistant() {
               </motion.p>
             </div>
 
-            {/* Live transcript */}
-            <div className="flex-1 w-full max-w-md overflow-y-auto px-6 pb-4 min-h-0">
-              <div className="space-y-2.5">
-                {transcriptMessages.map((msg) => (
-                  <motion.div
-                    key={msg.id}
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.25 }}
-                    className={cn(
-                      "flex",
-                      msg.role === "user" ? "justify-end" : "justify-start"
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "max-w-[85%] px-4 py-2.5 rounded-2xl text-[13px] leading-relaxed",
-                        msg.role === "user"
-                          ? "bg-[#C41230] text-white rounded-br-md"
-                          : "bg-white/10 text-white/90 rounded-bl-md"
-                      )}
+            {/* Live transcription */}
+            <div className="relative flex-1 w-full max-w-lg overflow-hidden min-h-0">
+              {/* Top fade gradient */}
+              <div className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-[#0A0A0A] to-transparent z-10 pointer-events-none" />
+
+              <div className="h-full overflow-y-auto px-8 pt-16 pb-6 scroll-smooth">
+                <div className="space-y-6">
+                  {transcriptMessages.map((msg, idx) => {
+                    const isLatest = idx === transcriptMessages.length - 1;
+                    return (
+                      <motion.div
+                        key={msg.id}
+                        initial={{ opacity: 0, y: 30, filter: 'blur(6px)' }}
+                        animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                        className="text-center"
+                      >
+                        <motion.span
+                          className="inline-block text-[10px] uppercase tracking-[0.2em] mb-2"
+                          style={{ color: msg.role === 'user' ? 'rgba(196,18,48,0.6)' : 'rgba(255,255,255,0.25)' }}
+                        >
+                          {msg.role === 'user' ? 'You' : 'ScotBot'}
+                        </motion.span>
+                        <motion.p
+                          className={cn(
+                            "leading-relaxed font-light",
+                            msg.role === 'user' ? 'text-white/60' : 'text-white',
+                            isLatest ? 'text-xl' : 'text-base opacity-50'
+                          )}
+                          animate={isLatest ? { opacity: 1 } : {}}
+                        >
+                          {msg.content}
+                        </motion.p>
+                      </motion.div>
+                    );
+                  })}
+
+                  {/* Thinking indicator */}
+                  {isThinking && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                      className="text-center"
                     >
-                      {msg.content}
-                    </div>
-                  </motion.div>
-                ))}
+                      <span className="inline-block text-[10px] uppercase tracking-[0.2em] mb-2 text-white/25">ScotBot</span>
+                      <div className="flex items-center justify-center gap-2">
+                        <motion.span className="w-2 h-2 rounded-full bg-white/30" animate={{ scale: [1, 1.4, 1], opacity: [0.3, 0.8, 0.3] }} transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut", delay: 0 }} />
+                        <motion.span className="w-2 h-2 rounded-full bg-white/30" animate={{ scale: [1, 1.4, 1], opacity: [0.3, 0.8, 0.3] }} transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut", delay: 0.2 }} />
+                        <motion.span className="w-2 h-2 rounded-full bg-white/30" animate={{ scale: [1, 1.4, 1], opacity: [0.3, 0.8, 0.3] }} transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut", delay: 0.4 }} />
+                      </div>
+                    </motion.div>
+                  )}
 
-                {/* Thinking dots in transcript */}
-                {isThinking && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex justify-start"
-                  >
-                    <div className="bg-white/10 px-4 py-3 rounded-2xl rounded-bl-md flex items-center gap-1.5">
-                      <motion.span className="w-1.5 h-1.5 rounded-full bg-white/40" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1, repeat: Infinity, delay: 0 }} />
-                      <motion.span className="w-1.5 h-1.5 rounded-full bg-white/40" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1, repeat: Infinity, delay: 0.2 }} />
-                      <motion.span className="w-1.5 h-1.5 rounded-full bg-white/40" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1, repeat: Infinity, delay: 0.4 }} />
-                    </div>
-                  </motion.div>
-                )}
-
-                <div ref={transcriptEndRef} />
+                  <div ref={transcriptEndRef} />
+                </div>
               </div>
+
+              {/* Bottom fade gradient */}
+              <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-[#0A0A0A] to-transparent z-10 pointer-events-none" />
             </div>
 
             {/* End call button */}
