@@ -230,6 +230,8 @@ export async function POST(request: NextRequest) {
         }
 
         // Generate 5 years of fake historical data (same as Plaid flow)
+        // This matches Plaid's behavior - Plaid sandbox provides 30-90 days of real data,
+        // but we generate 5 years of historical data for a complete demo experience
         const fakeTransactions = generateFiveYearsOfTransactions();
         const fakeIncome = generateFiveYearsOfIncome();
 
@@ -238,12 +240,40 @@ export async function POST(request: NextRequest) {
         await supabase.from('income').delete().eq('uuid_user_id', userId);
 
         // Add user_id to fake transactions and income
-        const allTransactionsWithUser = fakeTransactions.map(tx => ({
-            ...tx,
-            user_id: userId,
-            uuid_user_id: userId,
-            source: 'generated' as const,
-        }));
+        // Use 'capital_one' as source to distinguish from Plaid transactions
+        // Distribute transactions across accounts realistically:
+        // - Most transactions go to checking
+        // - Credit card transactions go to credit card
+        // - Savings gets occasional transfers
+        const checkingAccountId = accountsToStore[0].plaid_account_id;
+        const savingsAccountId = accountsToStore[1].plaid_account_id;
+        const creditAccountId = accountsToStore[2].plaid_account_id;
+        
+        const allTransactionsWithUser = fakeTransactions.map((tx, index) => {
+            // Determine account based on transaction type
+            let accountId = checkingAccountId; // Default to checking
+            
+            // Credit card transactions (shopping, entertainment, some food)
+            if (tx.category === 'Shopping' || 
+                (tx.category === 'Entertainment' && Math.random() > 0.3) ||
+                (tx.category === 'Food & Drink' && Math.random() > 0.5)) {
+                accountId = creditAccountId;
+            }
+            // Occasional savings transfers (income-related)
+            else if (tx.category === 'Other' && index % 20 === 0) {
+                accountId = savingsAccountId;
+            }
+            
+            return {
+                ...tx,
+                user_id: userId,
+                uuid_user_id: userId,
+                source: 'capital_one' as const,
+                account_id: accountId,
+                pending: false,
+                // Ensure all fields are populated - generator already includes location, merchant_name, etc.
+            };
+        });
 
         const fakeIncomeWithUser = fakeIncome.map(inc => ({
             ...inc,
