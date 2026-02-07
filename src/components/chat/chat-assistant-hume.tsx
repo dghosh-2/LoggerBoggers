@@ -11,10 +11,11 @@ import {
   MicOff,
   Bot,
   User,
-  Volume2,
+  Phone,
+  PhoneOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useWisprFlow } from "@/hooks/useWisprFlow";
+import { VoiceProvider, useVoice } from "@humeai/voice-react";
 
 interface Message {
   id: string;
@@ -30,7 +31,7 @@ const SUGGESTED_PROMPTS = [
   "Analyze my portfolio risk",
 ];
 
-export function ChatAssistant() {
+function ChatAssistantContent() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -46,15 +47,11 @@ export function ChatAssistant() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Wispr Flow integration
-  const {
-    isRecording,
-    isTranscribing,
-    error: wisprError,
-    startRecording,
-    stopRecordingAndTranscribe,
-    cancelRecording,
-  } = useWisprFlow();
+  // Hume Voice integration
+  const { status, connect, disconnect, sendSessionSettings, messages: voiceMessages } = useVoice();
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [isVoiceMode, setIsVoiceMode] = useState(false);
+  const [configId, setConfigId] = useState<string | null>(null);
 
   // Auto-scroll to latest message
   useEffect(() => {
@@ -67,6 +64,8 @@ export function ChatAssistant() {
       setTimeout(() => inputRef.current?.focus(), 300);
     }
   }, [isOpen]);
+
+  // Voice messages are handled separately and not added to chat history
 
   const addMessage = (role: "user" | "assistant", content: string) => {
     const msg: Message = {
@@ -164,23 +163,110 @@ export function ChatAssistant() {
     }
   };
 
-  const toggleVoice = async () => {
-    if (isRecording) {
-      // Stop recording and transcribe
-      try {
-        const transcribedText = await stopRecordingAndTranscribe();
+  const fetchAccessToken = async () => {
+    try {
+      const response = await fetch('/api/hume/token', {
+        method: 'POST',
+      });
 
-        if (transcribedText && transcribedText.trim()) {
-          addMessage("user", transcribedText);
-          fetchResponse(transcribedText);
-        }
-      } catch (error) {
-        console.error('Voice input error:', error);
-        // Error is already set in the hook
+      if (!response.ok) {
+        throw new Error('Failed to get access token');
       }
+
+      const data = await response.json();
+      return data.accessToken;
+    } catch (error) {
+      console.error('Error fetching access token:', error);
+      throw error;
+    }
+  };
+
+  const fetchOrCreateConfig = async () => {
+    try {
+      // Check localStorage for existing config
+      const storedConfigId = localStorage.getItem('hume_scotbot_config_id');
+      if (storedConfigId) {
+        console.log('Using stored config:', storedConfigId);
+        setConfigId(storedConfigId);
+        return storedConfigId;
+      }
+
+      // Create new config with financial assistant prompt (no custom LLM)
+      console.log('Creating new Hume config...');
+      const response = await fetch('/api/hume/config?useCustomLLM=false', {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error('Failed to create config:', error);
+        return null;
+      }
+
+      const data = await response.json();
+      const newConfigId = data.configId;
+
+      console.log('Created config:', newConfigId);
+
+      // Store for future use
+      localStorage.setItem('hume_scotbot_config_id', newConfigId);
+      setConfigId(newConfigId);
+
+      return newConfigId;
+    } catch (error) {
+      console.error('Error fetching/creating config:', error);
+      return null;
+    }
+  };
+
+  const toggleVoice = async () => {
+    if (status.value === 'connected') {
+      // Disconnect from voice conversation
+      disconnect();
+      setIsVoiceMode(false);
     } else {
-      // Start recording
-      startRecording();
+      // Connect to voice conversation
+      try {
+        setIsVoiceMode(true);
+
+        // Get access token
+        const token = await fetchAccessToken();
+        setAccessToken(token);
+
+        // Get or create config with financial assistant prompt
+        const config = await fetchOrCreateConfig();
+
+        // Fetch user's financial data
+        const financialDataResponse = await fetch('/api/user/financial-context');
+        const financialData = await financialDataResponse.json();
+
+        // Connect to Hume EVI
+        const connectOptions: any = {
+          auth: { type: 'accessToken', value: token },
+        };
+
+        // Use config with financial assistant prompt if available
+        if (config) {
+          connectOptions.configId = config;
+          console.log('Connecting with ScotBot config:', config);
+        } else {
+          console.warn('No config available, using Hume default');
+        }
+
+        await connect(connectOptions);
+
+        // Send financial context via session settings
+        await sendSessionSettings({
+          context: {
+            text: financialData.context || 'No financial data available yet.',
+          },
+        });
+
+        console.log('Connected to Hume EVI with financial context');
+      } catch (error) {
+        console.error('Voice connection error:', error);
+        setIsVoiceMode(false);
+      }
     }
   };
 
@@ -188,6 +274,9 @@ export function ChatAssistant() {
     addMessage("user", prompt);
     fetchResponse(prompt);
   };
+
+  const isVoiceConnected = status.value === 'connected';
+  const isVoiceConnecting = status.value === 'connecting';
 
   return (
     <>
@@ -246,11 +335,17 @@ export function ChatAssistant() {
               <h3 className="text-sm font-semibold leading-none">
                 ScotBot
               </h3>
+              {isVoiceConnected && (
+                <div className="ml-auto flex items-center gap-1.5 text-xs text-green-500">
+                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                  Voice Active
+                </div>
+              )}
             </div>
 
-            {/* Voice Listening Overlay */}
+            {/* Voice Mode Overlay */}
             <AnimatePresence>
-              {(isRecording || isTranscribing) && (
+              {isVoiceMode && (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -259,7 +354,7 @@ export function ChatAssistant() {
                 >
                   <motion.div
                     className="w-20 h-20 rounded-full bg-accent/10 flex items-center justify-center"
-                    animate={{ scale: [1, 1.15, 1] }}
+                    animate={isVoiceConnected ? { scale: [1, 1.15, 1] } : {}}
                     transition={{
                       duration: 1.5,
                       repeat: Infinity,
@@ -268,7 +363,7 @@ export function ChatAssistant() {
                   >
                     <motion.div
                       className="w-14 h-14 rounded-full bg-accent/20 flex items-center justify-center"
-                      animate={{ scale: [1, 1.1, 1] }}
+                      animate={isVoiceConnected ? { scale: [1, 1.1, 1] } : {}}
                       transition={{
                         duration: 1.5,
                         repeat: Infinity,
@@ -276,28 +371,26 @@ export function ChatAssistant() {
                         delay: 0.15,
                       }}
                     >
-                      <Mic className="w-6 h-6 text-accent" />
+                      <Phone className="w-6 h-6 text-accent" />
                     </motion.div>
                   </motion.div>
                   <p className="text-sm font-medium">
-                    {isRecording ? "Listening..." : "Transcribing..."}
+                    {isVoiceConnecting ? "Connecting..." : "Voice Mode Active"}
                   </p>
-                  <p className="text-xs text-foreground-muted">
-                    {isRecording ? "Speak your question" : "Processing audio..."}
+                  <p className="text-xs text-foreground-muted text-center px-8">
+                    {isVoiceConnected
+                      ? "Speak naturally. Your conversation will appear in the chat."
+                      : "Establishing voice connection..."
+                    }
                   </p>
-                  {wisprError && (
-                    <p className="text-xs text-red-500 px-4 text-center">
-                      {wisprError}
-                    </p>
-                  )}
-                  {isRecording && (
-                    <button
-                      onClick={cancelRecording}
-                      className="mt-2 px-4 py-1.5 rounded-md bg-secondary text-xs font-medium hover:bg-background-tertiary transition-colors cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                  )}
+                  <button
+                    onClick={toggleVoice}
+                    disabled={isVoiceConnecting}
+                    className="mt-2 px-4 py-1.5 rounded-md bg-red-500 text-white text-xs font-medium hover:bg-red-600 transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <PhoneOff className="w-3.5 h-3.5 inline mr-1" />
+                    End Call
+                  </button>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -413,20 +506,20 @@ export function ChatAssistant() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={toggleVoice}
-                  disabled={isTranscribing}
+                  disabled={isVoiceConnecting}
                   className={cn(
                     "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors cursor-pointer",
-                    isRecording
-                      ? "bg-accent text-white"
+                    isVoiceConnected
+                      ? "bg-green-500 text-white"
                       : "bg-secondary text-foreground-muted hover:text-foreground",
-                    isTranscribing && "opacity-50 cursor-not-allowed"
+                    isVoiceConnecting && "opacity-50 cursor-not-allowed"
                   )}
-                  aria-label="Voice input"
+                  aria-label="Voice conversation"
                 >
-                  {isRecording ? (
-                    <MicOff className="w-3.5 h-3.5" />
+                  {isVoiceConnected ? (
+                    <PhoneOff className="w-3.5 h-3.5" />
                   ) : (
-                    <Mic className="w-3.5 h-3.5" />
+                    <Phone className="w-3.5 h-3.5" />
                   )}
                 </button>
                 <input
@@ -437,13 +530,14 @@ export function ChatAssistant() {
                   onKeyDown={handleKeyDown}
                   placeholder="Ask about your finances..."
                   className="flex-1 bg-secondary rounded-lg px-3 py-2 text-[13px] placeholder:text-foreground-muted outline-none focus:ring-1 focus:ring-foreground/10 transition-shadow"
+                  disabled={isVoiceConnected}
                 />
                 <button
                   onClick={handleSend}
-                  disabled={!input.trim()}
+                  disabled={!input.trim() || isVoiceConnected}
                   className={cn(
                     "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors cursor-pointer",
-                    input.trim()
+                    input.trim() && !isVoiceConnected
                       ? "bg-foreground text-background"
                       : "bg-secondary text-foreground-muted"
                   )}
@@ -457,5 +551,13 @@ export function ChatAssistant() {
         )}
       </AnimatePresence>
     </>
+  );
+}
+
+export function ChatAssistant() {
+  return (
+    <VoiceProvider>
+      <ChatAssistantContent />
+    </VoiceProvider>
   );
 }
