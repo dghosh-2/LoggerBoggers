@@ -2,25 +2,23 @@
 
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MOCK_TRANSACTIONS } from '@/lib/mock-data';
 import { calculateMonthlyProjection } from '@/lib/projection-engine';
 import { useInsightsStore } from '@/stores/insights-store';
+import { useFinancialData } from '@/hooks/useFinancialData';
 import { cn } from '@/lib/utils';
-import { ChevronLeft, ChevronRight, X, Calendar, TrendingUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Calendar, TrendingUp, Link2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { GlassButton } from '@/components/ui/glass-button';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-// Recurring subscriptions/bills for calendar display
-const SUBSCRIPTIONS = [
-    { date: 1, name: 'Rent', amount: 2450 },
-    { date: 15, name: 'Netflix', amount: 15.99 },
-    { date: 20, name: 'Internet', amount: 79.99 },
-    { date: 25, name: 'Phone', amount: 45 },
-    { date: 28, name: 'Spotify', amount: 12 },
-];
+// Empty subscriptions - would be detected from real data
+const SUBSCRIPTIONS: Array<{ date: number; name: string; amount: number }> = [];
 
 export function CalendarView() {
+    const router = useRouter();
     const { selectedCategory, selectedMonth, setSelectedMonth, reductionGoals } = useInsightsStore();
+    const { transactions, isConnected, loading } = useFinancialData();
     const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
     // Helper to parse "Jan 2026"
@@ -37,37 +35,39 @@ export function CalendarView() {
 
     // Calculate Projection / Actual
     const projection = useMemo(() => 
-        calculateMonthlyProjection(year, month, reductionGoals), 
-        [year, month, reductionGoals]
+        calculateMonthlyProjection(year, month, reductionGoals, transactions), 
+        [year, month, reductionGoals, transactions]
     );
 
-    const actualSum = useMemo(() => 
-        MOCK_TRANSACTIONS
+    const actualSum = useMemo(() => {
+        if (!isConnected || transactions.length === 0) return 0;
+        return transactions
             .filter(t => {
                 const d = new Date(t.date);
                 return d.getMonth() === month && d.getFullYear() === year;
             })
-            .reduce((sum, t) => sum + t.amount, 0),
-        [month, year]
-    );
+            .reduce((sum, t) => sum + t.amount, 0);
+    }, [month, year, transactions, isConnected]);
 
     const isFuture = projection.isFuture;
     const displayTotal = isFuture ? projection.total : actualSum;
 
     // Find max daily spend for heatmap scaling
     const maxDailySpend = useMemo(() => {
+        if (!isConnected || transactions.length === 0) return 1;
+        
         let max = 0;
         const daysInMonth = new Date(year, month + 1, 0).getDate();
         for (let i = 1; i <= daysInMonth; i++) {
             const dateObj = new Date(year, month, i);
             const dayStr = dateObj.toISOString().split('T')[0];
-            const dayTotal = MOCK_TRANSACTIONS
+            const dayTotal = transactions
                 .filter(t => t.date === dayStr)
                 .reduce((sum, t) => sum + t.amount, 0);
             if (dayTotal > max) max = dayTotal;
         }
         return max || 1;
-    }, [year, month]);
+    }, [year, month, transactions, isConnected]);
 
     // Generate calendar grid
     const calendarDays = useMemo(() => {
@@ -89,7 +89,7 @@ export function CalendarView() {
             const dd = String(dateObj.getDate()).padStart(2, '0');
             const dayStr = `${yyyy}-${mm}-${dd}`;
 
-            const dailyTransactions = MOCK_TRANSACTIONS.filter(t => {
+            const dailyTransactions = (!isConnected || transactions.length === 0) ? [] : transactions.filter(t => {
                 const isSameDay = t.date === dayStr;
                 const isSameCategory = selectedCategory ? t.category === selectedCategory : true;
                 return isSameDay && isSameCategory;
@@ -107,7 +107,7 @@ export function CalendarView() {
         }
 
         return days;
-    }, [year, month, selectedCategory]);
+    }, [year, month, selectedCategory, transactions, isConnected]);
 
         // Get heatmap intensity based on amount relative to max (using primary color)
     const getHeatmapStyle = (amount: number) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -12,7 +12,8 @@ import {
   Bell,
   Calendar,
   X,
-  ChevronRight
+  ChevronRight,
+  Link2
 } from "lucide-react";
 import { PageTransition } from "@/components/layout/page-transition";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -22,34 +23,77 @@ import { TimelineChart } from "@/components/charts/timeline-chart";
 import { FinancialGraph } from "@/components/graph/financial-graph";
 import { Modal } from "@/components/ui/modal";
 import { toast } from "@/components/ui/toast";
-import { useUserStore } from "@/stores/user-store";
 import { useInsightsStore } from "@/stores/insights-store";
+import { GlassButton } from "@/components/ui/glass-button";
 
-const cashflowData = [
-  { month: "Jan", income: 8500, expenses: 6200, savings: 2300 },
-  { month: "Feb", income: 8500, expenses: 5800, savings: 2700 },
-  { month: "Mar", income: 9200, expenses: 6100, savings: 3100 },
-  { month: "Apr", income: 8500, expenses: 7200, savings: 1300 },
-  { month: "May", income: 9000, expenses: 5900, savings: 3100 },
-  { month: "Jun", income: 9500, expenses: 6400, savings: 3100 },
-];
+interface FinancialSummary {
+  is_connected: boolean;
+  total_spending: number;
+  total_income: number;
+  net_worth: number;
+  monthly_spending: number;
+  monthly_income: number;
+  spending_by_category: Record<string, number>;
+  recent_transactions: Array<{ name: string; amount: number; category: string; date: string }>;
+  monthly_trend: Array<{ month: string; spending: number; income: number }>;
+}
 
-const spendingData = [
-  { month: "Jan", spending: 6200, budget: 6500 },
-  { month: "Feb", spending: 5800, budget: 6500 },
-  { month: "Mar", spending: 6100, budget: 6500 },
-  { month: "Apr", spending: 7200, budget: 6500 },
-  { month: "May", spending: 5900, budget: 6500 },
-  { month: "Jun", spending: 6400, budget: 6500 },
-];
+interface DisplayTransaction {
+  id: string;
+  description: string;
+  amount: number;
+  category: string;
+  date: string;
+}
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { transactions } = useUserStore();
   const { setCurrentView } = useInsightsStore();
   const [isGraphExpanded, setIsGraphExpanded] = useState(false);
   const [isTransactionsOpen, setIsTransactionsOpen] = useState(false);
-  const [selectedTransaction, setSelectedTransaction] = useState<typeof transactions[0] | null>(null);
+  const [selectedTransaction, setSelectedTransaction] = useState<DisplayTransaction | null>(null);
+  const [summary, setSummary] = useState<FinancialSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Convert API transactions to display format
+  const transactions: DisplayTransaction[] = (summary?.recent_transactions || []).map((tx, index) => ({
+    id: `tx-${index}`,
+    description: tx.name,
+    amount: -tx.amount, // Expenses are negative for display
+    category: tx.category,
+    date: new Date(tx.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+  }));
+
+  useEffect(() => {
+    fetchSummary();
+  }, []);
+
+  const fetchSummary = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/data/summary');
+      const data = await response.json();
+      setSummary(data);
+    } catch (error) {
+      console.error('Error fetching summary:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Convert summary data to chart format
+  const cashflowData = summary?.monthly_trend?.map(item => ({
+    month: item.month,
+    income: item.income,
+    expenses: item.spending,
+    savings: item.income - item.spending,
+  })) || [];
+
+  const spendingData = summary?.monthly_trend?.map(item => ({
+    month: item.month,
+    spending: item.spending,
+    budget: 6500, // Default budget
+  })) || [];
 
   const handleNotifications = () => {
     toast.info("No new notifications");
@@ -91,29 +135,31 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <TrendCard
             title="Total Balance"
-            value={47250}
-            change={12.5}
+            value={summary?.is_connected ? summary.net_worth : 0}
+            change={summary?.is_connected ? 12.5 : 0}
             icon={<Wallet className="w-4 h-4 text-foreground-muted" />}
             delay={0}
           />
           <TrendCard
             title="Monthly Income"
-            value={9500}
-            change={5.2}
+            value={summary?.is_connected ? summary.monthly_income : 0}
+            change={summary?.is_connected ? 5.2 : 0}
             icon={<TrendingUp className="w-4 h-4 text-success" />}
             delay={50}
           />
           <TrendCard
             title="Monthly Expenses"
-            value={6400}
-            change={-3.1}
+            value={summary?.is_connected ? summary.monthly_spending : 0}
+            change={summary?.is_connected ? -3.1 : 0}
             icon={<CreditCard className="w-4 h-4 text-destructive" />}
             delay={100}
           />
           <TrendCard
             title="Savings Rate"
-            value={32}
-            change={8.4}
+            value={summary?.is_connected && summary.monthly_income > 0 
+              ? Math.round(((summary.monthly_income - summary.monthly_spending) / summary.monthly_income) * 100) 
+              : 0}
+            change={summary?.is_connected ? 8.4 : 0}
             prefix=""
             suffix="%"
             icon={<PiggyBank className="w-4 h-4 text-foreground-muted" />}
@@ -150,45 +196,76 @@ export default function DashboardPage() {
           {/* Quick Stats */}
           <GlassCard delay={250} className="h-[480px]">
             <h2 className="text-sm font-semibold mb-5">Quick Stats</h2>
-            <div className="space-y-4">
-              <motion.div
-                className="p-4 rounded-md bg-secondary/50 border border-border"
-                initial={{ opacity: 0, x: 8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.3 }}
-              >
-                <p className="text-xs text-foreground-muted mb-1.5">Net Worth</p>
-                <p className="text-2xl font-semibold tabular-nums font-mono">$127,340</p>
-                <p className="text-xs text-success mt-1">+2.34% this month</p>
-              </motion.div>
-              <motion.div
-                className="p-4 rounded-md bg-secondary/50 border border-border"
-                initial={{ opacity: 0, x: 8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.35 }}
-              >
-                <p className="text-xs text-foreground-muted mb-1.5">Investments</p>
-                <p className="text-2xl font-semibold tabular-nums font-mono">$63,450</p>
-                <p className="text-xs text-success mt-1">+5.2% this month</p>
-              </motion.div>
-              <motion.div
-                className="p-4 rounded-md bg-secondary/50 border border-border"
-                initial={{ opacity: 0, x: 8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.4 }}
-              >
-                <p className="text-xs text-foreground-muted mb-1.5">Savings Goal</p>
-                <p className="text-2xl font-semibold font-mono">68%</p>
-                <div className="mt-2.5 h-1 bg-border rounded-full overflow-hidden">
-                  <motion.div
-                    className="h-full bg-foreground rounded-full"
-                    initial={{ width: 0 }}
-                    animate={{ width: "68%" }}
-                    transition={{ delay: 0.5, duration: 0.6 }}
-                  />
+            {!summary?.is_connected ? (
+              <div className="flex flex-col items-center justify-center h-full text-center py-8">
+                <div className="p-3 rounded-full bg-secondary mb-3">
+                  <Link2 className="w-6 h-6 text-foreground-muted" />
                 </div>
-              </motion.div>
-            </div>
+                <h3 className="text-sm font-semibold mb-1">Connect Your Accounts</h3>
+                <p className="text-xs text-foreground-muted mb-4 max-w-[200px]">
+                  Link your bank accounts to see your financial data
+                </p>
+                <GlassButton 
+                  variant="primary" 
+                  size="sm"
+                  onClick={() => router.push('/imports')}
+                >
+                  Connect via Plaid
+                </GlassButton>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <motion.div
+                  className="p-4 rounded-md bg-secondary/50 border border-border"
+                  initial={{ opacity: 0, x: 8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.3 }}
+                >
+                  <p className="text-xs text-foreground-muted mb-1.5">Net Worth</p>
+                  <p className="text-2xl font-semibold tabular-nums font-mono">
+                    ${summary.net_worth.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-success mt-1">+2.34% this month</p>
+                </motion.div>
+                <motion.div
+                  className="p-4 rounded-md bg-secondary/50 border border-border"
+                  initial={{ opacity: 0, x: 8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.35 }}
+                >
+                  <p className="text-xs text-foreground-muted mb-1.5">Total Income (12mo)</p>
+                  <p className="text-2xl font-semibold tabular-nums font-mono">
+                    ${summary.total_income.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-success mt-1">+5.2% vs last year</p>
+                </motion.div>
+                <motion.div
+                  className="p-4 rounded-md bg-secondary/50 border border-border"
+                  initial={{ opacity: 0, x: 8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.4 }}
+                >
+                  <p className="text-xs text-foreground-muted mb-1.5">Savings Goal</p>
+                  <p className="text-2xl font-semibold font-mono">
+                    {summary.monthly_income > 0 
+                      ? Math.round(((summary.monthly_income - summary.monthly_spending) / summary.monthly_income) * 100)
+                      : 0}%
+                  </p>
+                  <div className="mt-2.5 h-1 bg-border rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full bg-foreground rounded-full"
+                      initial={{ width: 0 }}
+                      animate={{ 
+                        width: `${summary.monthly_income > 0 
+                          ? Math.min(100, Math.round(((summary.monthly_income - summary.monthly_spending) / summary.monthly_income) * 100))
+                          : 0}%` 
+                      }}
+                      transition={{ delay: 0.5, duration: 0.6 }}
+                    />
+                  </div>
+                </motion.div>
+              </div>
+            )}
           </GlassCard>
         </div>
 

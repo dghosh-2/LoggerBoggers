@@ -4,9 +4,12 @@ import React, { useMemo } from 'react';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
-import { MOCK_TRANSACTIONS } from '@/lib/mock-data';
 import { useInsightsStore } from '@/stores/insights-store';
 import { useThemeStore } from '@/stores/theme-store';
+import { useFinancialData } from '@/hooks/useFinancialData';
+import { Link2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { GlassButton } from '@/components/ui/glass-button';
 
 // Monochrome + accent palette
 const LIGHT_COLORS = [
@@ -28,15 +31,19 @@ const DARK_COLORS = [
 ];
 
 export function AnalysisView() {
+    const router = useRouter();
     const { selectedRange } = useInsightsStore();
     const { theme } = useThemeStore();
+    const { transactions, isConnected, loading } = useFinancialData();
 
     const COLORS = theme === 'dark' ? DARK_COLORS : LIGHT_COLORS;
 
-    // Get top 5 categories by total spend
+    // Get top 5 categories by total spend from real data
     const topCategories = useMemo(() => {
+        if (!isConnected || transactions.length === 0) return [];
+        
         const categoryTotals: Record<string, number> = {};
-        MOCK_TRANSACTIONS.forEach(t => {
+        transactions.forEach(t => {
             categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount;
         });
         
@@ -44,19 +51,22 @@ export function AnalysisView() {
             .sort((a, b) => b[1] - a[1])
             .slice(0, 5)
             .map(([name]) => name);
-    }, []);
+    }, [transactions, isConnected]);
 
     // 1. Aggregate Transactions by Month, condensing small categories into "Other"
     const chartData = useMemo(() => {
+        if (!isConnected || transactions.length === 0) return [];
+        
         const dataMap = new Map<string, any>();
 
-        MOCK_TRANSACTIONS.forEach(t => {
+        transactions.forEach(t => {
             const date = new Date(t.date);
             const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
             const monthLabel = date.toLocaleString('default', { month: 'short', year: '2-digit' });
 
             if (selectedRange === '3M') {
-                const cutoff = new Date('2025-11-01');
+                const cutoff = new Date();
+                cutoff.setMonth(cutoff.getMonth() - 3);
                 if (date < cutoff) return;
             }
 
@@ -77,14 +87,13 @@ export function AnalysisView() {
         });
 
         return Array.from(dataMap.values()).sort((a, b) => a.monthKey.localeCompare(b.monthKey));
-    }, [selectedRange, topCategories]);
+    }, [selectedRange, topCategories, transactions, isConnected]);
 
-    // Categories to display (top 5 + Other)
+    // Categories to display (top 5 + Other) - ensure unique
     const displayCategories = useMemo(() => {
-        const cats = [...topCategories];
-        // Check if there's any "Other" data
+        const cats = [...new Set(topCategories)]; // Ensure unique
         const hasOther = chartData.some(d => d['Other'] > 0);
-        if (hasOther) cats.push('Other');
+        if (hasOther && !cats.includes('Other')) cats.push('Other');
         return cats;
     }, [topCategories, chartData]);
 
@@ -93,6 +102,34 @@ export function AnalysisView() {
         if (category === 'Other') return COLORS[5];
         return COLORS[index % 5];
     };
+
+    // Show connect prompt if not connected
+    if (!loading && !isConnected) {
+        return (
+            <div className="h-full w-full pt-16 p-8 flex flex-col">
+                <div className="mb-6">
+                    <h2 className="text-2xl font-bold text-foreground">Monthly Spending</h2>
+                    <p className="text-foreground-muted text-sm">Analyze your spending trends over time</p>
+                </div>
+                <div className="flex-1 flex flex-col items-center justify-center">
+                    <div className="p-4 rounded-full bg-secondary mb-4">
+                        <Link2 className="w-8 h-8 text-foreground-muted" />
+                    </div>
+                    <h3 className="text-lg font-semibold mb-2">Connect Your Accounts</h3>
+                    <p className="text-sm text-foreground-muted text-center mb-6 max-w-[400px]">
+                        Link your bank accounts via Plaid to see spending analysis
+                    </p>
+                    <GlassButton 
+                        variant="primary" 
+                        size="md"
+                        onClick={() => router.push('/imports')}
+                    >
+                        Connect via Plaid
+                    </GlassButton>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="h-full w-full pt-16 p-8 flex flex-col">

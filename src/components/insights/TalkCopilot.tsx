@@ -3,12 +3,19 @@
 import React, { useState } from 'react';
 import { Send, Bot, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { MOCK_COPILOT_HISTORY } from '@/lib/mock-data';
+
+// Initial empty history - copilot starts fresh
+const INITIAL_HISTORY: { role: string, content: string, actions?: { label: string, action: string }[] }[] = [
+    {
+        role: 'assistant',
+        content: 'Hi! I\'m your financial copilot. Connect your accounts via Plaid to get personalized insights about your spending.',
+    }
+];
 
 export function TalkCopilot() {
     const [input, setInput] = useState('');
     // Explicitly type the history state to allow messages without actions
-    const [history, setHistory] = useState<{ role: string, content: string, actions?: { label: string, action: string }[] }[]>(MOCK_COPILOT_HISTORY);
+    const [history, setHistory] = useState<{ role: string, content: string, actions?: { label: string, action: string }[] }[]>(INITIAL_HISTORY);
 
     const handleSend = () => {
         if (!input.trim()) return;

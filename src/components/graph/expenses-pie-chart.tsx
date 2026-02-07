@@ -1,10 +1,13 @@
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
-import { MOCK_TRANSACTIONS } from '@/lib/mock-data';
 import { useInsightsStore } from '@/stores/insights-store';
 import { useThemeStore } from '@/stores/theme-store';
+import { useFinancialData } from '@/hooks/useFinancialData';
+import { Link2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { GlassButton } from '@/components/ui/glass-button';
 
 // Monochrome + accent palette
 const LIGHT_COLORS = [
@@ -32,8 +35,10 @@ interface CategoryData {
 }
 
 export function ExpensesPieChart() {
+    const router = useRouter();
     const { selectedRange, setSelectedCategory, selectedCategory } = useInsightsStore();
     const { theme } = useThemeStore();
+    const { transactions, isConnected, loading } = useFinancialData();
     const [mounted, setMounted] = React.useState(false);
 
     const COLORS = theme === 'dark' ? DARK_COLORS : LIGHT_COLORS;
@@ -43,13 +48,13 @@ export function ExpensesPieChart() {
     }, []);
 
     const categoryData = useMemo(() => {
-        if (!mounted) return [];
+        if (!mounted || !isConnected || transactions.length === 0) return [];
 
-        const now = new Date('2026-02-01');
-        const rangeTransactions = MOCK_TRANSACTIONS.filter(t => {
+        const now = new Date();
+        const rangeTransactions = transactions.filter(t => {
             const date = new Date(t.date);
             if (selectedRange === 'MTD') {
-                return date.getMonth() === 0 && date.getFullYear() === 2026;
+                return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
             } else if (selectedRange === '3M') {
                 const threeMonthsAgo = new Date(now);
                 threeMonthsAgo.setMonth(now.getMonth() - 3);
@@ -103,7 +108,7 @@ export function ExpensesPieChart() {
         }
 
         return finalData;
-    }, [selectedRange, mounted, COLORS, theme]);
+    }, [selectedRange, mounted, COLORS, theme, transactions, isConnected]);
 
     const totalSpend = useMemo(() => {
         return categoryData.reduce((sum, cat) => sum + cat.value, 0);
@@ -134,6 +139,37 @@ export function ExpensesPieChart() {
     };
 
     if (!mounted) return null;
+
+    // Show connect prompt if not connected
+    if (!isConnected) {
+        return (
+            <div className="h-full w-full flex flex-col items-center justify-center p-8">
+                <div className="p-4 rounded-full bg-secondary mb-4">
+                    <Link2 className="w-8 h-8 text-foreground-muted" />
+                </div>
+                <h3 className="text-lg font-semibold mb-2">Connect Your Accounts</h3>
+                <p className="text-sm text-foreground-muted text-center mb-6 max-w-[300px]">
+                    Link your bank accounts via Plaid to see your spending breakdown and insights
+                </p>
+                <GlassButton 
+                    variant="primary" 
+                    size="md"
+                    onClick={() => router.push('/imports')}
+                >
+                    Connect via Plaid
+                </GlassButton>
+            </div>
+        );
+    }
+
+    // Show loading state
+    if (loading) {
+        return (
+            <div className="h-full w-full flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+        );
+    }
 
     return (
         <div className="h-full w-full flex flex-col items-center justify-center p-4 pt-16 relative">

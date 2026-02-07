@@ -11,9 +11,7 @@
   "dependencies": {
     "@humeai/voice-react": "^0.2.13",
     "@pixi/react": "^8.0.5",
-    "@react-three/drei": "^10.7.7",
-    "@react-three/fiber": "^9.5.0",
-    "@types/three": "^0.182.0",
+    "@supabase/supabase-js": "^2.95.3",
     "axios": "^1.13.4",
     "cheerio": "^1.2.0",
     "class-variance-authority": "^0.7.1",
@@ -31,9 +29,7 @@
     "react-plaid-link": "^4.1.1",
     "reactflow": "^11.11.4",
     "recharts": "^3.7.0",
-    "simplex-noise": "^4.0.3",
     "tailwind-merge": "^3.4.0",
-    "three": "^0.182.0",
     "yahoo-finance2": "^3.13.0",
     "zod": "^4.3.6",
     "zustand": "^5.0.11"

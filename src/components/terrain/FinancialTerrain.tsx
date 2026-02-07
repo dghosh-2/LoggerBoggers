@@ -3,7 +3,6 @@
 import { useRef, useMemo, useEffect } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { MOCK_TRANSACTIONS } from "@/lib/mock-data";
 import {
     aggregateTransactionsByWeek,
     generateHeightMap,
@@ -11,6 +10,7 @@ import {
     CATEGORY_COLORS,
 } from "@/lib/terrain-utils";
 import { useTerrainStore } from "@/stores/terrain-store";
+import { useFinancialData } from "@/hooks/useFinancialData";
 
 interface FinancialTerrainProps {
     width?: number;
@@ -20,11 +20,13 @@ interface FinancialTerrainProps {
 export function FinancialTerrain({ width = 64, depth = 32 }: FinancialTerrainProps) {
     const meshRef = useRef<THREE.Mesh>(null);
     const { currentDate, activeCategories, startDate, endDate } = useTerrainStore();
+    const { transactions, summary, isConnected } = useFinancialData();
+    const monthlyIncome = isConnected ? (summary?.monthly_income || 0) : 0;
 
     // Generate terrain data based on current state
     const terrainData = useMemo(() => {
         // Filter transactions up to current date
-        const filteredTransactions = MOCK_TRANSACTIONS.filter(
+        const filteredTransactions = (!isConnected || transactions.length === 0) ? [] : transactions.filter(
             t => new Date(t.date) <= currentDate
         );
 
@@ -32,14 +34,15 @@ export function FinancialTerrain({ width = 64, depth = 32 }: FinancialTerrainPro
             filteredTransactions,
             startDate,
             new Date(Math.min(currentDate.getTime(), endDate.getTime())),
-            activeCategories
+            activeCategories,
+            monthlyIncome
         );
 
         const heightMap = generateHeightMap(dataPoints, width, depth);
         applyTerrainSmoothing(heightMap.heights, width, depth);
 
         return heightMap;
-    }, [currentDate, activeCategories, startDate, endDate, width, depth]);
+    }, [currentDate, activeCategories, startDate, endDate, width, depth, transactions, isConnected, monthlyIncome]);
 
     // Create geometry with heights and colors
     const geometry = useMemo(() => {
