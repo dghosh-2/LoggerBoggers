@@ -30,10 +30,7 @@ export function InsightsLayout() {
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6 flex-shrink-0">
                     <div>
-                        <h1 className="text-3xl font-semibold tracking-tight flex items-center gap-3">
-                            <div className="p-2 rounded-xl bg-primary/10">
-                                <Sparkles className="w-6 h-6 text-primary" />
-                            </div>
+                        <h1 className="text-2xl font-semibold tracking-tight">
                             Insights
                         </h1>
                         <p className="text-foreground-muted mt-1">
