@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { plaidClient } from '@/lib/plaid-client';
-import { supabase, Transaction, Income } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { generateFiveYearsOfTransactions, generateFiveYearsOfIncome } from '@/lib/fake-transaction-generator';
 
 // Map Plaid categories to our simplified categories
@@ -44,18 +44,21 @@ export async function POST(request: NextRequest) {
     try {
         const { item_id } = await request.json();
         
-        // Get access token from global storage
-        const storedTokens = (global as any).plaidAccessTokens as Map<string, { accessToken: string; itemId: string; institution: string }> | undefined;
+        // Get access token from Supabase
+        const { data: plaidItem, error: itemError } = await supabase
+            .from('plaid_items')
+            .select('access_token, institution_name')
+            .eq('item_id', item_id)
+            .single();
         
-        if (!storedTokens || !storedTokens.has(item_id)) {
+        if (itemError || !plaidItem) {
             return NextResponse.json(
                 { error: 'No access token found for this item' },
                 { status: 400 }
             );
         }
         
-        const tokenData = storedTokens.get(item_id)!;
-        const accessToken = tokenData.accessToken;
+        const accessToken = plaidItem.access_token;
         
         // Fetch transactions from Plaid (last 90 days)
         const now = new Date();
@@ -71,13 +74,14 @@ export async function POST(request: NextRequest) {
         const plaidTransactions = transactionsResponse.data.transactions;
         
         // Convert Plaid transactions to our format
-        const formattedPlaidTransactions: Transaction[] = plaidTransactions.map(tx => {
+        const formattedPlaidTransactions = plaidTransactions.map(tx => {
             const category = mapPlaidCategory(tx.category);
             const isFoodRelated = category === 'Food & Drink';
             
             return {
+                user_id: 'default_user',
                 plaid_transaction_id: tx.transaction_id,
-                amount: Math.abs(tx.amount), // Plaid uses negative for debits
+                amount: Math.abs(tx.amount),
                 category,
                 name: tx.name,
                 tip: isFoodRelated ? Math.round(Math.abs(tx.amount) * 0.15 * 100) / 100 : null,
@@ -131,6 +135,8 @@ export async function POST(request: NextRequest) {
             plaid_item_id: item_id,
             connected_at: new Date().toISOString(),
             last_sync_at: new Date().toISOString(),
+        }, {
+            onConflict: 'user_id',
         });
         
         return NextResponse.json({
