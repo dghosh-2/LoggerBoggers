@@ -1,7 +1,8 @@
 import { Configuration, PlaidApi, PlaidEnvironments } from 'plaid';
 
+// Force sandbox environment
 const configuration = new Configuration({
-    basePath: PlaidEnvironments[process.env.PLAID_ENV as keyof typeof PlaidEnvironments] || PlaidEnvironments.sandbox,
+    basePath: PlaidEnvironments.sandbox, // Explicitly use sandbox
     baseOptions: {
         headers: {
             'PLAID-CLIENT-ID': process.env.PLAID_CLIENT_ID,
@@ -9,5 +10,7 @@ const configuration = new Configuration({
         },
     },
 });
+
+console.log('Plaid configured for SANDBOX environment');
 
 export const plaidClient = new PlaidApi(configuration);
