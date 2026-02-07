@@ -9,6 +9,8 @@ import { SavingsGoalsGrid } from '@/components/budget/SavingsGoalsGrid';
 import { CategoryBreakdown } from '@/components/budget/CategoryBreakdown';
 import { UpcomingEvents } from '@/components/budget/UpcomingEvents';
 import { BudgetInsights } from '@/components/budget/BudgetInsights';
+import { QuickInsights } from '@/components/budget/QuickInsights';
+import { TrendsAnalytics } from '@/components/budget/TrendsAnalytics';
 import { CreateGoalModal } from '@/components/budget/CreateGoalModal';
 import { AdjustBudgetModal } from '@/components/budget/AdjustBudgetModal';
 import { PageTransition } from '@/components/layout/page-transition';
@@ -29,6 +31,7 @@ function BudgetPageContent() {
         isLoading,
         isInitialized,
         initialize,
+        trendAnalytics,
     } = useBudgetStore();
 
     const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
@@ -90,6 +93,15 @@ function BudgetPageContent() {
                         <BudgetOverview />
                     </motion.div>
 
+                    {/* Section 1.5: Quick Insights (compact actionable cards) */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.15 }}
+                    >
+                        <QuickInsights maxItems={3} />
+                    </motion.div>
+
                     {/* Section 2: Savings Goals */}
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
@@ -117,13 +129,25 @@ function BudgetPageContent() {
                         <UpcomingEvents />
                     </motion.div>
 
-                    {/* Section 5: AI Insights */}
+                    {/* Section 5: AI Insights (full detail with reasoning) */}
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.5 }}
                     >
                         <BudgetInsights />
+                    </motion.div>
+
+                    {/* Section 6: Trends & Analytics (charts & data) */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.6 }}
+                    >
+                        <TrendsAnalytics
+                            analytics={trendAnalytics}
+                            onEditCategory={() => setIsAdjustModalOpen(true)}
+                        />
                     </motion.div>
                 </div>
             </div>

@@ -12,7 +12,8 @@ import type {
     BudgetPriority,
     CategoryBudget,
     BudgetSummary,
-    AutopilotConfig
+    AutopilotConfig,
+    BudgetSimulationResult,
 } from '@/types/budget';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -309,6 +310,149 @@ export function generateBudgetSummary(
         safeToSpend: Math.round(safeToSpend * 100) / 100,
         daysRemaining,
         categoryBudgets,
+    };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// REAL-TIME BUDGET RECALCULATOR
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Recalculate ALL budget metrics when any category allocation changes.
+ * This is the single source of truth for metric computation.
+ */
+export function recalculateBudgetMetrics(
+    config: AutopilotConfig,
+    updatedCategoryBudgets: CategoryBudget[],
+    accountBalance: number,
+    upcomingBills: number
+): BudgetSummary {
+    const now = new Date();
+    const month = now.toISOString().substring(0, 7);
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const daysRemaining = Math.max(1, daysInMonth - now.getDate());
+
+    // Recalculate totals from the updated categories
+    const totalBudget = updatedCategoryBudgets.reduce((sum, c) => sum + c.allocated, 0);
+    const totalSpent = updatedCategoryBudgets.reduce((sum, c) => sum + c.spent, 0);
+    const fixedCosts = updatedCategoryBudgets
+        .filter(c => c.isFixed)
+        .reduce((sum, c) => sum + c.allocated, 0);
+
+    // Recalculate savings
+    const discretionaryPool = config.monthlyIncome - fixedCosts;
+    const savingsTarget = config.monthlyIncome * (config.savingsTargetPercentage / 100);
+    const savingsActual = Math.max(0, config.monthlyIncome - totalSpent);
+
+    // Recalculate safe to spend
+    const budgetRemaining = totalBudget - totalSpent;
+    const dailyBudget = daysRemaining > 0 ? budgetRemaining / daysRemaining : 0;
+    const safeToSpend = Math.max(0, budgetRemaining - upcomingBills);
+
+    // Recalculate each category's status
+    const recalculatedBudgets = updatedCategoryBudgets.map(cat => {
+        const remaining = cat.allocated - cat.spent;
+        const percentUsed = cat.allocated > 0 ? (cat.spent / cat.allocated) * 100 : 0;
+
+        let status: 'healthy' | 'warning' | 'danger';
+        if (percentUsed >= DANGER_THRESHOLD * 100) {
+            status = 'danger';
+        } else if (percentUsed >= WARNING_THRESHOLD * 100) {
+            status = 'warning';
+        } else {
+            status = 'healthy';
+        }
+
+        return {
+            ...cat,
+            remaining: Math.round(remaining * 100) / 100,
+            percentUsed: Math.round(percentUsed * 10) / 10,
+            status,
+        };
+    });
+
+    return {
+        month,
+        totalIncome: config.monthlyIncome,
+        fixedCosts,
+        savingsTarget,
+        savingsActual: Math.round(savingsActual * 100) / 100,
+        totalBudget: Math.round(totalBudget * 100) / 100,
+        totalSpent: Math.round(totalSpent * 100) / 100,
+        safeToSpend: Math.round(safeToSpend * 100) / 100,
+        daysRemaining,
+        categoryBudgets: recalculatedBudgets,
+    };
+}
+
+/**
+ * Simulate budget changes without persisting them.
+ * Returns a preview of what all metrics would look like with the proposed changes.
+ */
+export function simulateBudgetChanges(
+    currentSummary: BudgetSummary,
+    config: AutopilotConfig,
+    proposedChanges: Record<string, number>, // category → new allocation
+    accountBalance: number,
+    upcomingBills: number
+): BudgetSimulationResult {
+    // Apply proposed changes to a copy of category budgets
+    const simulated = currentSummary.categoryBudgets.map(cat => {
+        const newAllocation = proposedChanges[cat.category];
+        if (newAllocation !== undefined) {
+            return {
+                ...cat,
+                allocated: newAllocation,
+                remaining: newAllocation - cat.spent,
+            };
+        }
+        return { ...cat };
+    });
+
+    // Recalculate using the same engine
+    const newSummary = recalculateBudgetMetrics(config, simulated, accountBalance, upcomingBills);
+
+    // Determine status changes
+    const categoryStatuses = currentSummary.categoryBudgets.map(oldCat => {
+        const newCat = newSummary.categoryBudgets.find(c => c.category === oldCat.category);
+        return {
+            category: oldCat.category,
+            oldStatus: oldCat.status,
+            newStatus: newCat?.status || oldCat.status,
+        };
+    });
+
+    // Build warnings
+    const warnings: string[] = [];
+
+    if (newSummary.totalBudget > config.monthlyIncome) {
+        warnings.push(
+            `Total budget ($${newSummary.totalBudget.toLocaleString()}) exceeds monthly income ($${config.monthlyIncome.toLocaleString()})`
+        );
+    }
+
+    if (newSummary.savingsActual < newSummary.savingsTarget * 0.5) {
+        warnings.push(
+            `Savings would drop to $${newSummary.savingsActual.toLocaleString()}, less than half your target`
+        );
+    }
+
+    const statusDowngrades = categoryStatuses.filter(
+        cs => cs.oldStatus === 'healthy' && (cs.newStatus === 'warning' || cs.newStatus === 'danger')
+    );
+    if (statusDowngrades.length > 0) {
+        warnings.push(
+            `${statusDowngrades.map(s => s.category).join(', ')} would enter ${statusDowngrades[0].newStatus} status`
+        );
+    }
+
+    return {
+        newTotalBudget: newSummary.totalBudget,
+        newSafeToSpend: newSummary.safeToSpend,
+        newSavingsTarget: newSummary.savingsTarget,
+        newSavingsActual: newSummary.savingsActual,
+        categoryStatuses,
+        warnings,
     };
 }
 

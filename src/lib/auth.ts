@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export interface AuthUser {
     id: string;
@@ -21,7 +21,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
         }
 
         // Find session
-        const { data: session, error: sessionError } = await supabase
+        const { data: session, error: sessionError } = await supabaseAdmin
             .from('sessions')
             .select('user_id, expires_at')
             .eq('token', token)
@@ -37,7 +37,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
         }
 
         // Get user
-        const { data: user, error: userError } = await supabase
+        const { data: user, error: userError } = await supabaseAdmin
             .from('users')
             .select('id, username, display_name')
             .eq('id', session.user_id)
@@ -76,7 +76,7 @@ export async function getUserIdFromRequest(request: Request): Promise<string | n
         const token = cookies['session_token'];
         if (!token) return null;
 
-        const { data: session } = await supabase
+        const { data: session } = await supabaseAdmin
             .from('sessions')
             .select('user_id, expires_at')
             .eq('token', token)

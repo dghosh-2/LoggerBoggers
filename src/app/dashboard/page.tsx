@@ -1,43 +1,42 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
-  Wallet,
   TrendingUp,
+  TrendingDown,
   CreditCard,
-  PiggyBank,
-  ArrowUpRight,
   Bell,
   Calendar,
-  X,
   ChevronRight,
-  Link2
+  Link2,
+  ArrowUpRight,
 } from "lucide-react";
+import {
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
 import { PageTransition } from "@/components/layout/page-transition";
 import { GlassCard } from "@/components/ui/glass-card";
-import { TrendCard } from "@/components/cards/trend-card";
-import { CashflowChart } from "@/components/charts/cashflow-chart";
-import { TimelineChart } from "@/components/charts/timeline-chart";
-import { FinancialGraph } from "@/components/graph/financial-graph";
 import { Modal } from "@/components/ui/modal";
 import { toast } from "@/components/ui/toast";
 import { useInsightsStore } from "@/stores/insights-store";
 import { GlassButton } from "@/components/ui/glass-button";
 import { DogLoadingAnimation } from "@/components/ui/DogLoadingAnimation";
-
-interface FinancialSummary {
-  is_connected: boolean;
-  total_spending: number;
-  total_income: number;
-  net_worth: number;
-  monthly_spending: number;
-  monthly_income: number;
-  spending_by_category: Record<string, number>;
-  recent_transactions: Array<{ name: string; amount: number; category: string; date: string }>;
-  monthly_trend: Array<{ month: string; spending: number; income: number }>;
-}
+import { useFinancialData } from "@/hooks/useFinancialData";
 
 interface DisplayTransaction {
   id: string;
@@ -47,54 +46,34 @@ interface DisplayTransaction {
   date: string;
 }
 
+const CATEGORY_COLORS: Record<string, string> = {
+  'Shopping': '#8B5CF6',
+  'Food & Drink': '#F59E0B',
+  'Bills & Utilities': '#3B82F6',
+  'Transportation': '#10B981',
+  'Health & Fitness': '#EC4899',
+  'Entertainment': '#6366F1',
+  'Personal Care': '#14B8A6',
+  'Travel': '#F97316',
+  'Education': '#A855F7',
+  'Other': '#6B7280',
+};
+
 export default function DashboardPage() {
   const router = useRouter();
   const { setCurrentView } = useInsightsStore();
-  const [isGraphExpanded, setIsGraphExpanded] = useState(false);
-  const [isTransactionsOpen, setIsTransactionsOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<DisplayTransaction | null>(null);
-  const [summary, setSummary] = useState<FinancialSummary | null>(null);
-  const [loading, setLoading] = useState(true);
+  
+  // Use the financial data hook for consistent data fetching and caching
+  const { summary, loading, refetch } = useFinancialData();
 
-  // Convert API transactions to display format
   const transactions: DisplayTransaction[] = (summary?.recent_transactions || []).map((tx, index) => ({
     id: `tx-${index}`,
     description: tx.name,
-    amount: -tx.amount, // Expenses are negative for display
+    amount: -tx.amount,
     category: tx.category,
     date: new Date(tx.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
   }));
-
-  useEffect(() => {
-    fetchSummary();
-  }, []);
-
-  const fetchSummary = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch('/api/data/summary');
-      const data = await response.json();
-      setSummary(data);
-    } catch (error) {
-      console.error('Error fetching summary:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Convert summary data to chart format
-  const cashflowData = summary?.monthly_trend?.map(item => ({
-    month: item.month,
-    income: item.income,
-    expenses: item.spending,
-    savings: item.income - item.spending,
-  })) || [];
-
-  const spendingData = summary?.monthly_trend?.map(item => ({
-    month: item.month,
-    spending: item.spending,
-    budget: 6500, // Default budget
-  })) || [];
 
   const handleNotifications = () => {
     toast.info("No new notifications");
@@ -105,6 +84,27 @@ export default function DashboardPage() {
     router.push('/insights');
   };
 
+  // Prepare chart data
+  const incomeVsSpendingData = summary?.monthly_trend?.map(item => ({
+    month: item.month,
+    Income: item.income,
+    Spending: item.spending,
+  })) || [];
+
+  const categoryData = Object.entries(summary?.spending_by_category || {})
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([name, value]) => ({
+      name,
+      value,
+      color: CATEGORY_COLORS[name] || '#6B7280',
+    }));
+
+  const savingsData = summary?.monthly_trend?.map(item => ({
+    month: item.month,
+    savings: item.income - item.spending,
+  })) || [];
+
   // Show loading state
   if (loading) {
     return (
@@ -113,42 +113,81 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-              <p className="text-foreground-muted text-sm mt-1">
-                Your financial overview
-              </p>
+              <p className="text-foreground-muted text-sm mt-1">Your financial overview</p>
             </div>
           </div>
           <GlassCard>
-            <DogLoadingAnimation 
-              message="Loading your financial dashboard..."
-              size="lg"
-            />
+            <DogLoadingAnimation message="Loading your financial dashboard..." size="lg" />
           </GlassCard>
         </div>
       </PageTransition>
     );
   }
 
+  // Not connected state
+  if (!summary?.is_connected) {
+    return (
+      <PageTransition>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+              <p className="text-foreground-muted text-sm mt-1">Your financial overview</p>
+            </div>
+          </div>
+          <GlassCard className="py-16">
+            <div className="flex flex-col items-center justify-center text-center">
+              <div className="p-4 rounded-full bg-secondary mb-4">
+                <Link2 className="w-8 h-8 text-foreground-muted" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">Connect Your Accounts</h3>
+              <p className="text-sm text-foreground-muted mb-6 max-w-sm">
+                Link your bank accounts to see your financial data and insights
+              </p>
+              <GlassButton variant="primary" onClick={() => router.push('/imports')}>
+                Connect via Plaid
+              </GlassButton>
+            </div>
+          </GlassCard>
+        </div>
+      </PageTransition>
+    );
+  }
+
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload?.length) return null;
+    return (
+      <div className="bg-card border border-border rounded-lg shadow-lg p-3">
+        <p className="text-xs font-medium mb-2">{label}</p>
+        {payload.map((entry: any, index: number) => (
+          <div key={index} className="flex items-center gap-2 text-xs">
+            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+            <span className="text-foreground-muted">{entry.name}:</span>
+            <span className="font-semibold font-mono">${entry.value?.toLocaleString()}</span>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <PageTransition>
-      <div className="space-y-8">
-        {/* Header */}
+      <div className="space-y-4">
+        {/* Header - Compact */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-            <p className="text-foreground-muted text-sm mt-1">
-              Your financial overview
-            </p>
+            <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
+            <p className="text-foreground-muted text-xs">Your financial overview</p>
           </div>
           <div className="flex items-center gap-1">
             <button
-              className="p-2 rounded-md hover:bg-secondary transition-colors duration-100 cursor-pointer"
+              className="p-1.5 rounded-md hover:bg-secondary transition-colors cursor-pointer"
               onClick={handleNotifications}
             >
               <Bell className="w-4 h-4 text-foreground-muted" />
             </button>
             <button
-              className="p-2 rounded-md hover:bg-secondary transition-colors duration-100 cursor-pointer"
+              className="p-1.5 rounded-md hover:bg-secondary transition-colors cursor-pointer"
               onClick={handleCalendar}
             >
               <Calendar className="w-4 h-4 text-foreground-muted" />
@@ -156,255 +195,277 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <TrendCard
-            title="Total Balance"
-            value={summary?.is_connected ? summary.net_worth : 0}
-            change={summary?.is_connected ? 12.5 : 0}
-            icon={<Wallet className="w-4 h-4 text-foreground-muted" />}
-            delay={0}
-          />
-          <TrendCard
-            title="Monthly Income"
-            value={summary?.is_connected ? summary.monthly_income : 0}
-            change={summary?.is_connected ? 5.2 : 0}
-            icon={<TrendingUp className="w-4 h-4 text-success" />}
-            delay={50}
-          />
-          <TrendCard
-            title="Monthly Expenses"
-            value={summary?.is_connected ? summary.monthly_spending : 0}
-            change={summary?.is_connected ? -3.1 : 0}
-            icon={<CreditCard className="w-4 h-4 text-destructive" />}
-            delay={100}
-          />
-          <TrendCard
-            title="Savings Rate"
-            value={summary?.is_connected && summary.monthly_income > 0 
-              ? Math.round(((summary.monthly_income - summary.monthly_spending) / summary.monthly_income) * 100) 
-              : 0}
-            change={summary?.is_connected ? 8.4 : 0}
-            prefix=""
-            suffix="%"
-            icon={<PiggyBank className="w-4 h-4 text-foreground-muted" />}
-            delay={150}
-          />
-        </div>
-
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Financial Graph */}
-          <div className="lg:col-span-2">
-            <GlassCard delay={200} className="h-[480px] flex flex-col">
-              <div className="flex items-center justify-between mb-4 flex-shrink-0">
-                <div>
-                  <h2 className="text-sm font-semibold">Money Flow</h2>
-                  <p className="text-xs text-foreground-muted mt-0.5">
-                    Interactive financial graph
-                  </p>
-                </div>
-                <button
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-border hover:bg-secondary transition-colors duration-100 cursor-pointer"
-                  onClick={() => setIsGraphExpanded(true)}
-                >
-                  Expand
-                  <ArrowUpRight className="w-3 h-3" />
-                </button>
+        {/* Main Charts Grid - 2x2 - Compact to fit without scrolling */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          
+          {/* Income vs Spending Line Chart */}
+          <GlassCard delay={100} className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <h2 className="text-sm font-semibold">Income vs Spending</h2>
+                <p className="text-[10px] text-foreground-muted">12-month trend</p>
               </div>
-              <div className="flex-1 min-h-0 -mx-3 -mb-3">
-                <FinancialGraph />
-              </div>
-            </GlassCard>
-          </div>
-
-          {/* Quick Stats */}
-          <GlassCard delay={250} className="h-[480px]">
-            <h2 className="text-sm font-semibold mb-5">Quick Stats</h2>
-            {!summary?.is_connected ? (
-              <div className="flex flex-col items-center justify-center h-full text-center py-8">
-                <div className="p-3 rounded-full bg-secondary mb-3">
-                  <Link2 className="w-6 h-6 text-foreground-muted" />
+              <div className="flex items-center gap-3 text-[10px]">
+                <div className="flex items-center gap-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-success" />
+                  <span className="text-foreground-muted">Income</span>
                 </div>
-                <h3 className="text-sm font-semibold mb-1">Connect Your Accounts</h3>
-                <p className="text-xs text-foreground-muted mb-4 max-w-[200px]">
-                  Link your bank accounts to see your financial data
-                </p>
-                <GlassButton 
-                  variant="primary" 
-                  size="sm"
-                  onClick={() => router.push('/imports')}
-                >
-                  Connect via Plaid
-                </GlassButton>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <motion.div
-                  className="p-4 rounded-md bg-secondary/50 border border-border"
-                  initial={{ opacity: 0, x: 8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.3 }}
-                >
-                  <p className="text-xs text-foreground-muted mb-1.5">Net Worth</p>
-                  <p className="text-2xl font-semibold tabular-nums font-mono">
-                    ${summary.net_worth.toLocaleString()}
-                  </p>
-                  <p className="text-xs text-success mt-1">+2.34% this month</p>
-                </motion.div>
-                <motion.div
-                  className="p-4 rounded-md bg-secondary/50 border border-border"
-                  initial={{ opacity: 0, x: 8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.35 }}
-                >
-                  <p className="text-xs text-foreground-muted mb-1.5">Total Income (12mo)</p>
-                  <p className="text-2xl font-semibold tabular-nums font-mono">
-                    ${summary.total_income.toLocaleString()}
-                  </p>
-                  <p className="text-xs text-success mt-1">+5.2% vs last year</p>
-                </motion.div>
-                <motion.div
-                  className="p-4 rounded-md bg-secondary/50 border border-border"
-                  initial={{ opacity: 0, x: 8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.4 }}
-                >
-                  <p className="text-xs text-foreground-muted mb-1.5">Savings Goal</p>
-                  <p className="text-2xl font-semibold font-mono">
-                    {summary.monthly_income > 0 
-                      ? Math.round(((summary.monthly_income - summary.monthly_spending) / summary.monthly_income) * 100)
-                      : 0}%
-                  </p>
-                  <div className="mt-2.5 h-1 bg-border rounded-full overflow-hidden">
-                    <motion.div
-                      className="h-full bg-foreground rounded-full"
-                      initial={{ width: 0 }}
-                      animate={{ 
-                        width: `${summary.monthly_income > 0 
-                          ? Math.min(100, Math.round(((summary.monthly_income - summary.monthly_spending) / summary.monthly_income) * 100))
-                          : 0}%` 
-                      }}
-                      transition={{ delay: 0.5, duration: 0.6 }}
-                    />
-                  </div>
-                </motion.div>
-              </div>
-            )}
-          </GlassCard>
-        </div>
-
-        {/* Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <CashflowChart data={cashflowData} delay={300} />
-          <TimelineChart data={spendingData} delay={350} />
-        </div>
-
-        {/* Recent Transactions */}
-        <GlassCard delay={400}>
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="text-sm font-semibold">Recent Transactions</h2>
-            <button
-              className="text-xs font-medium text-foreground-muted hover:text-foreground transition-colors cursor-pointer"
-              onClick={() => setIsTransactionsOpen(true)}
-            >
-              View all
-            </button>
-          </div>
-          <div className="space-y-0 divide-y divide-border">
-            {transactions.slice(0, 5).map((tx, index) => (
-              <motion.div
-                key={tx.id}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.4 + index * 0.03 }}
-                className="flex items-center justify-between py-3 first:pt-0 last:pb-0 cursor-pointer hover:opacity-75 transition-opacity"
-                onClick={() => setSelectedTransaction(tx)}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-md flex items-center justify-center ${tx.amount > 0 ? "bg-success-soft" : "bg-secondary"
-                    }`}>
-                    {tx.amount > 0 ? (
-                      <TrendingUp className="w-3.5 h-3.5 text-success" />
-                    ) : (
-                      <CreditCard className="w-3.5 h-3.5 text-foreground-muted" />
-                    )}
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm">{tx.description}</p>
-                    <p className="text-xs text-foreground-muted">{tx.category}</p>
-                  </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-destructive" />
+                  <span className="text-foreground-muted">Spending</span>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <p className={`text-sm font-medium tabular-nums font-mono ${tx.amount > 0 ? "text-success" : ""}`}>
-                      {tx.amount > 0 ? "+" : ""}${Math.abs(tx.amount).toLocaleString()}
-                    </p>
-                    <p className="text-xs text-foreground-muted">{tx.date}</p>
-                  </div>
-                  <ChevronRight className="w-3.5 h-3.5 text-foreground-muted" />
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </GlassCard>
-      </div>
-
-      {/* Expanded Graph Modal */}
-      <Modal
-        isOpen={isGraphExpanded}
-        onClose={() => setIsGraphExpanded(false)}
-        title="Money Flow"
-        subtitle="Drag to pan, hover for details"
-        size="full"
-      >
-        <div className="p-4 h-[75vh]">
-          <FinancialGraph />
-        </div>
-      </Modal>
-
-      {/* All Transactions Modal */}
-      <Modal
-        isOpen={isTransactionsOpen}
-        onClose={() => setIsTransactionsOpen(false)}
-        title="All Transactions"
-        subtitle={`${transactions.length} total transactions`}
-        size="lg"
-      >
-        <div className="p-6 max-h-[60vh] overflow-auto divide-y divide-border">
-          {transactions.map((tx) => (
-            <div
-              key={tx.id}
-              className="flex items-center justify-between py-3 cursor-pointer hover:opacity-75 transition-opacity"
-              onClick={() => {
-                setIsTransactionsOpen(false);
-                setSelectedTransaction(tx);
-              }}
-            >
-              <div className="flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-md flex items-center justify-center ${tx.amount > 0 ? "bg-success-soft" : "bg-secondary"
-                  }`}>
-                  {tx.amount > 0 ? (
-                    <TrendingUp className="w-3.5 h-3.5 text-success" />
-                  ) : (
-                    <CreditCard className="w-3.5 h-3.5 text-foreground-muted" />
-                  )}
-                </div>
-                <div>
-                  <p className="font-medium text-sm">{tx.description}</p>
-                  <p className="text-xs text-foreground-muted">{tx.category}</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className={`text-sm font-medium tabular-nums font-mono ${tx.amount > 0 ? "text-success" : ""}`}>
-                  {tx.amount > 0 ? "+" : ""}${Math.abs(tx.amount).toLocaleString()}
-                </p>
-                <p className="text-xs text-foreground-muted">{tx.date}</p>
               </div>
             </div>
-          ))}
+            <div className="h-[140px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={incomeVsSpendingData} margin={{ top: 5, right: 5, left: -15, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis 
+                    dataKey="month" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: 'var(--foreground-muted)', fontSize: 9 }} 
+                  />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: 'var(--foreground-muted)', fontSize: 9 }}
+                    tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Line 
+                    type="monotone" 
+                    dataKey="Income" 
+                    stroke="var(--success)" 
+                    strokeWidth={1.5} 
+                    dot={false}
+                    activeDot={{ r: 3, strokeWidth: 0 }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="Spending" 
+                    stroke="var(--destructive)" 
+                    strokeWidth={1.5} 
+                    dot={false}
+                    activeDot={{ r: 3, strokeWidth: 0 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            {/* Bottom stats - compact */}
+            <div className="flex gap-3 mt-2 pt-2 border-t border-border">
+              <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-secondary/50 flex-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-success" />
+                <div>
+                  <p className="text-[9px] text-foreground-muted">Income</p>
+                  <p className="text-xs font-semibold font-mono text-success">
+                    ${summary.monthly_income.toLocaleString()}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-secondary/50 flex-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-destructive" />
+                <div>
+                  <p className="text-[9px] text-foreground-muted">Spending</p>
+                  <p className="text-xs font-semibold font-mono text-destructive">
+                    ${summary.monthly_spending.toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </GlassCard>
+
+          {/* Savings Trend Area Chart */}
+          <GlassCard delay={150} className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <h2 className="text-sm font-semibold">Monthly Savings</h2>
+                <p className="text-[10px] text-foreground-muted">Net savings over time</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[9px] text-foreground-muted">Net Worth</p>
+                <p className={`text-sm font-bold font-mono ${summary.net_worth >= 0 ? 'text-success' : 'text-destructive'}`}>
+                  ${summary.net_worth.toLocaleString()}
+                </p>
+              </div>
+            </div>
+            <div className="h-[140px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={savingsData} margin={{ top: 5, right: 5, left: -15, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="savingsGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis 
+                    dataKey="month" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: 'var(--foreground-muted)', fontSize: 9 }} 
+                  />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: 'var(--foreground-muted)', fontSize: 9 }}
+                    tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Area 
+                    type="monotone" 
+                    dataKey="savings" 
+                    name="Savings"
+                    stroke="var(--primary)" 
+                    strokeWidth={1.5}
+                    fill="url(#savingsGradient)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+            {/* Savings rate - compact */}
+            <div className="mt-2 pt-2 border-t border-border">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] text-foreground-muted">Savings Rate</span>
+                <span className="text-[10px] font-semibold">
+                  {summary.monthly_income > 0 
+                    ? Math.round(((summary.monthly_income - summary.monthly_spending) / summary.monthly_income) * 100)
+                    : 0}%
+                </span>
+              </div>
+              <div className="h-1 bg-secondary rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-primary rounded-full"
+                  initial={{ width: 0 }}
+                  animate={{ 
+                    width: `${Math.min(100, Math.max(0, summary.monthly_income > 0 
+                      ? ((summary.monthly_income - summary.monthly_spending) / summary.monthly_income) * 100 
+                      : 0))}%` 
+                  }}
+                  transition={{ duration: 0.8, delay: 0.3 }}
+                />
+              </div>
+            </div>
+          </GlassCard>
+
+          {/* Category Breakdown */}
+          <GlassCard delay={200} className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <h2 className="text-sm font-semibold">Spending by Category</h2>
+                <p className="text-[10px] text-foreground-muted">This month</p>
+              </div>
+              <span className="text-xs font-bold font-mono">${summary.monthly_spending.toLocaleString()}</span>
+            </div>
+            <div className="flex items-center gap-4">
+              {/* Pie Chart - smaller */}
+              <div className="w-[120px] h-[120px] flex-shrink-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={categoryData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={35}
+                      outerRadius={55}
+                      paddingAngle={2}
+                      dataKey="value"
+                    >
+                      {categoryData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-card border border-border rounded-lg shadow-lg p-2">
+                            <p className="text-[10px] font-medium">{data.name}</p>
+                            <p className="text-[10px] font-mono">${data.value.toLocaleString()}</p>
+                          </div>
+                        );
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              {/* Legend - compact */}
+              <div className="flex-1 space-y-1 max-h-[140px] overflow-y-auto">
+                {categoryData.map((cat, index) => (
+                  <motion.div
+                    key={cat.name}
+                    className="flex items-center justify-between"
+                    initial={{ opacity: 0, x: 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.3 + index * 0.03 }}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: cat.color }} />
+                      <span className="text-[10px] text-foreground-muted truncate max-w-[80px]">{cat.name}</span>
+                    </div>
+                    <span className="text-[10px] font-mono font-medium">${cat.value.toLocaleString()}</span>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </GlassCard>
+
+          {/* Recent Transactions */}
+          <GlassCard delay={250} className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <h2 className="text-sm font-semibold">Recent Transactions</h2>
+                <p className="text-[10px] text-foreground-muted">{transactions.length} transactions</p>
+              </div>
+              <button
+                className="text-[10px] font-medium text-primary hover:text-primary/80 transition-colors cursor-pointer flex items-center gap-0.5"
+                onClick={() => router.push('/receipts')}
+              >
+                View all
+                <ArrowUpRight className="w-2.5 h-2.5" />
+              </button>
+            </div>
+            <div className="space-y-0.5 max-h-[180px] overflow-y-auto">
+              {transactions.slice(0, 5).map((tx, index) => (
+                <motion.div
+                  key={tx.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.3 + index * 0.03 }}
+                  className="flex items-center justify-between py-1.5 px-1.5 rounded-md hover:bg-secondary/50 transition-colors cursor-pointer group"
+                  onClick={() => setSelectedTransaction(tx)}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className={`w-6 h-6 rounded-md flex items-center justify-center ${
+                      tx.amount > 0 ? "bg-success/20" : "bg-secondary"
+                    }`}>
+                      {tx.amount > 0 ? (
+                        <TrendingUp className="w-3 h-3 text-success" />
+                      ) : (
+                        <TrendingDown className="w-3 h-3 text-foreground-muted" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium truncate max-w-[120px]">{tx.description}</p>
+                      <p className="text-[9px] text-foreground-muted">{tx.category}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="text-right">
+                      <p className={`text-xs font-mono font-medium ${tx.amount > 0 ? "text-success" : ""}`}>
+                        {tx.amount > 0 ? "+" : ""}${Math.abs(tx.amount).toLocaleString()}
+                      </p>
+                      <p className="text-[9px] text-foreground-muted">{tx.date}</p>
+                    </div>
+                    <ChevronRight className="w-3 h-3 text-foreground-muted opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </GlassCard>
         </div>
-      </Modal>
+      </div>
 
       {/* Transaction Details Modal */}
       <Modal
@@ -416,8 +477,9 @@ export default function DashboardPage() {
         {selectedTransaction && (
           <div className="p-6 space-y-6">
             <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-md flex items-center justify-center ${selectedTransaction.amount > 0 ? "bg-success-soft" : "bg-secondary"
-                }`}>
+              <div className={`w-10 h-10 rounded-md flex items-center justify-center ${
+                selectedTransaction.amount > 0 ? "bg-success/20" : "bg-secondary"
+              }`}>
                 {selectedTransaction.amount > 0 ? (
                   <TrendingUp className="w-5 h-5 text-success" />
                 ) : (
@@ -433,7 +495,9 @@ export default function DashboardPage() {
             <div className="divide-y divide-border">
               <div className="flex justify-between items-center py-3">
                 <span className="text-sm text-foreground-muted">Amount</span>
-                <span className={`text-lg font-semibold tabular-nums font-mono ${selectedTransaction.amount > 0 ? "text-success" : ""}`}>
+                <span className={`text-lg font-semibold font-mono ${
+                  selectedTransaction.amount > 0 ? "text-success" : ""
+                }`}>
                   {selectedTransaction.amount > 0 ? "+" : ""}${Math.abs(selectedTransaction.amount).toLocaleString()}
                 </span>
               </div>
@@ -445,12 +509,6 @@ export default function DashboardPage() {
                 <span className="text-sm text-foreground-muted">Category</span>
                 <span className="px-2 py-0.5 rounded-md bg-secondary text-xs font-medium">
                   {selectedTransaction.category}
-                </span>
-              </div>
-              <div className="flex justify-between items-center py-3">
-                <span className="text-sm text-foreground-muted">Type</span>
-                <span className={`text-sm font-medium ${selectedTransaction.amount > 0 ? "text-success" : "text-destructive"}`}>
-                  {selectedTransaction.amount > 0 ? "Income" : "Expense"}
                 </span>
               </div>
             </div>

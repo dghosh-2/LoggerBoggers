@@ -1,13 +1,11 @@
 'use client';
 
 import React from 'react';
-import { motion } from 'framer-motion';
 import {
     LineChart, Line, AreaChart, Area, BarChart, Bar,
     XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
     ReferenceLine
 } from 'recharts';
-import { TrendingUp, TrendingDown } from 'lucide-react';
 import { ChartContainer } from './ChartContainer';
 import { ChartConfig, CHART_PALETTES, CHART_HEIGHTS } from '@/lib/visualization-schema';
 import { StockData } from '@/lib/schemas';
@@ -186,23 +184,6 @@ export function FlexibleChart({ config, stockData, delay = 0, onExpand }: Flexib
         }
     };
 
-    // Calculate returns for stock cards
-    const stockReturns = config.series.map((series, idx) => {
-        const stock = stockData.find(s => s.symbol === series.symbol);
-        if (!stock || stock.data.length < 2) {
-            return { symbol: series.symbol, price: 0, return: 0, color: colors[idx % colors.length] };
-        }
-        const first = stock.data[0].close;
-        const last = stock.data[stock.data.length - 1].close;
-        return {
-            symbol: series.symbol,
-            name: stock.name,
-            price: last,
-            return: ((last - first) / first) * 100,
-            color: series.color || colors[idx % colors.length],
-        };
-    });
-
     return (
         <ChartContainer
             title={config.title}
@@ -211,50 +192,10 @@ export function FlexibleChart({ config, stockData, delay = 0, onExpand }: Flexib
             delay={delay}
             onExpand={onExpand}
         >
-            <div className="h-full flex flex-col">
-                {/* Chart */}
-                <div className="flex-1 min-h-0">
-                    <ResponsiveContainer width="100%" height="100%">
-                        {renderChart()}
-                    </ResponsiveContainer>
-                </div>
-
-                {/* Stock Cards */}
-                <div className="mt-4 flex gap-3 flex-wrap">
-                    {stockReturns.map((stock) => (
-                        <motion.div
-                            key={stock.symbol}
-                            className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-secondary border border-border"
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ duration: 0.3, delay: (delay + 200) / 1000 }}
-                            whileHover={{ scale: 1.02, y: -2 }}
-                        >
-                            <div
-                                className="w-2.5 h-2.5 rounded-full"
-                                style={{ backgroundColor: stock.color }}
-                            />
-                            <div>
-                                <p className="font-semibold text-sm">{stock.symbol}</p>
-                                <p className="text-xs text-foreground-muted">
-                                    ${stock.price.toFixed(2)}
-                                </p>
-                            </div>
-                            <div className={`flex items-center gap-1 px-2 py-1 rounded-full ${
-                                stock.return >= 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'
-                            }`}>
-                                {stock.return >= 0 ? (
-                                    <TrendingUp className="w-3 h-3" />
-                                ) : (
-                                    <TrendingDown className="w-3 h-3" />
-                                )}
-                                <span className="text-xs font-bold">
-                                    {stock.return >= 0 ? '+' : ''}{stock.return.toFixed(1)}%
-                                </span>
-                            </div>
-                        </motion.div>
-                    ))}
-                </div>
+            <div className="h-full">
+                <ResponsiveContainer width="100%" height="100%">
+                    {renderChart()}
+                </ResponsiveContainer>
             </div>
         </ChartContainer>
     );

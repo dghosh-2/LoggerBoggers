@@ -63,12 +63,17 @@ function PlaidLinkButtonInner({
     const [loading, setLoading] = useState(false);
 
     const handleOnSuccess = useCallback(async (public_token: string, metadata: any) => {
+        console.log('=== PLAID LINK SUCCESS ===');
+        console.log('Public token received:', public_token?.substring(0, 20) + '...');
+        console.log('Metadata:', JSON.stringify(metadata, null, 2));
+        
         setLoading(true);
         let attempt = 0;
         const MAX_EXCHANGE_RETRIES = 2;
         
         while (attempt <= MAX_EXCHANGE_RETRIES) {
             try {
+                console.log(`Exchange attempt ${attempt + 1}...`);
                 // Add timeout for exchange request
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
@@ -94,6 +99,11 @@ function PlaidLinkButtonInner({
                         // ignore
                     }
                     console.error('Token exchange failed:', { status: response.status, errorData, attempt });
+                    
+                    // Handle auth errors specifically
+                    if (response.status === 401) {
+                        throw new Error('Please log in first to connect your accounts');
+                    }
                     
                     // Retry on 5xx errors
                     if (response.status >= 500 && attempt < MAX_EXCHANGE_RETRIES) {
@@ -146,6 +156,9 @@ function PlaidLinkButtonInner({
     }, [onSuccess]);
 
     const handleOnExit = useCallback((err: any, metadata: any) => {
+        console.log('=== PLAID LINK EXIT ===');
+        console.log('Error:', err);
+        console.log('Exit metadata:', JSON.stringify(metadata, null, 2));
         if (err) {
             console.error('Plaid Link exit error:', err);
         }
@@ -209,7 +222,22 @@ export function PlaidLinkButton({
     const [tokenLoading, setTokenLoading] = useState(true);
     const [tokenError, setTokenError] = useState<string | null>(null);
     const [retryCount, setRetryCount] = useState(0);
+    const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
     const MAX_RETRIES = 3;
+
+    // Check if user is authenticated
+    useEffect(() => {
+        const checkAuth = async () => {
+            try {
+                const response = await fetch('/api/auth/session');
+                const data = await response.json();
+                setIsAuthenticated(!!data.user);
+            } catch {
+                setIsAuthenticated(false);
+            }
+        };
+        checkAuth();
+    }, []);
 
     // Fetch link token with retry logic
     const fetchLinkToken = useCallback(async (attempt: number = 0): Promise<void> => {
@@ -310,8 +338,8 @@ export function PlaidLinkButton({
         fetchLinkToken(0);
     }, [fetchLinkToken]);
 
-    // Show loading state while fetching token
-    if (tokenLoading) {
+    // Show loading state while checking auth or fetching token
+    if (isAuthenticated === null || tokenLoading) {
         return (
             <GlassButton
                 variant={buttonVariant}
@@ -320,6 +348,22 @@ export function PlaidLinkButton({
                 className={className}
             >
                 Loading...
+            </GlassButton>
+        );
+    }
+
+    // If not authenticated, show login prompt
+    if (!isAuthenticated) {
+        return (
+            <GlassButton
+                variant={buttonVariant}
+                size={buttonSize}
+                onClick={() => {
+                    toast.error('Please log in first to connect your accounts');
+                }}
+                className={className}
+            >
+                {buttonText}
             </GlassButton>
         );
     }

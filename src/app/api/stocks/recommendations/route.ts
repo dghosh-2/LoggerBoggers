@@ -1,6 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateText } from '@/lib/openai';
 
+// Helper to clean markdown formatting from text
+function cleanMarkdown(text: string): string {
+    return text
+        // Remove bold markers
+        .replace(/\*\*([^*]+)\*\*/g, '$1')
+        // Remove italic markers
+        .replace(/\*([^*]+)\*/g, '$1')
+        // Remove underscores for bold/italic
+        .replace(/__([^_]+)__/g, '$1')
+        .replace(/_([^_]+)_/g, '$1')
+        // Clean up multiple spaces
+        .replace(/\s+/g, ' ')
+        // Clean up line breaks with asterisks
+        .replace(/\n\s*\*\*\s*/g, '\n')
+        .trim();
+}
+
 export async function POST(request: NextRequest) {
     try {
         const { query, stocks, extractedQuestions = [], dedalusContext = '' } = await request.json();
@@ -53,43 +70,65 @@ ${extractedQuestions.length > 0 ? '5. Direct answers to each of the user\'s spec
 ${dedalusContext ? '6. Incorporate any relevant news or analyst opinions from the research' : ''}
 
 Be specific, actionable, and personalized. Consider their age, risk tolerance, debt, and income status.
+Do NOT use markdown formatting like **bold** or *italic*. Use plain text only.
 `;
 
-        const response = await generateText(
-            'You are a certified financial advisor providing personalized investment insights.',
+        const rawResponse = await generateText(
+            'You are a certified financial advisor providing personalized investment insights. Always respond in plain text without markdown formatting.',
             recommendationPrompt
         );
+        
+        // Clean any markdown that might still be in the response
+        const response = cleanMarkdown(rawResponse);
 
         // Parse the response into structured format
-        const sections = response.split('\n\n');
-        const summary = sections[0] || '';
+        const sections = response.split('\n\n').filter(s => s.trim());
+        
+        // Get summary - first paragraph or first 2-3 sentences
+        let summary = sections[0] || '';
+        // Limit summary to ~300 chars
+        if (summary.length > 350) {
+            const sentences = summary.match(/[^.!?]+[.!?]+/g) || [summary];
+            summary = sentences.slice(0, 2).join(' ').trim();
+            if (summary.length > 350) {
+                summary = summary.substring(0, 347) + '...';
+            }
+        }
 
         // Extract insights (look for numbered or bulleted lists)
-        const insights = [];
-        for (const section of sections) {
-            if (section.match(/^\d+\.|^-|^•/)) {
-                const lines = section.split('\n').filter(l => l.match(/^\d+\.|^-|^•/));
-                for (const line of lines.slice(0, 4)) {
-                    const text = line.replace(/^\d+\.\s*|^-\s*|^•\s*/, '').trim();
-                    if (text) {
-                        insights.push({
-                            title: text.split(':')[0] || 'Insight',
-                            description: text.split(':')[1]?.trim() || text,
-                            relevance: 'Based on your profile',
-                        });
+        const insights: { title: string; description: string; relevance: string }[] = [];
+        for (const section of sections.slice(1)) { // Skip first section (summary)
+            // Check for numbered items like "1." or "2."
+            const lines = section.split('\n');
+            for (const line of lines) {
+                const trimmedLine = line.trim();
+                if (trimmedLine.match(/^\d+\.\s+/) || trimmedLine.match(/^[-•]\s+/)) {
+                    const text = trimmedLine.replace(/^\d+\.\s*|^-\s*|^•\s*/, '').trim();
+                    if (text && text.length > 10) {
+                        // Try to extract title:description format
+                        const colonIndex = text.indexOf(':');
+                        if (colonIndex > 0 && colonIndex < 50) {
+                            insights.push({
+                                title: text.substring(0, colonIndex).trim(),
+                                description: text.substring(colonIndex + 1).trim(),
+                                relevance: 'Based on your profile',
+                            });
+                        } else {
+                            // Use first few words as title
+                            const words = text.split(' ');
+                            insights.push({
+                                title: words.slice(0, 3).join(' '),
+                                description: text,
+                                relevance: 'Based on your profile',
+                            });
+                        }
                     }
                 }
             }
         }
 
-        // Fallback insights if parsing fails
-        if (insights.length === 0) {
-            insights.push({
-                title: 'Personalized Analysis',
-                description: response,
-                relevance: 'Based on your profile and query',
-            });
-        }
+        // Limit to 4 insights max
+        const limitedInsights = insights.slice(0, 4);
 
         // Extract question answers if there were extracted questions
         const questionAnswers: { question: string; answer: string }[] = [];
@@ -108,9 +147,9 @@ Be specific, actionable, and personalized. Consider their age, risk tolerance, d
 
         const recommendation = {
             summary,
-            insights: insights.slice(0, 4),
-            contextualAdvice: sections.find(s => s.toLowerCase().includes('advice') || s.toLowerCase().includes('consider')) || sections[sections.length - 1] || '',
-            riskAlignment: sections.find(s => s.toLowerCase().includes('risk')) || 'Recommendations align with your stated risk tolerance.',
+            insights: limitedInsights,
+            contextualAdvice: sections.find(s => s.toLowerCase().includes('advice') || s.toLowerCase().includes('consider'))?.substring(0, 300) || '',
+            riskAlignment: sections.find(s => s.toLowerCase().includes('risk'))?.substring(0, 300) || '',
             questionAnswers,
         };
 

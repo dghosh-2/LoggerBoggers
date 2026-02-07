@@ -201,11 +201,41 @@ const MERCHANTS = {
     ],
 };
 
-// Income sources with locations
+// Income sources with locations - more realistic salary (~$75k/year = ~$2,885 biweekly after taxes)
 const INCOME_SOURCES = [
-    { name: 'Tech Company Inc.', source: 'salary', amount: 4500, frequency: 'biweekly', location: '5000 Forbes Ave, Pittsburgh, PA 15213' },
-    { name: 'Freelance Project', source: 'freelance', amount: 800, frequency: 'monthly', location: '4720 Forbes Ave, Pittsburgh, PA 15213' },
+    { name: 'Tech Company Inc.', source: 'salary', amount: 2885, frequency: 'biweekly', location: '5000 Forbes Ave, Pittsburgh, PA 15213' },
+    { name: 'Freelance Project', source: 'freelance', amount: 500, frequency: 'monthly', location: '4720 Forbes Ave, Pittsburgh, PA 15213' },
 ];
+
+// Large occasional purchases that happen randomly
+const LARGE_PURCHASES = [
+    { name: 'Car Repair - Brake Service', category: 'Transportation', amount: 450, frequency: 0.08 }, // ~once per year
+    { name: 'Car Repair - Oil Change', category: 'Transportation', amount: 75, frequency: 0.25 }, // ~3x per year
+    { name: 'Emergency Room Visit', category: 'Health & Fitness', amount: 350, frequency: 0.05 }, // rare
+    { name: 'Dentist - Filling', category: 'Health & Fitness', amount: 200, frequency: 0.08 },
+    { name: 'Eye Exam & Glasses', category: 'Health & Fitness', amount: 280, frequency: 0.08 },
+    { name: 'Home Appliance Repair', category: 'Bills & Utilities', amount: 180, frequency: 0.06 },
+    { name: 'New Tires', category: 'Transportation', amount: 600, frequency: 0.04 }, // every 2-3 years
+    { name: 'Furniture Purchase', category: 'Shopping', amount: 450, frequency: 0.06 },
+    { name: 'Electronics Upgrade', category: 'Shopping', amount: 350, frequency: 0.08 },
+    { name: 'Annual Insurance Premium', category: 'Bills & Utilities', amount: 1200, frequency: 0.08 },
+];
+
+// Holiday spending multipliers by month (0 = January, 11 = December)
+const HOLIDAY_MULTIPLIERS: Record<number, number> = {
+    0: 0.85,  // January - post-holiday recovery
+    1: 0.90,  // February - Valentine's day
+    2: 0.95,  // March
+    3: 1.00,  // April
+    4: 1.00,  // May
+    5: 1.10,  // June - summer starts
+    6: 1.15,  // July - summer peak
+    7: 1.10,  // August - back to school
+    8: 1.00,  // September
+    9: 1.05,  // October - Halloween
+    10: 1.20, // November - Black Friday, Thanksgiving
+    11: 1.40, // December - Holiday shopping
+};
 
 // Helper to get a random location for a merchant
 function getRandomLocation(locations: string[]): string {
@@ -225,23 +255,44 @@ function formatDate(date: Date): string {
     return date.toISOString().split('T')[0];
 }
 
+// Calculate years from start for gradual spending increase (inflation/lifestyle)
+function getYearMultiplier(year: number, startYear: number): number {
+    const yearsElapsed = year - startYear;
+    // 3% annual increase in spending (inflation + lifestyle creep)
+    return Math.pow(1.03, yearsElapsed);
+}
+
 // Generate transactions for a specific month
-function generateMonthTransactions(year: number, month: number): Transaction[] {
+function generateMonthTransactions(year: number, month: number, startYear: number = 2021): Transaction[] {
     const transactions: Transaction[] = [];
+    const now = new Date();
+    const isCurrentMonth = year === now.getFullYear() && month === now.getMonth();
+    
+    // For current month, only generate up to today's date
+    // For past months, use full month
+    const maxDay = isCurrentMonth ? now.getDate() : new Date(year, month + 1, 0).getDate();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     
-    // Food & Drink: 15-25 transactions per month
-    const foodCount = 15 + Math.floor(Math.random() * 10);
+    // Scale transaction counts for partial months
+    const dayRatio = maxDay / daysInMonth;
+    
+    // Get multipliers for realistic variation
+    const yearMultiplier = getYearMultiplier(year, startYear);
+    const holidayMultiplier = HOLIDAY_MULTIPLIERS[month] || 1.0;
+    const combinedMultiplier = yearMultiplier * holidayMultiplier;
+    
+    // Food & Drink: 15-25 transactions per month (scaled for partial month)
+    const foodCount = Math.round((15 + Math.floor(Math.random() * 10)) * holidayMultiplier * dayRatio);
     for (let i = 0; i < foodCount; i++) {
         const merchants = MERCHANTS['Food & Drink'];
         const merchant = merchants[Math.floor(Math.random() * merchants.length)];
-        const day = 1 + Math.floor(Math.random() * daysInMonth);
-        const baseAmount = randomVariation(merchant.avgAmount);
+        const day = 1 + Math.floor(Math.random() * maxDay);
+        const baseAmount = randomVariation(merchant.avgAmount) * yearMultiplier;
         const tip = merchant.hasTipTax ? Math.round(baseAmount * (0.15 + Math.random() * 0.1) * 100) / 100 : null;
         const tax = merchant.hasTipTax ? Math.round(baseAmount * 0.08 * 100) / 100 : null;
         
         transactions.push({
-            amount: baseAmount + (tip || 0) + (tax || 0),
+            amount: Math.round((baseAmount + (tip || 0) + (tax || 0)) * 100) / 100,
             category: 'Food & Drink',
             name: merchant.name,
             tip,
@@ -253,12 +304,12 @@ function generateMonthTransactions(year: number, month: number): Transaction[] {
         });
     }
     
-    // Transportation: 8-15 transactions per month
-    const transportCount = 8 + Math.floor(Math.random() * 7);
+    // Transportation: 8-15 transactions per month (scaled for partial month)
+    const transportCount = Math.round((8 + Math.floor(Math.random() * 7)) * dayRatio);
     for (let i = 0; i < transportCount; i++) {
         const merchants = MERCHANTS['Transportation'];
         const merchant = merchants[Math.floor(Math.random() * merchants.length)];
-        const day = 1 + Math.floor(Math.random() * daysInMonth);
+        const day = 1 + Math.floor(Math.random() * maxDay);
         
         transactions.push({
             amount: randomVariation(merchant.avgAmount),
@@ -273,15 +324,15 @@ function generateMonthTransactions(year: number, month: number): Transaction[] {
         });
     }
     
-    // Shopping: 5-12 transactions per month
-    const shoppingCount = 5 + Math.floor(Math.random() * 7);
+    // Shopping: 5-12 transactions per month (more during holidays, scaled for partial month)
+    const shoppingCount = Math.round((5 + Math.floor(Math.random() * 7)) * holidayMultiplier * dayRatio);
     for (let i = 0; i < shoppingCount; i++) {
         const merchants = MERCHANTS['Shopping'];
         const merchant = merchants[Math.floor(Math.random() * merchants.length)];
-        const day = 1 + Math.floor(Math.random() * daysInMonth);
+        const day = 1 + Math.floor(Math.random() * maxDay);
         
         transactions.push({
-            amount: randomVariation(merchant.avgAmount),
+            amount: Math.round(randomVariation(merchant.avgAmount) * combinedMultiplier * 100) / 100,
             category: 'Shopping',
             name: merchant.name,
             tip: null,
@@ -295,28 +346,29 @@ function generateMonthTransactions(year: number, month: number): Transaction[] {
     
     // Entertainment: 3-6 subscriptions + occasional purchases
     const entertainmentMerchants = MERCHANTS['Entertainment'];
-    // Monthly subscriptions
+    // Monthly subscriptions (usually charge early in month)
     const subscriptions = entertainmentMerchants.slice(0, 4);
+    const subscriptionDay = Math.min(5, maxDay); // Subscriptions charge around day 1-5
     subscriptions.forEach(merchant => {
-        if (Math.random() > 0.2) { // 80% chance of having each subscription
+        if (Math.random() > 0.2 && subscriptionDay >= 1) { // 80% chance of having each subscription
             transactions.push({
                 amount: merchant.avgAmount,
                 category: 'Entertainment',
                 name: merchant.name,
                 tip: null,
                 tax: null,
-                date: formatDate(new Date(year, month, 1 + Math.floor(Math.random() * 5))),
+                date: formatDate(new Date(year, month, 1 + Math.floor(Math.random() * subscriptionDay))),
                 source: 'generated',
                 merchant_name: merchant.name,
                 location: getRandomLocation(merchant.locations),
             });
         }
     });
-    // Occasional entertainment
-    const occasionalCount = Math.floor(Math.random() * 3);
+    // Occasional entertainment (scaled for partial month)
+    const occasionalCount = Math.round(Math.floor(Math.random() * 3) * dayRatio);
     for (let i = 0; i < occasionalCount; i++) {
         const merchant = entertainmentMerchants[4 + Math.floor(Math.random() * (entertainmentMerchants.length - 4))];
-        const day = 1 + Math.floor(Math.random() * daysInMonth);
+        const day = 1 + Math.floor(Math.random() * maxDay);
         transactions.push({
             amount: randomVariation(merchant.avgAmount),
             category: 'Entertainment',
@@ -330,16 +382,17 @@ function generateMonthTransactions(year: number, month: number): Transaction[] {
         });
     }
     
-    // Bills & Utilities: Monthly bills
+    // Bills & Utilities: Monthly bills (usually charge early in month)
+    const billDay = Math.min(10, maxDay);
     MERCHANTS['Bills & Utilities'].forEach(merchant => {
-        if (Math.random() > 0.3) { // 70% chance of each bill
+        if (Math.random() > 0.3 && billDay >= 1) { // 70% chance of each bill
             transactions.push({
                 amount: randomVariation(merchant.avgAmount, 0.15),
                 category: 'Bills & Utilities',
                 name: merchant.name,
                 tip: null,
                 tax: null,
-                date: formatDate(new Date(year, month, 1 + Math.floor(Math.random() * 10))),
+                date: formatDate(new Date(year, month, 1 + Math.floor(Math.random() * billDay))),
                 source: 'generated',
                 merchant_name: merchant.name,
                 location: getRandomLocation(merchant.locations),
@@ -347,12 +400,12 @@ function generateMonthTransactions(year: number, month: number): Transaction[] {
         }
     });
     
-    // Health & Fitness: 1-3 per month
-    const healthCount = 1 + Math.floor(Math.random() * 2);
+    // Health & Fitness: 1-3 per month (scaled for partial month)
+    const healthCount = Math.max(1, Math.round((1 + Math.floor(Math.random() * 2)) * dayRatio));
     for (let i = 0; i < healthCount; i++) {
         const merchants = MERCHANTS['Health & Fitness'];
         const merchant = merchants[Math.floor(Math.random() * merchants.length)];
-        const day = 1 + Math.floor(Math.random() * daysInMonth);
+        const day = 1 + Math.floor(Math.random() * maxDay);
         
         transactions.push({
             amount: randomVariation(merchant.avgAmount),
@@ -369,10 +422,10 @@ function generateMonthTransactions(year: number, month: number): Transaction[] {
     
     // Travel: Occasional (0-1 per month, more in summer)
     const isSummer = month >= 5 && month <= 8;
-    if (Math.random() < (isSummer ? 0.4 : 0.15)) {
+    if (Math.random() < (isSummer ? 0.4 : 0.15) * dayRatio) {
         const merchants = MERCHANTS['Travel'];
         const merchant = merchants[Math.floor(Math.random() * merchants.length)];
-        const day = 1 + Math.floor(Math.random() * daysInMonth);
+        const day = 1 + Math.floor(Math.random() * maxDay);
         
         transactions.push({
             amount: randomVariation(merchant.avgAmount),
@@ -388,10 +441,10 @@ function generateMonthTransactions(year: number, month: number): Transaction[] {
     }
     
     // Personal Care: 1-2 per month
-    if (Math.random() > 0.3) {
+    if (Math.random() > 0.3 * (1 / dayRatio)) { // Adjust probability for partial month
         const merchants = MERCHANTS['Personal Care'];
         const merchant = merchants[Math.floor(Math.random() * merchants.length)];
-        const day = 1 + Math.floor(Math.random() * daysInMonth);
+        const day = 1 + Math.floor(Math.random() * maxDay);
         const baseAmount = randomVariation(merchant.avgAmount);
         const tip = merchant.hasTipTax ? Math.round(baseAmount * 0.2 * 100) / 100 : null;
         
@@ -409,13 +462,13 @@ function generateMonthTransactions(year: number, month: number): Transaction[] {
     }
     
     // Education: Occasional
-    if (Math.random() < 0.2) {
+    if (Math.random() < 0.2 * dayRatio) {
         const merchants = MERCHANTS['Education'];
         const merchant = merchants[Math.floor(Math.random() * merchants.length)];
-        const day = 1 + Math.floor(Math.random() * daysInMonth);
+        const day = 1 + Math.floor(Math.random() * maxDay);
         
         transactions.push({
-            amount: randomVariation(merchant.avgAmount),
+            amount: Math.round(randomVariation(merchant.avgAmount) * yearMultiplier * 100) / 100,
             category: 'Education',
             name: merchant.name,
             tip: null,
@@ -425,6 +478,82 @@ function generateMonthTransactions(year: number, month: number): Transaction[] {
             merchant_name: merchant.name,
             location: getRandomLocation(merchant.locations),
         });
+    }
+    
+    // Large occasional purchases (car repairs, medical, etc.)
+    for (const purchase of LARGE_PURCHASES) {
+        if (Math.random() < (purchase.frequency / 12) * dayRatio) { // Convert annual frequency to monthly, scaled
+            const day = 1 + Math.floor(Math.random() * maxDay);
+            const locationMap: Record<string, string[]> = {
+                'Transportation': ADDRESSES.transportation,
+                'Health & Fitness': ADDRESSES.healthcare,
+                'Bills & Utilities': ADDRESSES.pittsburgh,
+                'Shopping': ADDRESSES.retail,
+            };
+            const locations = locationMap[purchase.category] || ADDRESSES.pittsburgh;
+            
+            transactions.push({
+                amount: Math.round(randomVariation(purchase.amount, 0.2) * yearMultiplier * 100) / 100,
+                category: purchase.category,
+                name: purchase.name,
+                tip: null,
+                tax: null,
+                date: formatDate(new Date(year, month, day)),
+                source: 'generated',
+                merchant_name: purchase.name,
+                location: getRandomLocation(locations),
+            });
+        }
+    }
+    
+    // Holiday-specific purchases
+    // Holiday-specific purchases (December - gift shopping)
+    if (month === 11 && maxDay >= 1) {
+        const giftMaxDay = Math.min(24, maxDay); // Before Christmas, but respect current date
+        const giftCount = Math.round((3 + Math.floor(Math.random() * 5)) * (giftMaxDay / 24));
+        for (let i = 0; i < giftCount; i++) {
+            const merchants = MERCHANTS['Shopping'];
+            const merchant = merchants[Math.floor(Math.random() * merchants.length)];
+            const day = 1 + Math.floor(Math.random() * giftMaxDay);
+            
+            transactions.push({
+                amount: Math.round(randomVariation(merchant.avgAmount * 1.5) * yearMultiplier * 100) / 100,
+                category: 'Shopping',
+                name: `${merchant.name} - Holiday Gift`,
+                tip: null,
+                tax: null,
+                date: formatDate(new Date(year, month, day)),
+                source: 'generated',
+                merchant_name: merchant.name,
+                location: getRandomLocation(merchant.locations),
+            });
+        }
+    }
+    
+    // Back to school (August)
+    if (month === 7 && maxDay >= 10) {
+        const schoolMaxDay = Math.min(25, maxDay);
+        const schoolItems = [
+            { name: 'Target - School Supplies', amount: 85 },
+            { name: 'Amazon - Textbooks', amount: 150 },
+            { name: 'Best Buy - Laptop/Electronics', amount: 450 },
+        ];
+        for (const item of schoolItems) {
+            if (Math.random() < 0.4 * dayRatio) {
+                const day = Math.min(10 + Math.floor(Math.random() * 15), schoolMaxDay);
+                transactions.push({
+                    amount: Math.round(randomVariation(item.amount, 0.25) * yearMultiplier * 100) / 100,
+                    category: 'Shopping',
+                    name: item.name,
+                    tip: null,
+                    tax: null,
+                    date: formatDate(new Date(year, month, day)),
+                    source: 'generated',
+                    merchant_name: item.name.split(' - ')[0],
+                    location: getRandomLocation(ADDRESSES.retail),
+                });
+            }
+        }
     }
     
     return transactions;
@@ -438,6 +567,7 @@ export function generateFiveYearsOfTransactions(): Transaction[] {
     const endMonth = now.getMonth();
     const startDate = new Date();
     startDate.setFullYear(startDate.getFullYear() - 5);
+    const startYear = startDate.getFullYear();
     
     let currentDate = new Date(startDate);
     
@@ -446,12 +576,14 @@ export function generateFiveYearsOfTransactions(): Transaction[] {
            (currentDate.getFullYear() === endYear && currentDate.getMonth() <= endMonth)) {
         const monthTransactions = generateMonthTransactions(
             currentDate.getFullYear(),
-            currentDate.getMonth()
+            currentDate.getMonth(),
+            startYear
         );
         allTransactions.push(...monthTransactions);
         currentDate.setMonth(currentDate.getMonth() + 1);
     }
     
+    console.log(`Generated ${allTransactions.length} transactions over 5 years`);
     return allTransactions;
 }
 
@@ -514,4 +646,100 @@ export function generateFiveYearsOfIncome(): Income[] {
     }
     
     return allIncome;
+}
+
+// Realistic stock holdings for portfolio
+const STOCK_HOLDINGS = [
+    { symbol: 'AAPL', name: 'Apple Inc.', avgPrice: 178.50, shares: 25, costBasisMultiplier: 0.75 },
+    { symbol: 'GOOGL', name: 'Alphabet Inc.', avgPrice: 141.80, shares: 15, costBasisMultiplier: 0.65 },
+    { symbol: 'MSFT', name: 'Microsoft Corporation', avgPrice: 378.90, shares: 20, costBasisMultiplier: 0.70 },
+    { symbol: 'AMZN', name: 'Amazon.com Inc.', avgPrice: 178.25, shares: 18, costBasisMultiplier: 0.80 },
+    { symbol: 'NVDA', name: 'NVIDIA Corporation', avgPrice: 495.20, shares: 10, costBasisMultiplier: 0.45 },
+    { symbol: 'TSLA', name: 'Tesla Inc.', avgPrice: 248.50, shares: 12, costBasisMultiplier: 0.90 },
+    { symbol: 'META', name: 'Meta Platforms Inc.', avgPrice: 505.75, shares: 8, costBasisMultiplier: 0.55 },
+    { symbol: 'JPM', name: 'JPMorgan Chase & Co.', avgPrice: 198.40, shares: 15, costBasisMultiplier: 0.85 },
+    { symbol: 'V', name: 'Visa Inc.', avgPrice: 279.30, shares: 10, costBasisMultiplier: 0.80 },
+    { symbol: 'JNJ', name: 'Johnson & Johnson', avgPrice: 156.80, shares: 20, costBasisMultiplier: 0.95 },
+];
+
+// ETF holdings for diversification
+const ETF_HOLDINGS = [
+    { symbol: 'VOO', name: 'Vanguard S&P 500 ETF', avgPrice: 458.20, shares: 30, costBasisMultiplier: 0.82 },
+    { symbol: 'QQQ', name: 'Invesco QQQ Trust', avgPrice: 438.50, shares: 15, costBasisMultiplier: 0.75 },
+    { symbol: 'VTI', name: 'Vanguard Total Stock Market ETF', avgPrice: 252.30, shares: 25, costBasisMultiplier: 0.85 },
+    { symbol: 'SCHD', name: 'Schwab US Dividend Equity ETF', avgPrice: 78.40, shares: 40, costBasisMultiplier: 0.88 },
+];
+
+export interface Holding {
+    symbol: string;
+    name: string;
+    quantity: number;
+    price: number;
+    value: number;
+    cost_basis: number;
+    gain_loss: number;
+    gain_loss_percent: number;
+    location: string;
+}
+
+// Generate realistic investment holdings
+export function generateHoldings(): Holding[] {
+    const holdings: Holding[] = [];
+    
+    // Add 5-7 random stocks from the list
+    const numStocks = 5 + Math.floor(Math.random() * 3);
+    const shuffledStocks = [...STOCK_HOLDINGS].sort(() => Math.random() - 0.5);
+    const selectedStocks = shuffledStocks.slice(0, numStocks);
+    
+    for (const stock of selectedStocks) {
+        // Add some variance to shares and price
+        const shares = Math.round(stock.shares * (0.7 + Math.random() * 0.6));
+        const currentPrice = stock.avgPrice * (0.9 + Math.random() * 0.2);
+        const costBasis = currentPrice * stock.costBasisMultiplier * (0.9 + Math.random() * 0.2);
+        const value = shares * currentPrice;
+        const totalCostBasis = shares * costBasis;
+        const gainLoss = value - totalCostBasis;
+        const gainLossPercent = ((value - totalCostBasis) / totalCostBasis) * 100;
+        
+        holdings.push({
+            symbol: stock.symbol,
+            name: stock.name,
+            quantity: shares,
+            price: Math.round(currentPrice * 100) / 100,
+            value: Math.round(value * 100) / 100,
+            cost_basis: Math.round(totalCostBasis * 100) / 100,
+            gain_loss: Math.round(gainLoss * 100) / 100,
+            gain_loss_percent: Math.round(gainLossPercent * 100) / 100,
+            location: '1 PPG Pl, Pittsburgh, PA 15222', // Investment firm location
+        });
+    }
+    
+    // Add 2-3 ETFs
+    const numETFs = 2 + Math.floor(Math.random() * 2);
+    const shuffledETFs = [...ETF_HOLDINGS].sort(() => Math.random() - 0.5);
+    const selectedETFs = shuffledETFs.slice(0, numETFs);
+    
+    for (const etf of selectedETFs) {
+        const shares = Math.round(etf.shares * (0.7 + Math.random() * 0.6));
+        const currentPrice = etf.avgPrice * (0.95 + Math.random() * 0.1);
+        const costBasis = currentPrice * etf.costBasisMultiplier * (0.95 + Math.random() * 0.1);
+        const value = shares * currentPrice;
+        const totalCostBasis = shares * costBasis;
+        const gainLoss = value - totalCostBasis;
+        const gainLossPercent = ((value - totalCostBasis) / totalCostBasis) * 100;
+        
+        holdings.push({
+            symbol: etf.symbol,
+            name: etf.name,
+            quantity: shares,
+            price: Math.round(currentPrice * 100) / 100,
+            value: Math.round(value * 100) / 100,
+            cost_basis: Math.round(totalCostBasis * 100) / 100,
+            gain_loss: Math.round(gainLoss * 100) / 100,
+            gain_loss_percent: Math.round(gainLossPercent * 100) / 100,
+            location: '1 PPG Pl, Pittsburgh, PA 15222',
+        });
+    }
+    
+    return holdings;
 }

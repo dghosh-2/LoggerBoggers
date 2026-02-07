@@ -6,13 +6,14 @@ interface InsightsState {
     selectedCategory: string | null;
     selectedMonth: string;
     selectedRange: 'MTD' | '3M' | 'YR' | 'All'; // Updated 12M -> YR
-    currentView: 'graph' | 'calendar' | 'analysis' | 'trends'; // NEW: Track active view
+    currentView: 'graph' | 'calendar' | 'analysis' | 'trends' | 'subscriptions'; // Track active view
     visibleGraphLayers: string[]; // ['base', 'sandbox', 'overlay']
     explainingInsightId: string | null; // Controls the deep dive panel
     explainingItem: any | null; // Using any to avoid circular dependency
     activeSim: any | null; // Active simulation modal data
     budgets: Record<string, number>; // Category budget caps
     reductionGoals: Record<string, number>; // Category -> reduction %
+    selectedDate: string | null; // Selected date in calendar view (YYYY-MM-DD format)
 
     setSelectedInsightId: (id: string | null) => void;
     setExplainingInsightId: (id: string | null) => void;
@@ -24,8 +25,9 @@ interface InsightsState {
     setSelectedCategory: (category: string | null) => void;
     setSelectedMonth: (month: string) => void;
     setSelectedRange: (range: 'MTD' | '3M' | 'YR' | 'All') => void;
-    setCurrentView: (view: 'graph' | 'calendar' | 'analysis' | 'trends') => void;
+    setCurrentView: (view: 'graph' | 'calendar' | 'analysis' | 'trends' | 'subscriptions') => void;
     toggleGraphLayer: (layer: string) => void;
+    setSelectedDate: (date: string | null) => void;
 }
 
 export const useInsightsStore = create<InsightsState>((set) => ({
@@ -40,6 +42,7 @@ export const useInsightsStore = create<InsightsState>((set) => ({
     activeSim: null,
     budgets: {},
     reductionGoals: {},
+    selectedDate: null,
 
     setSelectedInsightId: (id) => set({ selectedInsightId: id, selectedCategory: null }),
     setExplainingInsightId: (id) => set({ explainingInsightId: id, explainingItem: null }), // Clear manual item if ID set
@@ -61,4 +64,5 @@ export const useInsightsStore = create<InsightsState>((set) => ({
                 ? state.visibleGraphLayers.filter(l => l !== layer)
                 : [...state.visibleGraphLayers, layer]
         })),
+    setSelectedDate: (date) => set({ selectedDate: date }),
 }));
