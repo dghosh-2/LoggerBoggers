@@ -2,17 +2,26 @@
 
 import { useTerrainStore } from "@/stores/terrain-store";
 import { cn } from "@/lib/utils";
+import { STANDARD_CATEGORIES } from "@/lib/categories";
 
-const CATEGORIES = [
-    { id: "Rent", label: "Rent", color: "#8B7355" },
-    { id: "Bills", label: "Bills", color: "#A0826D" },
-    { id: "Groceries", label: "Groceries", color: "#D4A574" },
-    { id: "Food", label: "Dining", color: "#FF6B6B" },
-    { id: "Entertainment", label: "Entertain", color: "#A78BFA" },
-    { id: "Shopping", label: "Shopping", color: "#F472B6" },
-    { id: "Transport", label: "Transport", color: "#FB923C" },
-    { id: "Subscriptions", label: "Subs", color: "#818CF8" },
-];
+const CATEGORY_COLORS: Record<string, string> = {
+    'Bills & Utilities': '#06b6d4',
+    'Education': '#a855f7',
+    'Entertainment': '#3b82f6',
+    'Food & Drink': '#f97316',
+    'Health & Fitness': '#ec4899',
+    'Personal Care': '#14b8a6',
+    'Shopping': '#f472b6',
+    'Transportation': '#eab308',
+    'Travel': '#fb923c',
+    'Other': '#6b7280',
+};
+
+const CATEGORIES = STANDARD_CATEGORIES.map((c) => ({
+    id: c,
+    label: c === 'Bills & Utilities' ? 'Bills' : c,
+    color: CATEGORY_COLORS[c] ?? '#6b7280',
+}));
 
 export function CategoryToggles() {
     const { activeCategories, toggleCategory, setAllCategories } = useTerrainStore();

@@ -12,9 +12,11 @@ import {
   Plus,
   Wallet,
   TrendingUp,
-  CreditCard
+  CreditCard,
+  ReceiptText,
 } from "lucide-react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { PageTransition } from "@/components/layout/page-transition";
 import { GlassCard } from "@/components/ui/glass-card";
 import { GlassButton } from "@/components/ui/glass-button";
@@ -68,6 +70,7 @@ const popularBanks = [
 ];
 
 export default function ImportsPage() {
+  const router = useRouter();
   const [institutions, setInstitutions] = useState<PlaidInstitution[]>([]);
   const [accounts, setAccounts] = useState<PlaidAccount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -221,6 +224,28 @@ export default function ImportsPage() {
             />
           </div>
         </div>
+
+        {/* Receipts entry point (moved from main nav) */}
+        <GlassCard delay={0} className="p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <ReceiptText className="w-4 h-4 text-foreground-muted" />
+                <h2 className="text-sm font-semibold">Receipts</h2>
+              </div>
+              <p className="text-[11px] text-foreground-muted mt-1">
+                Upload receipt photos and review extracted line items.
+              </p>
+            </div>
+            <GlassButton
+              variant="secondary"
+              size="sm"
+              onClick={() => router.push("/receipts")}
+            >
+              Open Receipts
+            </GlassButton>
+          </div>
+        </GlassCard>
 
         {/* Import Options */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

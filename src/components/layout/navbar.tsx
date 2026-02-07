@@ -17,7 +17,6 @@ import {
   UserCircle,
   Globe,
   Target,
-  ReceiptText,
 } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
 import { useUIStore } from "@/stores/ui-store";
@@ -32,7 +31,6 @@ const navItems = [
   { name: "Globe", href: "/globe", icon: Globe },
   { name: "Stocks", href: "/stocks", icon: LineChart },
   { name: "Imports", href: "/imports", icon: Upload },
-  { name: "Receipts", href: "/receipts", icon: ReceiptText },
   { name: "Portfolio", href: "/portfolio", icon: Briefcase },
 ];
 

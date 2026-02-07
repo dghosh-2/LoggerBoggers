@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
         console.log('Attempting to insert test transaction:', testTransaction);
 
         const { data: insertedTx, error: txError } = await supabaseAdmin
-            .from('transactions')
+            .from('financial_transactions')
             .insert(testTransaction)
             .select()
             .single();
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
 
         // Clean up - delete the test transaction
         await supabaseAdmin
-            .from('transactions')
+            .from('financial_transactions')
             .delete()
             .eq('id', insertedTx.id);
 

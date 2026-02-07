@@ -41,25 +41,36 @@ export function FinancialGraph() {
   const isDark = theme === 'dark';
 
   // Generate dynamic nodes and edges based on real data
-  const { dynamicNodes, dynamicEdges, totalIncome, totalExpenses } = useMemo(() => {
+  const { dynamicNodes, dynamicEdges, totalIncome, totalExpenses, effectiveRange } = useMemo(() => {
     const now = new Date();
     
     // Filter transactions by range
-    const rangeTransactions = transactions.filter(t => {
-      const date = new Date(t.date);
-      if (selectedRange === 'MTD') {
-        return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-      } else if (selectedRange === '3M') {
-        const threeMonthsAgo = new Date(now);
-        threeMonthsAgo.setMonth(now.getMonth() - 3);
-        return date >= threeMonthsAgo;
-      } else if (selectedRange === 'YR') {
-        const twelveMonthsAgo = new Date(now);
-        twelveMonthsAgo.setFullYear(now.getFullYear() - 1);
-        return date >= twelveMonthsAgo;
-      }
-      return true;
-    });
+    const filterByRange = (range: typeof selectedRange) => {
+      return transactions.filter((t) => {
+        const date = new Date(t.date);
+        if (range === 'MTD') {
+          return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+        } else if (range === '3M') {
+          const threeMonthsAgo = new Date(now);
+          threeMonthsAgo.setMonth(now.getMonth() - 3);
+          return date >= threeMonthsAgo;
+        } else if (range === 'YR') {
+          const twelveMonthsAgo = new Date(now);
+          twelveMonthsAgo.setFullYear(now.getFullYear() - 1);
+          return date >= twelveMonthsAgo;
+        }
+        return true; // 'All'
+      });
+    };
+
+    let effectiveRange: typeof selectedRange = selectedRange;
+    let rangeTransactions = filterByRange(selectedRange);
+
+    // If the selected range has no transactions but there is data overall, fall back so the graph isn't empty.
+    if (transactions.length > 0 && rangeTransactions.length === 0 && selectedRange !== 'All') {
+      effectiveRange = 'All';
+      rangeTransactions = transactions;
+    }
 
     // Calculate category totals
     const categoryTotals: Record<string, number> = {};
@@ -70,7 +81,7 @@ export function FinancialGraph() {
     const totalExp = Object.values(categoryTotals).reduce((a, b) => a + b, 0);
     // Use real income from summary if available
     const totalInc = summary?.monthly_income 
-      ? (selectedRange === 'MTD' ? summary.monthly_income : summary.monthly_income * (selectedRange === '3M' ? 3 : 12))
+      ? (effectiveRange === 'MTD' ? summary.monthly_income : summary.monthly_income * (effectiveRange === '3M' ? 3 : 12))
       : Math.round(totalExp * 1.2);
 
     // Sort categories by amount and take top 6
@@ -175,7 +186,8 @@ export function FinancialGraph() {
       dynamicNodes: nodes, 
       dynamicEdges: edges, 
       totalIncome: totalInc, 
-      totalExpenses: totalExp 
+      totalExpenses: totalExp,
+      effectiveRange,
     };
   }, [selectedRange, transactions, summary, isConnected, isDark]);
 
@@ -296,7 +308,13 @@ export function FinancialGraph() {
         {/* Total Overlay */}
         <div className="px-4 py-3 rounded-xl bg-card/95 dark:bg-card/90 border border-border backdrop-blur-md shadow-lg">
           <div className="text-[10px] uppercase tracking-wider font-bold text-foreground-muted mb-1">
-            {selectedRange === 'MTD' ? 'This Month' : selectedRange === '3M' ? 'Last 3 Months' : 'Yearly Total'}
+            {effectiveRange === 'MTD'
+              ? 'This Month'
+              : effectiveRange === '3M'
+                ? 'Last 3 Months'
+                : effectiveRange === 'YR'
+                  ? 'Yearly Total'
+                  : 'All Time'}
           </div>
           <div className="text-xl font-mono font-bold text-foreground">
             ${totalDisplayedSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

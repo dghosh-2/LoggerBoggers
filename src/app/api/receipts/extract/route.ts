@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { FAST_PROMPT, ITEM_BBOX_PROMPT, OCR_SYSTEM_PROMPT, TEXT_ONLY_PROMPT } from '@/lib/receiptOcrPrompts';
 import { getServiceSupabase } from '@/lib/serverSupabase';
 import { getEnvFallback } from '@/lib/envFallback';
+import { normalizeCategory } from '@/lib/categories';
 
 export const runtime = 'nodejs';
 
@@ -1222,21 +1223,21 @@ export async function POST(req: Request) {
                 // Replace receipt items (best-effort).
                 const items = Array.isArray(extracted?.items) ? extracted.items : [];
                 await supabase.from('receipt_items').delete().eq('receipt_id', receipt_id);
-                if (items.length) {
-                    await supabase.from('receipt_items').insert(
-                        items.map((item: any, idx: number) => ({
-                            receipt_id,
-                            line_index: item?.line_index ?? idx,
-                            item_name: item?.name ?? null,
-                            item_amount: item?.price ?? null,
-                            quantity: item?.quantity ?? null,
-                            unit_price: item?.unit_price ?? null,
-                            item_category: item?.category_prediction ?? item?.category ?? null,
-                            bbox: item?.bbox ?? null,
-                            confidence: item?.confidence ?? null,
-                        })),
-                    );
-                }
+	                if (items.length) {
+	                    await supabase.from('receipt_items').insert(
+	                        items.map((item: any, idx: number) => ({
+	                            receipt_id,
+	                            line_index: item?.line_index ?? idx,
+	                            item_name: item?.name ?? null,
+	                            item_amount: item?.price ?? null,
+	                            quantity: item?.quantity ?? null,
+	                            unit_price: item?.unit_price ?? null,
+	                            item_category: normalizeCategory(item?.category_prediction ?? item?.category),
+	                            bbox: item?.bbox ?? null,
+	                            confidence: item?.confidence ?? null,
+	                        })),
+	                    );
+	                }
 
                 stored = true;
             } catch (e: any) {

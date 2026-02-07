@@ -17,9 +17,9 @@ export async function GET(request: NextRequest) {
         const category = searchParams.get('category');
         const limit = parseInt(searchParams.get('limit') || '1000');
         
-        // Schema: id, user_id, uuid_user_id, date, category, name, merchant_name, amount, tip, tax, location, source, pending
+        // financial_transactions schema: id, user_id, uuid_user_id, date, category, name, merchant_name, amount, tip, tax, location, source, pending
         let query = supabaseAdmin
-            .from('transactions')
+            .from('financial_transactions')
             .select('*')
             .eq('uuid_user_id', userId)
             .order('date', { ascending: false })
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
         // Normalize transaction format for frontend compatibility
         const normalizedTransactions = (data || []).map((tx: any) => ({
             id: tx.id,
-            amount: tx.amount,
+            amount: Number(tx.amount),
             category: tx.category || 'Other',
             name: tx.merchant_name || tx.name || 'Unknown',
             merchant_name: tx.merchant_name,

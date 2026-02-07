@@ -16,6 +16,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { GlassButton } from "@/components/ui/glass-button";
 import { refreshGlobalFinancialData } from "@/hooks/useFinancialData";
 import { cn } from "@/lib/utils";
+import { STANDARD_CATEGORIES, normalizeCategory } from "@/lib/categories";
 import { AnimatePresence, motion } from "framer-motion";
 import {
     ArrowLeft,
@@ -119,7 +120,7 @@ interface EditableItem {
     bbox?: [number, number, number, number] | null;
 }
 
-const CATEGORY_OPTIONS = ['Groceries', 'Dining', 'Transport', 'Household', 'Health', 'Tech', 'Other'];
+const CATEGORY_OPTIONS = [...STANDARD_CATEGORIES];
 
 type BboxTransformMode = 'none' | 'flipY' | 'rotate180' | 'rotate90cw' | 'rotate90ccw';
 type BboxModeOverride = 'auto' | BboxTransformMode;
@@ -726,7 +727,7 @@ export default function ReceiptReviewPage() {
                 price: Number(item.item_amount || 0),
                 quantity: item.quantity != null ? Number(item.quantity) : null,
                 unitPrice: item.unit_price != null ? Number(item.unit_price) : null,
-                category: item.item_category,
+	                category: item.item_category ? normalizeCategory(item.item_category) : 'Other',
                 bbox: item.bbox ?? (bboxByLineIndex.get(item.line_index) ?? null),
             }));
         }
@@ -739,7 +740,7 @@ export default function ReceiptReviewPage() {
             unitPrice: item.unit_price != null
                 ? Number(item.unit_price)
                 : (item.unitPrice != null ? Number(item.unitPrice) : null),
-            category: item.category_prediction ?? null,
+	            category: item.category_prediction ? normalizeCategory(item.category_prediction) : null,
             bbox: item.bbox ?? null,
         }));
     }, [data]);

@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
         // Only seed demo data once per user. After that, we only append new Plaid transactions.
         // This prevents wiping user history on subsequent syncs/logins.
         const [{ data: anyTx }, { data: anyIncome }] = await Promise.all([
-            supabaseAdmin.from('transactions').select('id').eq('uuid_user_id', userId).limit(1),
+            supabaseAdmin.from('financial_transactions').select('id').eq('uuid_user_id', userId).limit(1),
             supabaseAdmin.from('income').select('id').eq('uuid_user_id', userId).limit(1),
         ]);
         const hasExistingData = (anyTx?.length ?? 0) > 0 || (anyIncome?.length ?? 0) > 0;
@@ -87,6 +87,26 @@ export async function POST(request: NextRequest) {
         
         const plaidTransactions = transactionsResponse.data.transactions;
         
+        const formatTxLocation = (loc: any): string | null => {
+            if (!loc || typeof loc !== 'object') return null;
+            // Plaid's shape varies by API version. Support common keys.
+            const parts = [
+                loc.address,
+                loc.street,
+                loc.city,
+                loc.region,
+                loc.state,
+                loc.postal_code,
+                loc.zip,
+                loc.country,
+            ]
+                .map((v) => (typeof v === 'string' ? v.trim() : ''))
+                .filter(Boolean);
+
+            const joined = parts.join(', ');
+            return joined.length ? joined : null;
+        };
+
         // Convert Plaid transactions to our format
         const formattedPlaidTransactions = plaidTransactions.map(tx => {
             const category = mapPlaidCategory(tx.category);
@@ -104,6 +124,7 @@ export async function POST(request: NextRequest) {
                 source: 'plaid' as const,
                 merchant_name: tx.merchant_name || tx.name,
                 pending: tx.pending,
+                location: formatTxLocation((tx as any).location),
             };
         });
 
@@ -132,7 +153,7 @@ export async function POST(request: NextRequest) {
 
             for (let i = 0; i < seedTransactions.length; i += BATCH_SIZE) {
                 const batch = seedTransactions.slice(i, i + BATCH_SIZE);
-                const { error } = await supabaseAdmin.from('transactions').insert(batch);
+                const { error } = await supabaseAdmin.from('financial_transactions').insert(batch);
                 if (error) {
                     console.error('Error inserting seeded transactions batch:', error);
                 }
@@ -164,7 +185,7 @@ export async function POST(request: NextRequest) {
                 for (let i = 0; i < plaidIds.length; i += CHUNK) {
                     const chunk = plaidIds.slice(i, i + CHUNK);
                     const { data: existing } = await supabaseAdmin
-                        .from('transactions')
+                        .from('financial_transactions')
                         .select('plaid_transaction_id')
                         .eq('uuid_user_id', userId)
                         .in('plaid_transaction_id', chunk);
@@ -185,7 +206,7 @@ export async function POST(request: NextRequest) {
 
             for (let i = 0; i < newPlaidTransactions.length; i += BATCH_SIZE) {
                 const batch = newPlaidTransactions.slice(i, i + BATCH_SIZE);
-                const { error } = await supabaseAdmin.from('transactions').insert(batch);
+                const { error } = await supabaseAdmin.from('financial_transactions').insert(batch);
                 if (error) {
                     console.error('Error inserting incremental Plaid transactions batch:', error);
                 }

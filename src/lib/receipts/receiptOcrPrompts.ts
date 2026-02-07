@@ -37,7 +37,7 @@ Rules:
     "currency": { "value": string|null, "confidence": number }
   },
   "items": [
-    { "name": string, "price": number, "quantity": number|null, "unit_price": number|null, "confidence": number, "category_prediction": "Groceries" | "Dining" | "Transport" | "Household" | "Health" | "Tech" | "Other" }
+    { "name": string, "price": number, "quantity": number|null, "unit_price": number|null, "confidence": number, "category_prediction": "Bills & Utilities" | "Education" | "Entertainment" | "Food & Drink" | "Health & Fitness" | "Personal Care" | "Shopping" | "Transportation" | "Travel" | "Other" }
   ],
   "lines": []
 }`;
@@ -71,7 +71,7 @@ Rules:
     "currency": { "value": string|null, "confidence": number }
   },
   "items": [
-    { "name": string, "price": number, "quantity": number|null, "unit_price": number|null, "confidence": number, "category_prediction": "Groceries" | "Dining" | "Transport" | "Household" | "Health" | "Tech" | "Other" }
+    { "name": string, "price": number, "quantity": number|null, "unit_price": number|null, "confidence": number, "category_prediction": "Bills & Utilities" | "Education" | "Entertainment" | "Food & Drink" | "Health & Fitness" | "Personal Care" | "Shopping" | "Transportation" | "Travel" | "Other" }
   ],
   "lines": []
 }`;

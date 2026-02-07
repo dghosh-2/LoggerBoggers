@@ -232,7 +232,7 @@ export async function POST(request: NextRequest) {
 
         // Only seed demo history once per user; never wipe existing history.
         const [{ data: anyTx }, { data: anyIncome }] = await Promise.all([
-            supabaseAdmin.from('transactions').select('id').eq('uuid_user_id', userId).limit(1),
+            supabaseAdmin.from('financial_transactions').select('id').eq('uuid_user_id', userId).limit(1),
             supabaseAdmin.from('income').select('id').eq('uuid_user_id', userId).limit(1),
         ]);
         const hasExistingFinancialData = (anyTx?.length ?? 0) > 0 || (anyIncome?.length ?? 0) > 0;
@@ -286,7 +286,7 @@ export async function POST(request: NextRequest) {
             let insertedTx = 0;
             for (let i = 0; i < allTransactionsWithUser.length; i += BATCH_SIZE) {
                 const batch = allTransactionsWithUser.slice(i, i + BATCH_SIZE);
-                const { error: txError } = await supabaseAdmin.from('transactions').insert(batch);
+                const { error: txError } = await supabaseAdmin.from('financial_transactions').insert(batch);
                 if (txError) {
                     console.error('Error inserting transactions batch:', txError);
                 } else {

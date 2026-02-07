@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
         const fakeIncome = generateFiveYearsOfIncome();
 
         // Clear existing data for this user
-        await supabaseAdmin.from('transactions').delete().eq('uuid_user_id', userId);
+        await supabaseAdmin.from('financial_transactions').delete().eq('uuid_user_id', userId);
         await supabaseAdmin.from('income').delete().eq('uuid_user_id', userId);
 
         // Transform transactions to match actual database schema
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
         let insertedTransactions = 0;
         for (let i = 0; i < transformedTransactions.length; i += BATCH_SIZE) {
             const batch = transformedTransactions.slice(i, i + BATCH_SIZE);
-            const { error } = await supabaseAdmin.from('transactions').insert(batch);
+            const { error } = await supabaseAdmin.from('financial_transactions').insert(batch);
             if (error) {
                 console.error('Error inserting transactions batch:', error);
             } else {

@@ -156,6 +156,17 @@ export default function GlobePage() {
         {/* Globe - Always show the 3D globe */}
         <div className="rounded-xl bg-card border border-border overflow-hidden relative" style={{ height: '600px' }}>
           <PurchaseGlobe locations={locations} isLoading={loading} />
+          {!loading && locations.length === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="max-w-md text-center p-6 bg-card/85 backdrop-blur-sm border border-border rounded-xl">
+                <p className="text-sm font-semibold">No locations to show yet</p>
+                <p className="text-xs text-foreground-muted mt-2">
+                  The globe needs an address for each transaction (for example, a Plaid location or a receipt address) so it
+                  can geocode it into latitude/longitude.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Recent Purchases List */}

@@ -16,6 +16,7 @@ import {
     Edit3,
 } from 'lucide-react';
 import type { TrendAnalytics, CategoryTrend } from '@/types/budget';
+import { normalizeCategory } from '@/lib/categories';
 import {
     ResponsiveContainer,
     LineChart,
@@ -35,19 +36,20 @@ import {
 // ═══════════════════════════════════════════════════════════════════════════
 
 const CATEGORY_COLORS: Record<string, string> = {
-    Dining: '#f97316',
-    Shopping: '#a855f7',
-    Entertainment: '#3b82f6',
-    Groceries: '#22c55e',
-    Transportation: '#eab308',
-    Utilities: '#06b6d4',
-    Healthcare: '#ec4899',
-    Housing: '#6366f1',
-    Other: '#6b7280',
+    'Bills & Utilities': '#06b6d4',
+    'Education': '#a855f7',
+    'Entertainment': '#3b82f6',
+    'Food & Drink': '#f97316',
+    'Health & Fitness': '#ec4899',
+    'Personal Care': '#14b8a6',
+    'Shopping': '#a855f7',
+    'Transportation': '#eab308',
+    'Travel': '#fb923c',
+    'Other': '#6b7280',
 };
 
 function getCategoryColor(category: string): string {
-    return CATEGORY_COLORS[category] || '#6b7280';
+    return CATEGORY_COLORS[normalizeCategory(category)] || '#6b7280';
 }
 
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

@@ -32,22 +32,6 @@ export async function GET(request: NextRequest) {
         
         const isConnected = connectionData?.is_connected || false;
         
-        if (!isConnected) {
-            // Return zeros if not connected (but user IS authenticated)
-            return NextResponse.json({
-                is_connected: false,
-                is_authenticated: true,
-                total_spending: 0,
-                total_income: 0,
-                net_worth: 0,
-                monthly_spending: 0,
-                monthly_income: 0,
-                spending_by_category: {},
-                recent_transactions: [],
-                monthly_trend: [],
-            });
-        }
-        
         // Get current month dates
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
@@ -61,7 +45,7 @@ export async function GET(request: NextRequest) {
         // Fetch all transactions for calculations
         // Schema: id, user_id, uuid_user_id, amount, date, category, name, merchant_name, tip, tax, location, source
         const { data: allTransactions, error: txError } = await supabaseAdmin
-            .from('transactions')
+            .from('financial_transactions')
             .select('amount, date, category, merchant_name, name, tip, tax, location')
             .eq('uuid_user_id', userId)
             .gte('date', twelveMonthsAgoStr)
@@ -195,7 +179,8 @@ export async function GET(request: NextRequest) {
         const hasAnyData = transactions.length > 0 || income.length > 0;
 
         return NextResponse.json({
-            is_connected: true,
+            // "connected" means "has usable data" for the dashboard. Plaid is optional for the MVP.
+            is_connected: isConnected || hasAnyData,
             is_authenticated: true,
             total_spending: Math.round(totalSpending * 100) / 100,
             total_income: Math.round(totalIncome * 100) / 100,

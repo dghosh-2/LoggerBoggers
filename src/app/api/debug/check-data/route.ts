@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
         ] = await Promise.all([
             supabaseAdmin.from('users').select('*', { count: 'exact', head: true }),
             supabaseAdmin.from('sessions').select('*', { count: 'exact', head: true }),
-            supabaseAdmin.from('transactions').select('*', { count: 'exact', head: true }),
+            supabaseAdmin.from('financial_transactions').select('*', { count: 'exact', head: true }),
             supabaseAdmin.from('income').select('*', { count: 'exact', head: true }),
             supabaseAdmin.from('accounts').select('*', { count: 'exact', head: true }),
             supabaseAdmin.from('holdings').select('*', { count: 'exact', head: true }),
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
                 { data: userAccounts },
                 { data: userConnection },
             ] = await Promise.all([
-                supabaseAdmin.from('transactions').select('*', { count: 'exact' }).eq('uuid_user_id', userId).limit(5),
+                supabaseAdmin.from('financial_transactions').select('*', { count: 'exact' }).eq('uuid_user_id', userId).limit(5),
                 supabaseAdmin.from('income').select('*', { count: 'exact' }).eq('uuid_user_id', userId).limit(5),
                 supabaseAdmin.from('accounts').select('*').eq('uuid_user_id', userId),
                 supabaseAdmin.from('user_plaid_connections').select('*').eq('uuid_user_id', userId).single(),
