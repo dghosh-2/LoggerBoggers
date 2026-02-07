@@ -9,12 +9,17 @@ import type {
     CreateGoalInput,
     BudgetPriority,
     CategoryBudget,
+    TrendAnalytics,
+    BudgetSimulationResult,
 } from '@/types/budget';
 import {
     initializeBudget,
     updateBudgetWithSpending,
     generateBudgetSummary,
+    recalculateBudgetMetrics,
+    simulateBudgetChanges,
 } from '@/lib/budget/autopilot-engine';
+import { generateAllInsights, generateTrendAnalytics } from '@/lib/budget/trend-analyzer';
 
 // Helper for generating IDs
 const generateId = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
@@ -32,6 +37,10 @@ interface BudgetState {
     upcomingEvents: DetectedEvent[];
     insights: BudgetInsight[];
     alerts: BudgetAlert[];
+
+    // Analytics state
+    trendAnalytics: TrendAnalytics | null;
+    cachedTransactions: Array<{ amount: number; category: string; date: string; name: string }>;
 
     // UI state
     isLoading: boolean;
@@ -65,6 +74,11 @@ interface BudgetState {
     fetchInsights: () => Promise<void>;
     dismissInsight: (insightId: string) => Promise<void>;
     acknowledgeAlert: (alertId: string) => Promise<void>;
+    applyInsightRecommendation: (insightId: string) => Promise<void>;
+
+    // Actions - Trend Analytics
+    generateTrends: () => void;
+    simulateChanges: (changes: Record<string, number>) => BudgetSimulationResult | null;
 
     // UI Actions
     setSelectedCategory: (category: string | null) => void;
@@ -94,6 +108,8 @@ export const useBudgetStore = create<BudgetState>((set, get) => ({
     upcomingEvents: [],
     insights: [],
     alerts: [],
+    trendAnalytics: null,
+    cachedTransactions: [],
     isLoading: false,
     isInitialized: false,
     selectedCategory: null,
@@ -114,6 +130,7 @@ export const useBudgetStore = create<BudgetState>((set, get) => ({
             const cachedGoals = localStorage.getItem('budget_savingsGoals');
             const cachedEvents = localStorage.getItem('budget_upcomingEvents');
             const cachedInsights = localStorage.getItem('budget_insights');
+            const cachedTrends = localStorage.getItem('budget_trendAnalytics');
 
             if (cachedConfig && cachedSummary) {
                 set({
@@ -122,6 +139,7 @@ export const useBudgetStore = create<BudgetState>((set, get) => ({
                     savingsGoals: cachedGoals ? JSON.parse(cachedGoals) : [],
                     upcomingEvents: cachedEvents ? JSON.parse(cachedEvents) : [],
                     insights: cachedInsights ? JSON.parse(cachedInsights) : [],
+                    trendAnalytics: cachedTrends ? JSON.parse(cachedTrends) : null,
                     isInitialized: true,
                 });
             }
@@ -140,13 +158,12 @@ export const useBudgetStore = create<BudgetState>((set, get) => ({
         try {
             // 1. Fetch user profile to get risk tolerance
             const profileResponse = await fetch('/api/user');
+            let priority: BudgetPriority = 'balanced';
             if (profileResponse.ok) {
                 const profileData = await profileResponse.json();
                 const content = profileData.content || '';
                 const riskTolerance = extractRiskTolerance(content);
-                var priority = mapRiskToPriority(riskTolerance);
-            } else {
-                var priority: BudgetPriority = 'balanced';
+                priority = mapRiskToPriority(riskTolerance);
             }
 
             // 2. Fetch transaction history (last 6 months)
@@ -190,47 +207,47 @@ export const useBudgetStore = create<BudgetState>((set, get) => ({
             const currentMonthData = await currentMonthResponse.json();
 
             // 7. Update budgets with current spending
-            // Merge with existing manual adjustments if any
-            const existingSummary = get().currentMonth;
-            let budgetsToUpdate = categoryBudgets;
-
-            if (existingSummary) {
-                // Preserve manual allocations if category exists in new calculation
-                budgetsToUpdate = categoryBudgets.map(newBudget => {
-                    const existing = existingSummary.categoryBudgets.find(b => b.category === newBudget.category);
-                    if (existing && existing.allocated !== newBudget.allocated) {
-                        // Keep manual allocation? For now, let's reset on rebalance/init unless we track manual overrides
-                        // User wants AI Rebalance to "force" optimization, so maybe overwriting is correct.
-                        // But for regular init, we might want to respect overrides.
-                        // Let's assume AI Rebalance means "reset to optimal".
-                        return newBudget;
-                    }
-                    return newBudget;
-                });
-            }
-
             const updatedBudgets = updateBudgetWithSpending(
-                budgetsToUpdate,
+                categoryBudgets,
                 currentMonthData.transactions || []
             );
 
-            // 8. Generate summary
-            const summary = generateBudgetSummary(
-                fullConfig,
-                updatedBudgets,
-                0, // Account balance (could fetch)
-                0  // Upcoming bills (could fetch)
-            );
+            // 8. Generate summary using recalculation engine
+            const summary = recalculateBudgetMetrics(fullConfig, updatedBudgets, 0, 0);
+
+            // 9. Cache transactions for trend analysis
+            const allTransactions = transactionsData.transactions || [];
 
             set({
                 config: fullConfig,
                 currentMonth: summary,
+                cachedTransactions: allTransactions,
                 isInitialized: true,
             });
 
-            // 9. Persist
+            // 10. Persist
             localStorage.setItem('budget_config', JSON.stringify(fullConfig));
             localStorage.setItem('budget_summary', JSON.stringify(summary));
+
+            // 11. Generate insights and trends in background
+            const state = get();
+            if (allTransactions.length > 0) {
+                // Generate trend analytics
+                const trends = generateTrendAnalytics(allTransactions, summary.categoryBudgets);
+                set({ trendAnalytics: trends });
+                localStorage.setItem('budget_trendAnalytics', JSON.stringify(trends));
+
+                // Generate insights
+                const insights = generateAllInsights(
+                    allTransactions,
+                    summary,
+                    fullConfig,
+                    state.savingsGoals,
+                    state.upcomingEvents
+                );
+                set({ insights });
+                localStorage.setItem('budget_insights', JSON.stringify(insights));
+            }
 
         } catch (error) {
             console.error('Failed to generate budget:', error);
@@ -241,7 +258,6 @@ export const useBudgetStore = create<BudgetState>((set, get) => ({
         set({ isLoading: true });
         try {
             await get().generateBudgetFromProfile();
-            // Could add toast here
         } catch (error) {
             console.error('Failed to rebalance:', error);
         } finally {
@@ -253,22 +269,40 @@ export const useBudgetStore = create<BudgetState>((set, get) => ({
         await get().generateBudgetFromProfile();
     },
 
-    adjustCategoryBudget: async (category, newAmount) => {
-        const { currentMonth } = get();
-        if (!currentMonth) return;
+    // ─────────────────────────────────────────────────────────────────────────
+    // Budget Adjustment — Full Metric Recalculation
+    // ─────────────────────────────────────────────────────────────────────────
 
+    adjustCategoryBudget: async (category, newAmount) => {
+        const { currentMonth, config } = get();
+        if (!currentMonth || !config) return;
+
+        // Update the specific category
         const updatedCategories = currentMonth.categoryBudgets.map(cat =>
-            cat.category === category ? { ...cat, allocated: newAmount, remaining: newAmount - cat.spent } : cat
+            cat.category === category
+                ? { ...cat, allocated: newAmount, remaining: newAmount - cat.spent }
+                : cat
         );
 
-        const newSummary = {
-            ...currentMonth,
-            categoryBudgets: updatedCategories,
-            totalBudget: updatedCategories.reduce((sum, c) => sum + c.allocated, 0),
-        };
+        // Full recalculation of all metrics
+        const newSummary = recalculateBudgetMetrics(config, updatedCategories, 0, 0);
 
         set({ currentMonth: newSummary });
         localStorage.setItem('budget_summary', JSON.stringify(newSummary));
+
+        // Regenerate insights since budget changed
+        const { cachedTransactions, savingsGoals, upcomingEvents } = get();
+        if (cachedTransactions.length > 0) {
+            const insights = generateAllInsights(
+                cachedTransactions,
+                newSummary,
+                config,
+                savingsGoals,
+                upcomingEvents
+            );
+            set({ insights });
+            localStorage.setItem('budget_insights', JSON.stringify(insights));
+        }
     },
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -322,13 +356,11 @@ export const useBudgetStore = create<BudgetState>((set, get) => ({
     // ─────────────────────────────────────────────────────────────────────────
 
     fetchUpcomingEvents: async () => {
-        // In a real app we'd fetch from calendar/news here.
-        // For now, load from LS or init with some mock data if empty
         const stored = localStorage.getItem('budget_upcomingEvents');
         if (stored) {
             set({ upcomingEvents: JSON.parse(stored) });
         } else {
-            // Optional: Mock events
+            // Mock events
             const mockEvents: DetectedEvent[] = [
                 {
                     id: generateId(),
@@ -358,7 +390,6 @@ export const useBudgetStore = create<BudgetState>((set, get) => ({
     },
 
     refreshNewsAnalysis: async () => {
-        // Mock analysis
         set({ isLoading: true });
         setTimeout(() => {
             set({ isLoading: false });
@@ -379,32 +410,30 @@ export const useBudgetStore = create<BudgetState>((set, get) => ({
     },
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Insights & Alerts (LocalStorage)
+    // Insights & Alerts
     // ─────────────────────────────────────────────────────────────────────────
 
     fetchInsights: async () => {
+        const { currentMonth, config, cachedTransactions, savingsGoals, upcomingEvents } = get();
+
+        // If we have transactions and budget data, generate real insights
+        if (cachedTransactions.length > 0 && currentMonth && config) {
+            const insights = generateAllInsights(
+                cachedTransactions,
+                currentMonth,
+                config,
+                savingsGoals,
+                upcomingEvents
+            );
+            set({ insights });
+            localStorage.setItem('budget_insights', JSON.stringify(insights));
+            return;
+        }
+
+        // Fall back to stored insights
         const stored = localStorage.getItem('budget_insights');
         if (stored) {
             set({ insights: JSON.parse(stored) });
-        } else {
-            // Mock insights
-            const mockInsights: BudgetInsight[] = [
-                {
-                    id: generateId(),
-                    userId: 'local-user',
-                    insightType: 'optimization',
-                    title: 'Dining Optimization',
-                    description: 'You spent 15% less on Dining than allocated last month.',
-                    impact: 'medium',
-                    isActionable: true,
-                    actionType: null,
-                    actionPayload: null,
-                    dismissed: false,
-                    createdAt: new Date().toISOString(),
-                }
-            ];
-            set({ insights: mockInsights });
-            localStorage.setItem('budget_insights', JSON.stringify(mockInsights));
         }
     },
 
@@ -419,6 +448,125 @@ export const useBudgetStore = create<BudgetState>((set, get) => ({
             a.id === alertId ? { ...a, acknowledged: true } : a
         );
         set({ alerts: updatedAlerts });
+    },
+
+    applyInsightRecommendation: async (insightId) => {
+        const { insights, currentMonth, config } = get();
+        const insight = insights.find(i => i.id === insightId);
+        if (!insight || !insight.actionPayload || !currentMonth || !config) return;
+
+        try {
+            switch (insight.actionType) {
+                case 'reallocate': {
+                    const { fromCategory, amount } = insight.actionPayload as {
+                        fromCategory: string;
+                        amount: number;
+                    };
+                    const catBudget = currentMonth.categoryBudgets.find(c => c.category === fromCategory);
+                    if (catBudget) {
+                        await get().adjustCategoryBudget(fromCategory, catBudget.allocated - (amount as number));
+                    }
+                    break;
+                }
+
+                case 'reduce_category': {
+                    const { category, reductionAmount } = insight.actionPayload as {
+                        category: string;
+                        reductionAmount: number;
+                    };
+                    const catBudget = currentMonth.categoryBudgets.find(c => c.category === category);
+                    if (catBudget) {
+                        await get().adjustCategoryBudget(category, catBudget.allocated - (reductionAmount as number));
+                    }
+                    break;
+                }
+
+                case 'address_trend': {
+                    const { category, suggestedCap } = insight.actionPayload as {
+                        category: string;
+                        suggestedCap: number;
+                    };
+                    await get().adjustCategoryBudget(category, suggestedCap);
+                    break;
+                }
+
+                case 'prepare_for_event': {
+                    const { fromCategory, shortage } = insight.actionPayload as {
+                        fromCategory: string | null;
+                        shortage: number;
+                    };
+                    if (fromCategory) {
+                        const srcBudget = currentMonth.categoryBudgets.find(c => c.category === fromCategory);
+                        if (srcBudget) {
+                            await get().adjustCategoryBudget(fromCategory, srcBudget.allocated - shortage);
+                        }
+                    }
+                    break;
+                }
+
+                case 'create_event_goal': {
+                    const { goalName, targetAmount, deadline, weeklyContribution } = insight.actionPayload as {
+                        goalName: string;
+                        targetAmount: number;
+                        deadline: string;
+                        weeklyContribution: number;
+                        eventId: string;
+                    };
+                    await get().createSavingsGoal({
+                        name: goalName,
+                        targetAmount,
+                        deadline,
+                    });
+                    break;
+                }
+
+                case 'boost_goal': {
+                    const { reallocationOptions } = insight.actionPayload as {
+                        goalId: string;
+                        requiredWeeklyIncrease: number;
+                        reallocationOptions: Array<{ category: string; available: number }>;
+                    };
+                    // Pull from first available category
+                    if (reallocationOptions && reallocationOptions.length > 0) {
+                        const src = reallocationOptions[0];
+                        const catBudget = currentMonth.categoryBudgets.find(c => c.category === src.category);
+                        if (catBudget) {
+                            const reduction = Math.min(src.available, catBudget.allocated * 0.3);
+                            await get().adjustCategoryBudget(src.category, catBudget.allocated - reduction);
+                        }
+                    }
+                    break;
+                }
+
+                default:
+                    console.log('Unhandled insight action:', insight.actionType, insight.actionPayload);
+            }
+
+            // Dismiss the applied insight
+            get().dismissInsight(insightId);
+        } catch (error) {
+            console.error('Failed to apply insight:', error);
+        }
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Trend Analytics
+    // ─────────────────────────────────────────────────────────────────────────
+
+    generateTrends: () => {
+        const { cachedTransactions, currentMonth } = get();
+        if (cachedTransactions.length === 0 || !currentMonth) return;
+
+        const trends = generateTrendAnalytics(cachedTransactions, currentMonth.categoryBudgets);
+        set({ trendAnalytics: trends });
+        localStorage.setItem('budget_trendAnalytics', JSON.stringify(trends));
+    },
+
+    simulateChanges: (changes) => {
+        const { currentMonth, config } = get();
+        if (!currentMonth || !config) return null;
+
+        return simulateBudgetChanges(currentMonth, config, changes, 0, 0);
     },
 
     // ─────────────────────────────────────────────────────────────────────────
