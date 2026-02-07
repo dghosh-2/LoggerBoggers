@@ -1,28 +1,27 @@
 "use client";
 
 import React from 'react';
-import { Sparkles } from 'lucide-react';
-
+import { motion, AnimatePresence } from 'framer-motion';
 import { CategoryDetails } from './CategoryDetails';
 import { useInsightsStore } from '@/stores/insights-store';
 
 export function InsightsFeed() {
     const { selectedCategory } = useInsightsStore();
 
-    if (selectedCategory) {
-        return <CategoryDetails />;
-    }
-
-    // Blank placeholder state per user request
     return (
-        <div className="h-full flex flex-col items-center justify-center text-center p-8">
-            <div className="p-4 rounded-full bg-secondary mb-4">
-                <Sparkles className="w-8 h-8 text-foreground-muted" />
-            </div>
-            <h3 className="text-lg font-medium text-foreground-muted">Feed Coming Soon</h3>
-            <p className="text-sm text-muted-foreground max-w-xs mt-2">
-                We are building a new intelligent feed to surface your most important financial insights.
-            </p>
-        </div>
+        <AnimatePresence mode="wait">
+            {selectedCategory && (
+                <motion.aside 
+                    key="category-details"
+                    initial={{ opacity: 0, x: -20, width: 0 }}
+                    animate={{ opacity: 1, x: 0, width: 'auto' }}
+                    exit={{ opacity: 0, x: -20, width: 0 }}
+                    transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                    className="col-span-3 card-elevated overflow-hidden"
+                >
+                    <CategoryDetails />
+                </motion.aside>
+            )}
+        </AnimatePresence>
     );
 }
