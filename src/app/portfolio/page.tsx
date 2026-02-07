@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { 
   TrendingUp, 
@@ -40,13 +40,8 @@ import { UploadCard } from "@/components/cards/upload-card";
 import { PortfolioChart } from "@/components/charts/portfolio-chart";
 import { HoldingCard } from "@/components/cards/holding-card";
 import { useUserStore } from "@/stores/user-store";
+import { usePortfolioData } from "@/stores/portfolio-store";
 import {
-  getConnectedInstitutions,
-  getBankAccounts,
-  getInvestmentAccounts,
-  getInvestmentHoldings,
-  getLoans,
-  getFinancialSummary,
   syncInstitution,
   syncAllInstitutions,
   type PlaidInstitution,
@@ -138,13 +133,20 @@ const loanTypeIcons: Record<string, typeof GraduationCap> = {
 
 export default function PortfolioPage() {
   const { holdings } = useUserStore();
-  const [institutions, setInstitutions] = useState<PlaidInstitution[]>([]);
-  const [bankAccounts, setBankAccounts] = useState<PlaidAccount[]>([]);
-  const [investmentAccounts, setInvestmentAccounts] = useState<PlaidAccount[]>([]);
-  const [plaidHoldings, setPlaidHoldings] = useState<PlaidInvestmentHolding[]>([]);
-  const [loans, setLoans] = useState<PlaidLoan[]>([]);
-  const [summary, setSummary] = useState<FinancialSummary | null>(null);
-  const [loading, setLoading] = useState(true);
+  
+  // Use cached portfolio data
+  const {
+    institutions,
+    bankAccounts,
+    investmentAccounts,
+    holdings: plaidHoldings,
+    loans,
+    summary,
+    isLoading,
+    fetchData,
+    invalidateAndRefetch,
+  } = usePortfolioData();
+  
   const [syncingInstitutions, setSyncingInstitutions] = useState<Set<string>>(new Set());
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [showRecommendations, setShowRecommendations] = useState(false);
@@ -164,96 +166,18 @@ export default function PortfolioPage() {
   
   const totalStockValue = portfolio.reduce((sum, h) => sum + h.value, 0);
 
+  // Fetch data on mount (will use cache if available)
   useEffect(() => {
-    loadData();
-    fetchRealAccounts();
+    fetchData();
   }, []);
 
-  // Fetch real accounts from Plaid API
-  const fetchRealAccounts = async () => {
-    try {
-      const response = await fetch('/api/plaid/accounts');
-      if (response.ok) {
-        const data = await response.json();
-        if (data.institutions && data.institutions.length > 0) {
-          // Merge real Plaid accounts with fake data
-          const realInstitutions: PlaidInstitution[] = data.institutions.map((inst: any) => ({
-            id: inst.itemId || inst.id,
-            name: inst.name,
-            logo: inst.logo,
-            primaryColor: inst.primaryColor,
-            lastSync: inst.lastSync || 'Just now',
-            status: inst.status || 'connected',
-            accounts: inst.accounts.map((acc: any) => ({
-              id: acc.id,
-              name: acc.name,
-              officialName: acc.officialName,
-              type: acc.type,
-              subtype: acc.subtype,
-              institution: inst.name,
-              institutionId: inst.id,
-              mask: acc.mask || '****',
-              currentBalance: acc.currentBalance || 0,
-              availableBalance: acc.availableBalance,
-              limit: acc.limit,
-              isoCurrencyCode: acc.isoCurrencyCode || 'USD',
-              lastUpdated: new Date().toISOString(),
-              status: 'connected',
-            })),
-          }));
-          
-          // Add real institutions to the list (avoiding duplicates)
-          setInstitutions(prev => {
-            const existingIds = new Set(prev.map(i => i.id));
-            const newInstitutions = realInstitutions.filter(i => !existingIds.has(i.id));
-            return [...prev, ...newInstitutions];
-          });
+  // Force refresh data (invalidates cache)
+  const loadData = useCallback(async () => {
+    await invalidateAndRefetch();
+  }, [invalidateAndRefetch]);
 
-          // Update bank accounts
-          const realBankAccounts = data.accounts.filter((acc: any) => acc.type === 'depository');
-          setBankAccounts(prev => {
-            const existingIds = new Set(prev.map(a => a.id));
-            const newAccounts = realBankAccounts.filter((a: any) => !existingIds.has(a.id));
-            return [...prev, ...newAccounts];
-          });
-
-          // Update investment accounts
-          const realInvestmentAccounts = data.accounts.filter((acc: any) => acc.type === 'investment');
-          setInvestmentAccounts(prev => {
-            const existingIds = new Set(prev.map(a => a.id));
-            const newAccounts = realInvestmentAccounts.filter((a: any) => !existingIds.has(a.id));
-            return [...prev, ...newAccounts];
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching real accounts:', error);
-    }
-  };
-
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [inst, bank, invest, hold, loan, sum] = await Promise.all([
-        getConnectedInstitutions(),
-        getBankAccounts(),
-        getInvestmentAccounts(),
-        getInvestmentHoldings(),
-        getLoans(),
-        getFinancialSummary(),
-      ]);
-      setInstitutions(inst);
-      setBankAccounts(bank);
-      setInvestmentAccounts(invest);
-      setPlaidHoldings(hold);
-      setLoans(loan);
-      setSummary(sum);
-    } catch (error) {
-      toast.error("Failed to load financial data");
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Alias for loading state
+  const loading = isLoading;
 
   const handleSyncInstitution = async (institutionId: string) => {
     setSyncingInstitutions(prev => new Set([...prev, institutionId]));
@@ -261,7 +185,7 @@ export default function PortfolioPage() {
     
     try {
       await syncInstitution(institutionId);
-      await loadData();
+      await invalidateAndRefetch();
       toast.success("Account synced successfully!");
     } catch (error) {
       toast.error("Failed to sync account");
@@ -281,7 +205,7 @@ export default function PortfolioPage() {
     
     try {
       await syncAllInstitutions();
-      await loadData();
+      await invalidateAndRefetch();
       toast.success("All accounts synced!");
     } catch (error) {
       toast.error("Failed to sync accounts");
@@ -297,7 +221,7 @@ export default function PortfolioPage() {
     // In production, this would open Plaid Link
     setTimeout(() => {
       toast.success(`${bankName} connected successfully!`);
-      loadData();
+      invalidateAndRefetch();
     }, 1500);
   };
 
@@ -347,8 +271,7 @@ export default function PortfolioPage() {
               </GlassButton>
               <PlaidLinkButton 
                 onSuccess={() => {
-                  loadData();
-                  fetchRealAccounts();
+                  invalidateAndRefetch();
                 }}
                 buttonText="Add Account"
               />
@@ -368,8 +291,7 @@ export default function PortfolioPage() {
                   </p>
                   <PlaidLinkButton 
                     onSuccess={() => {
-                      loadData();
-                      fetchRealAccounts();
+                      invalidateAndRefetch();
                     }}
                     buttonText="Connect Account"
                     buttonVariant="primary"
@@ -590,8 +512,7 @@ export default function PortfolioPage() {
                 </p>
                 <PlaidLinkButton 
                   onSuccess={() => {
-                    loadData();
-                    fetchRealAccounts();
+                    invalidateAndRefetch();
                   }}
                   buttonText="Connect Account"
                   buttonVariant="primary"
@@ -999,8 +920,7 @@ export default function PortfolioPage() {
             <PlaidLinkButton 
               onSuccess={() => {
                 setShowAddAccount(false);
-                loadData();
-                fetchRealAccounts();
+                invalidateAndRefetch();
               }}
               onExit={() => {}}
               buttonText="Connect with Plaid"
