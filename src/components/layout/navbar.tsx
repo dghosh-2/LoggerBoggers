@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import {
   LayoutDashboard,
   Sparkles,
@@ -54,16 +55,21 @@ export function Navbar() {
 
         {/* Navigation */}
         <nav className="flex-1 px-3 pt-2 space-y-0.5 overflow-y-auto">
-          {navItems.map((item) => {
+          {navItems.map((item, index) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
 
             return (
-              <button
+              <motion.button
                 key={item.href}
                 onClick={() => handleNavClick(item.href)}
+                initial={{ opacity: 0, x: -12 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.05, duration: 0.3 }}
+                whileHover={{ x: 4, transition: { duration: 0.2 } }}
+                whileTap={{ scale: 0.98 }}
                 className={cn(
-                  "w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-[13px] transition-colors duration-100 cursor-pointer",
+                  "w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-[13px] transition-colors duration-200 cursor-pointer",
                   isActive
                     ? "bg-secondary font-medium text-foreground"
                     : "text-foreground-muted hover:text-foreground hover:bg-secondary/60"
@@ -71,7 +77,7 @@ export function Navbar() {
               >
                 <Icon className="w-4 h-4 shrink-0" />
                 <span>{item.name}</span>
-              </button>
+              </motion.button>
             );
           })}
         </nav>

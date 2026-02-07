@@ -28,13 +28,23 @@ export function GlassButton({
   variant = "primary",
   size = "md",
   className,
+  disabled,
   ...props
 }: GlassButtonProps) {
   return (
     <motion.button
-      whileTap={{ scale: 0.98 }}
+      whileHover={!disabled ? { 
+        scale: 1.02,
+        transition: { duration: 0.2, ease: "easeOut" }
+      } : undefined}
+      whileTap={!disabled ? { 
+        scale: 0.97,
+        transition: { duration: 0.1 }
+      } : undefined}
+      disabled={disabled}
       className={cn(
-        "inline-flex items-center justify-center gap-2 font-medium transition-all duration-100 rounded-md cursor-pointer",
+        "inline-flex items-center justify-center gap-2 font-medium transition-all duration-200 rounded-md cursor-pointer",
+        "active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50",
         variants[variant],
         sizes[size],
         className
