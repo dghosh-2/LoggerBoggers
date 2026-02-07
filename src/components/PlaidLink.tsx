@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { usePlaidLink } from 'react-plaid-link';
+import { usePlaidLink, PlaidLinkOptions } from 'react-plaid-link';
 import { toast } from '@/components/ui/toast';
 import { GlassButton } from '@/components/ui/glass-button';
 import { Link2, Loader2 } from 'lucide-react';
@@ -15,39 +15,17 @@ interface PlaidLinkProps {
     className?: string;
 }
 
-export function PlaidLinkButton({
+// Inner component that uses the hook only when token is available
+function PlaidLinkButtonInner({
+    linkToken,
     onSuccess,
     onExit,
-    buttonText = 'Connect Account',
-    buttonVariant = 'primary',
-    buttonSize = 'sm',
+    buttonText,
+    buttonVariant,
+    buttonSize,
     className,
-}: PlaidLinkProps) {
-    const [linkToken, setLinkToken] = useState<string | null>(null);
+}: PlaidLinkProps & { linkToken: string }) {
     const [loading, setLoading] = useState(false);
-
-    // Fetch link token on mount
-    useEffect(() => {
-        const fetchLinkToken = async () => {
-            try {
-                const response = await fetch('/api/plaid/create-link-token', {
-                    method: 'POST',
-                });
-                
-                if (!response.ok) {
-                    throw new Error('Failed to create link token');
-                }
-                
-                const data = await response.json();
-                setLinkToken(data.link_token);
-            } catch (error) {
-                console.error('Error fetching link token:', error);
-                toast.error('Failed to initialize Plaid. Please try again.');
-            }
-        };
-
-        fetchLinkToken();
-    }, []);
 
     const handleOnSuccess = useCallback(async (public_token: string, metadata: any) => {
         setLoading(true);
@@ -82,11 +60,13 @@ export function PlaidLinkButton({
         onExit?.();
     }, [onExit]);
 
-    const { open, ready } = usePlaidLink({
+    const config: PlaidLinkOptions = {
         token: linkToken,
         onSuccess: handleOnSuccess,
         onExit: handleOnExit,
-    });
+    };
+
+    const { open, ready } = usePlaidLink(config);
 
     return (
         <GlassButton
@@ -103,6 +83,71 @@ export function PlaidLinkButton({
             )}
             {loading ? 'Connecting...' : buttonText}
         </GlassButton>
+    );
+}
+
+export function PlaidLinkButton({
+    onSuccess,
+    onExit,
+    buttonText = 'Connect Account',
+    buttonVariant = 'primary',
+    buttonSize = 'sm',
+    className,
+}: PlaidLinkProps) {
+    const [linkToken, setLinkToken] = useState<string | null>(null);
+    const [tokenLoading, setTokenLoading] = useState(true);
+
+    // Fetch link token on mount
+    useEffect(() => {
+        const fetchLinkToken = async () => {
+            try {
+                setTokenLoading(true);
+                const response = await fetch('/api/plaid/create-link-token', {
+                    method: 'POST',
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to create link token');
+                }
+                
+                const data = await response.json();
+                setLinkToken(data.link_token);
+            } catch (error) {
+                console.error('Error fetching link token:', error);
+                toast.error('Failed to initialize Plaid. Please try again.');
+            } finally {
+                setTokenLoading(false);
+            }
+        };
+
+        fetchLinkToken();
+    }, []);
+
+    // Show loading state while fetching token
+    if (tokenLoading || !linkToken) {
+        return (
+            <GlassButton
+                variant={buttonVariant}
+                size={buttonSize}
+                disabled
+                className={className}
+            >
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                {tokenLoading ? 'Loading...' : buttonText}
+            </GlassButton>
+        );
+    }
+
+    return (
+        <PlaidLinkButtonInner
+            linkToken={linkToken}
+            onSuccess={onSuccess}
+            onExit={onExit}
+            buttonText={buttonText}
+            buttonVariant={buttonVariant}
+            buttonSize={buttonSize}
+            className={className}
+        />
     );
 }
 
