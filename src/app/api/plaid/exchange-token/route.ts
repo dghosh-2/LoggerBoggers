@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { plaidClient } from '@/lib/plaid-client';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getUserIdFromRequest } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
         console.log('Successfully exchanged token. Item ID:', itemId);
 
         // Store the access token in Supabase (in production, encrypt this!)
-        const { error: insertError } = await supabase.from('plaid_items').upsert({
+        const { error: insertError } = await supabaseAdmin.from('plaid_items').upsert({
             user_id: userId,
             uuid_user_id: userId,
             item_id: itemId,
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
                     adjustedBalance = Math.round(adjustedBalance * 2); // Double investments
                 }
                 
-                await supabase.from('accounts').upsert({
+                await supabaseAdmin.from('accounts').upsert({
                     user_id: userId,
                     uuid_user_id: userId,
                     plaid_account_id: account.account_id,
@@ -222,8 +222,8 @@ export async function POST(request: NextRequest) {
             const allTransactions = fakeTransactions;
 
             // Clear existing data and insert new
-            await supabase.from('transactions').delete().eq('uuid_user_id', userId);
-            await supabase.from('income').delete().eq('uuid_user_id', userId);
+            await supabaseAdmin.from('financial_transactions').delete().eq('uuid_user_id', userId);
+            await supabaseAdmin.from('income').delete().eq('uuid_user_id', userId);
 
             // Add user_id to fake transactions and income
             const allTransactionsWithUser = allTransactions.map(tx => ({
@@ -242,17 +242,17 @@ export async function POST(request: NextRequest) {
             const BATCH_SIZE = 500;
             for (let i = 0; i < allTransactionsWithUser.length; i += BATCH_SIZE) {
                 const batch = allTransactionsWithUser.slice(i, i + BATCH_SIZE);
-                await supabase.from('transactions').insert(batch);
+                await supabaseAdmin.from('financial_transactions').insert(batch);
             }
 
             // Insert income
             for (let i = 0; i < fakeIncomeWithUser.length; i += BATCH_SIZE) {
                 const batch = fakeIncomeWithUser.slice(i, i + BATCH_SIZE);
-                await supabase.from('income').insert(batch);
+                await supabaseAdmin.from('income').insert(batch);
             }
 
             // Update user connection status
-            await supabase.from('user_plaid_connections').upsert({
+            await supabaseAdmin.from('user_plaid_connections').upsert({
                 user_id: userId,
                 uuid_user_id: userId,
                 is_connected: true,

@@ -42,10 +42,19 @@ function PlaidLinkButtonInner({
             });
 
             if (!response.ok) {
-                // Parse error details from response
-                const errorData = await response.json();
-                console.error('Token exchange failed:', errorData);
-                throw new Error(errorData.error || 'Failed to exchange token');
+                // Try to parse JSON error details, but don't assume it's always JSON.
+                let errorData: any = null;
+                try {
+                    errorData = await response.json();
+                } catch {
+                    // ignore
+                }
+                console.error('Token exchange failed:', { status: response.status, errorData });
+                const message =
+                    errorData?.details ||
+                    errorData?.error ||
+                    `Failed to exchange token (HTTP ${response.status})`;
+                throw new Error(message);
             }
 
             // Invalidate all caches so fresh data is fetched

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getUserIdFromRequest } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Check if user is connected to Plaid
-        const { data: connectionData } = await supabase
+        const { data: connectionData } = await supabaseAdmin
             .from('user_plaid_connections')
             .select('is_connected')
             .eq('uuid_user_id', userId)
@@ -61,15 +61,15 @@ export async function GET(request: NextRequest) {
         const twelveMonthsAgoStr = twelveMonthsAgo.toISOString().split('T')[0];
         
         // Fetch all transactions for calculations
-        const { data: allTransactions } = await supabase
-            .from('transactions')
+        const { data: allTransactions } = await supabaseAdmin
+            .from('financial_transactions')
             .select('amount, category, date, name')
             .eq('uuid_user_id', userId)
             .gte('date', twelveMonthsAgoStr)
             .order('date', { ascending: false });
         
         // Fetch all income
-        const { data: allIncome } = await supabase
+        const { data: allIncome } = await supabaseAdmin
             .from('income')
             .select('amount, date')
             .eq('uuid_user_id', userId)

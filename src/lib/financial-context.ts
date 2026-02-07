@@ -1,6 +1,4 @@
-import { supabase } from './supabase';
-import fs from 'fs';
-import path from 'path';
+import { supabaseAdmin } from "@/lib/supabase-admin";
 
 interface TransactionData {
     amount: number;
@@ -34,7 +32,7 @@ async function fetchSupabaseData(userId?: string) {
 
     try {
         // Check if user is connected to Plaid
-        const { data: connectionData } = await supabase
+        const { data: connectionData } = await supabaseAdmin
             .from('user_plaid_connections')
             .select('is_connected')
             .eq('uuid_user_id', userId)
@@ -47,8 +45,8 @@ async function fetchSupabaseData(userId?: string) {
         sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
         const sixMonthsAgoStr = sixMonthsAgo.toISOString().split('T')[0];
 
-        const { data: transactions } = await supabase
-            .from('transactions')
+        const { data: transactions } = await supabaseAdmin
+            .from('financial_transactions')
             .select('amount, category, name, date, merchant_name')
             .eq('uuid_user_id', userId)
             .gte('date', sixMonthsAgoStr)
@@ -59,7 +57,7 @@ async function fetchSupabaseData(userId?: string) {
         }
 
         // Fetch income from last 6 months
-        const { data: income } = await supabase
+        const { data: income } = await supabaseAdmin
             .from('income')
             .select('amount, source, name, date')
             .eq('uuid_user_id', userId)
@@ -158,18 +156,7 @@ export async function getFinancialContext(userId?: string): Promise<string> {
     try {
         const contextParts: string[] = [];
 
-        // 1. Get user profile data from onboarding file
-        try {
-            const filePath = path.join(process.cwd(), 'src/app/onboarding/data.md');
-            if (fs.existsSync(filePath)) {
-                const userProfile = fs.readFileSync(filePath, 'utf8');
-                contextParts.push(`USER PROFILE:\n${userProfile}`);
-            }
-        } catch (error) {
-            console.error('Error fetching user profile:', error);
-        }
-
-        // 2. Fetch real data from Supabase
+        // 1. Fetch real data from Supabase
         const supabaseData = await fetchSupabaseData(userId);
 
         if (supabaseData.isConnected) {
@@ -178,7 +165,7 @@ export async function getFinancialContext(userId?: string): Promise<string> {
             contextParts.push('ACCOUNT STATUS: No bank accounts connected');
         }
 
-        // 3. Analyze and format transaction data
+        // 2. Analyze and format transaction data
         if (supabaseData.transactions.length > 0) {
             const spending = analyzeTransactions(supabaseData.transactions);
 
@@ -206,7 +193,7 @@ export async function getFinancialContext(userId?: string): Promise<string> {
             contextParts.push('SPENDING DATA: No transaction history available');
         }
 
-        // 4. Analyze income data
+        // 3. Analyze income data
         if (supabaseData.income.length > 0) {
             const incomeAnalysis = analyzeIncome(supabaseData.income);
 
@@ -243,27 +230,6 @@ export async function getFinancialContext(userId?: string): Promise<string> {
 export async function getConciseFinancialContext(userId?: string): Promise<string> {
     try {
         const contextParts: string[] = [];
-
-        // User profile essentials
-        try {
-            const filePath = path.join(process.cwd(), 'src/app/onboarding/data.md');
-            if (fs.existsSync(filePath)) {
-                const content = fs.readFileSync(filePath, 'utf8');
-                const age = content.match(/Age.*?(\d+)/)?.[1];
-                const risk = content.match(/Risk Tolerance.*?(\w+)/)?.[1];
-                const income = content.match(/Monthly Income.*?\$?([\d,]+)/)?.[1];
-
-                if (age || risk || income) {
-                    const parts = [];
-                    if (age) parts.push(`${age} years old`);
-                    if (risk) parts.push(`${risk} risk tolerance`);
-                    if (income) parts.push(`$${income}/month income`);
-                    contextParts.push(`User: ${parts.join(', ')}`);
-                }
-            }
-        } catch (error) {
-            console.error('Error fetching user profile:', error);
-        }
 
         // Fetch real data from Supabase
         const supabaseData = await fetchSupabaseData(userId);
