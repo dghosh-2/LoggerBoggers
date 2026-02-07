@@ -259,20 +259,56 @@ export async function POST(request: NextRequest) {
 
             // Clear existing data and insert new
             console.log('=== CLEARING EXISTING DATA ===');
-            await supabaseAdmin.from('transactions').delete().eq('uuid_user_id', userId);
+            await supabaseAdmin.from('transactions').delete().eq('user_id', userId);
             await supabaseAdmin.from('income').delete().eq('uuid_user_id', userId);
             console.log('Cleared existing transactions and income');
 
-            // Add user_id to fake transactions and income
-            const allTransactionsWithUser = allTransactions.map(tx => ({
-                ...tx,
-                user_id: userId,
-                uuid_user_id: userId,
-            }));
+            // Ensure categories exist and build category map
+            const CATEGORY_NAMES = [
+                'Food & Drink', 'Shopping', 'Transportation', 'Bills & Utilities',
+                'Entertainment', 'Health & Fitness', 'Travel', 'Personal Care', 'Education', 'Other'
+            ];
+            const categoryMap: Record<string, string> = {};
+            for (const categoryName of CATEGORY_NAMES) {
+                const { data: existing } = await supabaseAdmin
+                    .from('categories')
+                    .select('id')
+                    .eq('name', categoryName)
+                    .single();
+                
+                if (existing) {
+                    categoryMap[categoryName] = existing.id;
+                } else {
+                    const { data: created } = await supabaseAdmin
+                        .from('categories')
+                        .insert({ name: categoryName })
+                        .select('id')
+                        .single();
+                    if (created) {
+                        categoryMap[categoryName] = created.id;
+                    }
+                }
+            }
+
+            // Transform transactions to match actual database schema
+            // Fake generator produces: { category, date, merchant_name, amount, location, name }
+            // Database expects: { category_id, transaction_date, merchant_name, amount, notes, user_id }
+            const allTransactionsWithUser = allTransactions.map(tx => {
+                const categoryId = categoryMap[tx.category] || categoryMap['Other'];
+                return {
+                    merchant_name: tx.merchant_name || tx.name,
+                    amount: tx.amount,
+                    transaction_date: tx.date,
+                    category_id: categoryId,
+                    user_id: userId,
+                    notes: tx.location || null,
+                };
+            });
 
             const fakeIncomeWithUser = fakeIncome.map(inc => ({
-                ...inc,
-                user_id: userId,
+                amount: inc.amount,
+                date: inc.date,
+                source: inc.source || 'Salary',
                 uuid_user_id: userId,
             }));
 
