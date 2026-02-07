@@ -5,6 +5,14 @@ import { getUserIdFromRequest } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
     try {
+        // This endpoint is destructive (deletes + regenerates). Keep it disabled unless explicitly enabled.
+        if (process.env.NODE_ENV === 'production' || process.env.ALLOW_DESTRUCTIVE_REGENERATE !== 'true') {
+            return NextResponse.json(
+                { error: 'Regenerate disabled' },
+                { status: 403 }
+            );
+        }
+
         const userId = await getUserIdFromRequest(request);
         if (!userId) {
             return NextResponse.json({ error: 'Authentication required' }, { status: 401 });

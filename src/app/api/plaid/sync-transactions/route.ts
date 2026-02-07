@@ -65,6 +65,14 @@ export async function POST(request: NextRequest) {
         }
         
         const accessToken = plaidItem.access_token;
+
+        // Only seed demo data once per user. After that, we only append new Plaid transactions.
+        // This prevents wiping user history on subsequent syncs/logins.
+        const [{ data: anyTx }, { data: anyIncome }] = await Promise.all([
+            supabaseAdmin.from('transactions').select('id').eq('uuid_user_id', userId).limit(1),
+            supabaseAdmin.from('income').select('id').eq('uuid_user_id', userId).limit(1),
+        ]);
+        const hasExistingData = (anyTx?.length ?? 0) > 0 || (anyIncome?.length ?? 0) > 0;
         
         // Fetch transactions from Plaid (last 90 days)
         const now = new Date();
@@ -85,7 +93,6 @@ export async function POST(request: NextRequest) {
             const isFoodRelated = category === 'Food & Drink';
             
             return {
-                user_id: 'default_user',
                 plaid_transaction_id: tx.transaction_id,
                 amount: Math.abs(tx.amount),
                 category,
@@ -99,46 +106,89 @@ export async function POST(request: NextRequest) {
                 pending: tx.pending,
             };
         });
-        
-        // Generate 5 years of fake historical data
-        const fakeTransactions = generateFiveYearsOfTransactions();
-        const fakeIncome = generateFiveYearsOfIncome();
-        
-        // Filter out fake transactions that overlap with Plaid data (last 90 days)
-        const ninetyDaysAgoStr = ninetyDaysAgo.toISOString().split('T')[0];
-        const filteredFakeTransactions = fakeTransactions.filter(tx => tx.date < ninetyDaysAgoStr);
-        
-        // Combine all transactions
-        const allTransactions = [...filteredFakeTransactions, ...formattedPlaidTransactions];
-        
-        // Clear existing data for this user
-        await supabaseAdmin.from('transactions').delete().eq('uuid_user_id', userId);
-        await supabaseAdmin.from('income').delete().eq('uuid_user_id', userId);
 
         // Insert transactions in batches (Supabase has limits)
         const BATCH_SIZE = 500;
-        for (let i = 0; i < allTransactions.length; i += BATCH_SIZE) {
-            const batch = allTransactions.slice(i, i + BATCH_SIZE).map(tx => ({
+
+        // Seed demo history only if the user has no existing financial data.
+        let generatedFakeCount = 0;
+        let totalInsertedTransactions = 0;
+        let incomeRecords = 0;
+        if (!hasExistingData) {
+            const fakeTransactions = generateFiveYearsOfTransactions();
+            const fakeIncome = generateFiveYearsOfIncome();
+
+            // Filter out fake transactions that overlap with Plaid data (last 90 days)
+            const ninetyDaysAgoStr = ninetyDaysAgo.toISOString().split('T')[0];
+            const filteredFakeTransactions = fakeTransactions.filter(tx => tx.date < ninetyDaysAgoStr);
+            generatedFakeCount = filteredFakeTransactions.length;
+
+            const seedTransactions = [...filteredFakeTransactions, ...formattedPlaidTransactions].map(tx => ({
                 ...tx,
                 user_id: userId,
                 uuid_user_id: userId,
             }));
-            const { error } = await supabaseAdmin.from('transactions').insert(batch);
-            if (error) {
-                console.error('Error inserting transactions batch:', error);
+            totalInsertedTransactions = seedTransactions.length;
+
+            for (let i = 0; i < seedTransactions.length; i += BATCH_SIZE) {
+                const batch = seedTransactions.slice(i, i + BATCH_SIZE);
+                const { error } = await supabaseAdmin.from('transactions').insert(batch);
+                if (error) {
+                    console.error('Error inserting seeded transactions batch:', error);
+                }
             }
-        }
-        
-        // Insert income
-        for (let i = 0; i < fakeIncome.length; i += BATCH_SIZE) {
-            const batch = fakeIncome.slice(i, i + BATCH_SIZE).map(inc => ({
-                ...inc,
-                user_id: userId,
-                uuid_user_id: userId,
-            }));
-            const { error } = await supabaseAdmin.from('income').insert(batch);
-            if (error) {
-                console.error('Error inserting income batch:', error);
+
+            for (let i = 0; i < fakeIncome.length; i += BATCH_SIZE) {
+                const batch = fakeIncome.slice(i, i + BATCH_SIZE).map(inc => ({
+                    ...inc,
+                    user_id: userId,
+                    uuid_user_id: userId,
+                }));
+                const { error } = await supabaseAdmin.from('income').insert(batch);
+                if (error) {
+                    console.error('Error inserting seeded income batch:', error);
+                } else {
+                    incomeRecords += batch.length;
+                }
+            }
+        } else {
+            // Incremental: insert only Plaid transactions we don't already have (by plaid_transaction_id).
+            const plaidIds = formattedPlaidTransactions
+                .map(tx => tx.plaid_transaction_id)
+                .filter((id): id is string => typeof id === 'string' && id.length > 0);
+
+            let existingIds = new Set<string>();
+            if (plaidIds.length > 0) {
+                // Chunk to avoid huge IN queries.
+                const CHUNK = 500;
+                for (let i = 0; i < plaidIds.length; i += CHUNK) {
+                    const chunk = plaidIds.slice(i, i + CHUNK);
+                    const { data: existing } = await supabaseAdmin
+                        .from('transactions')
+                        .select('plaid_transaction_id')
+                        .eq('uuid_user_id', userId)
+                        .in('plaid_transaction_id', chunk);
+                    (existing || []).forEach((row: any) => {
+                        if (row?.plaid_transaction_id) existingIds.add(String(row.plaid_transaction_id));
+                    });
+                }
+            }
+
+            const newPlaidTransactions = formattedPlaidTransactions
+                .filter(tx => tx.plaid_transaction_id && !existingIds.has(tx.plaid_transaction_id))
+                .map(tx => ({
+                    ...tx,
+                    user_id: userId,
+                    uuid_user_id: userId,
+                }));
+            totalInsertedTransactions = newPlaidTransactions.length;
+
+            for (let i = 0; i < newPlaidTransactions.length; i += BATCH_SIZE) {
+                const batch = newPlaidTransactions.slice(i, i + BATCH_SIZE);
+                const { error } = await supabaseAdmin.from('transactions').insert(batch);
+                if (error) {
+                    console.error('Error inserting incremental Plaid transactions batch:', error);
+                }
             }
         }
         
@@ -157,9 +207,10 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
             success: true,
             plaid_transactions: formattedPlaidTransactions.length,
-            generated_transactions: filteredFakeTransactions.length,
-            total_transactions: allTransactions.length,
-            income_records: fakeIncome.length,
+            generated_transactions: generatedFakeCount,
+            total_transactions: totalInsertedTransactions,
+            income_records: incomeRecords,
+            skipped_demo_seed: hasExistingData,
         });
         
     } catch (error: any) {
