@@ -17,30 +17,23 @@ export async function GET(request: NextRequest) {
         const category = searchParams.get('category');
         const limit = parseInt(searchParams.get('limit') || '1000');
         
-        // Actual schema: id, receipt_id, merchant_name, amount, transaction_date, category_id, notes, created_at, user_id
+        // Actual schema: id, user_id, plaid_transaction_id, amount, category, name, date, account_id, source, merchant_name, pending, uuid_user_id, location
         let query = supabaseAdmin
             .from('transactions')
-            .select('*, categories(name)')
-            .eq('user_id', userId)
-            .order('transaction_date', { ascending: false })
+            .select('*')
+            .eq('uuid_user_id', userId)
+            .order('date', { ascending: false })
             .limit(limit);
         
         if (startDate) {
-            query = query.gte('transaction_date', startDate);
+            query = query.gte('date', startDate);
         }
         if (endDate) {
-            query = query.lte('transaction_date', endDate);
+            query = query.lte('date', endDate);
         }
         if (category) {
-            // Need to filter by category_id - get category id first
-            const { data: catData } = await supabaseAdmin
-                .from('categories')
-                .select('id')
-                .eq('name', category)
-                .single();
-            if (catData) {
-                query = query.eq('category_id', catData.id);
-            }
+            // Category is a text field, filter directly
+            query = query.eq('category', category);
         }
         
         const { data, error } = await query;
@@ -53,15 +46,12 @@ export async function GET(request: NextRequest) {
         const normalizedTransactions = (data || []).map((tx: any) => ({
             id: tx.id,
             amount: tx.amount,
-            category: tx.categories?.name || 'Other',
-            name: tx.merchant_name || 'Unknown',
+            category: tx.category || 'Other',
+            name: tx.merchant_name || tx.name || 'Unknown',
             merchant_name: tx.merchant_name,
-            date: tx.transaction_date,
-            location: tx.notes,
+            date: tx.date,
+            location: tx.location,
             created_at: tx.created_at,
-            // Keep original fields too
-            category_id: tx.category_id,
-            transaction_date: tx.transaction_date,
         }));
         
         // #region agent log

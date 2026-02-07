@@ -63,13 +63,13 @@ export async function GET(request: NextRequest) {
         const twelveMonthsAgoStr = twelveMonthsAgo.toISOString().split('T')[0];
         
         // Fetch all transactions for calculations
-        // Actual schema: id, receipt_id, merchant_name, amount, transaction_date, category_id, notes, created_at, user_id
+        // Actual schema: id, user_id, amount, category, name, date, merchant_name, uuid_user_id, location
         const { data: allTransactions, error: txError } = await supabaseAdmin
             .from('transactions')
-            .select('amount, category_id, transaction_date, merchant_name, categories(name)')
-            .eq('user_id', userId)
-            .gte('transaction_date', twelveMonthsAgoStr)
-            .order('transaction_date', { ascending: false });
+            .select('amount, category, date, merchant_name, name')
+            .eq('uuid_user_id', userId)
+            .gte('date', twelveMonthsAgoStr)
+            .order('date', { ascending: false });
         
         // #region agent log
         fetch('http://127.0.0.1:7245/ingest/2d405ccf-cb3f-4611-bc27-f95a616c15c9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'summary/route.ts:70',message:'Transaction fetch result',data:{count:allTransactions?.length||0,error:txError,userId,sample:allTransactions?.[0]},timestamp:Date.now(),hypothesisId:'A,D'})}).catch(()=>{});
@@ -124,10 +124,10 @@ export async function GET(request: NextRequest) {
         
         const netWorth = totalAssets - totalLiabilities;
         
-        // Helper to get transaction date (schema uses transaction_date)
-        const getTxDate = (tx: any) => tx.transaction_date || tx.date;
-        // Helper to get category name (schema uses category_id with joined categories)
-        const getTxCategory = (tx: any) => tx.categories?.name || tx.category || 'Other';
+        // Helper to get transaction date (schema uses 'date')
+        const getTxDate = (tx: any) => tx.date;
+        // Helper to get category name (schema uses 'category' as text)
+        const getTxCategory = (tx: any) => tx.category || 'Other';
         // Helper to get transaction name
         const getTxName = (tx: any) => tx.merchant_name || tx.name || 'Unknown';
         
@@ -197,7 +197,7 @@ export async function GET(request: NextRequest) {
         console.log(`Monthly: Spending $${monthlySpending.toFixed(2)}, Income $${monthlyIncome.toFixed(2)}`);
         console.log(`Categories: ${Object.keys(spendingByCategory).join(', ')}`);
         if (transactions.length > 0) {
-            console.log(`Most recent transaction: ${transactions[0].date} - ${transactions[0].name}`);
+            console.log(`Most recent transaction: ${getTxDate(transactions[0])} - ${getTxName(transactions[0])}`);
         }
         
         const hasAnyData = transactions.length > 0 || income.length > 0;
