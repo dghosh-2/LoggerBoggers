@@ -1,12 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { plaidClient } from '@/lib/plaid-client';
+import { supabase } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
     try {
-        // Get all stored access tokens
-        const storedTokens = (global as any).plaidAccessTokens as Map<string, { accessToken: string; itemId: string; institution: string }> | undefined;
-        
-        if (!storedTokens || storedTokens.size === 0) {
+        // Check if user is connected
+        const { data: connectionData } = await supabase
+            .from('user_plaid_connections')
+            .select('is_connected')
+            .eq('user_id', 'default_user')
+            .single();
+
+        if (!connectionData?.is_connected) {
+            return NextResponse.json({ 
+                accounts: [],
+                institutions: [],
+                message: 'No connected accounts' 
+            });
+        }
+
+        // Get all stored Plaid items for this user
+        const { data: plaidItems, error: itemsError } = await supabase
+            .from('plaid_items')
+            .select('*')
+            .eq('user_id', 'default_user')
+            .eq('status', 'active');
+
+        if (itemsError || !plaidItems || plaidItems.length === 0) {
             return NextResponse.json({ 
                 accounts: [],
                 institutions: [],
@@ -17,11 +37,11 @@ export async function GET(request: NextRequest) {
         const allAccounts: any[] = [];
         const institutions: any[] = [];
 
-        // Fetch accounts for each connected item
-        for (const [itemId, tokenData] of storedTokens.entries()) {
+        // Fetch fresh account data from Plaid for each connected item
+        for (const item of plaidItems) {
             try {
                 const accountsResponse = await plaidClient.accountsGet({
-                    access_token: tokenData.accessToken,
+                    access_token: item.access_token,
                 });
 
                 const accounts = accountsResponse.data.accounts.map(account => ({
@@ -31,28 +51,50 @@ export async function GET(request: NextRequest) {
                     type: account.type,
                     subtype: account.subtype,
                     mask: account.mask,
-                    currentBalance: account.balances.current,
+                    currentBalance: account.balances.current || 0,
                     availableBalance: account.balances.available,
                     limit: account.balances.limit,
-                    isoCurrencyCode: account.balances.iso_currency_code,
-                    institution: tokenData.institution,
-                    itemId: itemId,
+                    isoCurrencyCode: account.balances.iso_currency_code || 'USD',
+                    institution: item.institution_name,
+                    itemId: item.item_id,
                 }));
 
                 allAccounts.push(...accounts);
 
+                // Update accounts in Supabase with fresh balances
+                for (const account of accountsResponse.data.accounts) {
+                    await supabase.from('accounts').upsert({
+                        user_id: 'default_user',
+                        plaid_account_id: account.account_id,
+                        plaid_item_id: item.item_id,
+                        name: account.name,
+                        official_name: account.official_name,
+                        type: account.type,
+                        subtype: account.subtype,
+                        institution_name: item.institution_name,
+                        current_balance: account.balances.current || 0,
+                        available_balance: account.balances.available,
+                        credit_limit: account.balances.limit,
+                        mask: account.mask,
+                        iso_currency_code: account.balances.iso_currency_code || 'USD',
+                        last_synced_at: new Date().toISOString(),
+                    }, {
+                        onConflict: 'plaid_account_id',
+                    });
+                }
+
                 // Get institution info
-                const item = accountsResponse.data.item;
-                if (item.institution_id) {
+                const plaidItem = accountsResponse.data.item;
+                if (plaidItem.institution_id) {
                     try {
                         const instResponse = await plaidClient.institutionsGetById({
-                            institution_id: item.institution_id,
+                            institution_id: plaidItem.institution_id,
                             country_codes: ['US'] as any,
                         });
                         
                         institutions.push({
-                            id: item.institution_id,
-                            itemId: itemId,
+                            id: plaidItem.institution_id,
+                            itemId: item.item_id,
                             name: instResponse.data.institution.name,
                             logo: instResponse.data.institution.logo,
                             primaryColor: instResponse.data.institution.primary_color,
@@ -62,9 +104,9 @@ export async function GET(request: NextRequest) {
                         });
                     } catch (instError) {
                         institutions.push({
-                            id: item.institution_id,
-                            itemId: itemId,
-                            name: tokenData.institution,
+                            id: plaidItem.institution_id,
+                            itemId: item.item_id,
+                            name: item.institution_name,
                             logo: null,
                             primaryColor: null,
                             accounts: accounts,
@@ -72,11 +114,36 @@ export async function GET(request: NextRequest) {
                             lastSync: 'Just now',
                         });
                     }
+                } else {
+                    institutions.push({
+                        id: item.item_id,
+                        itemId: item.item_id,
+                        name: item.institution_name,
+                        logo: null,
+                        primaryColor: null,
+                        accounts: accounts,
+                        status: 'connected',
+                        lastSync: 'Just now',
+                    });
                 }
             } catch (accountError: any) {
-                console.error(`Error fetching accounts for item ${itemId}:`, accountError.response?.data || accountError.message);
+                console.error(`Error fetching accounts for item ${item.item_id}:`, accountError.response?.data || accountError.message);
+                
+                // If token is invalid, mark item as inactive
+                if (accountError.response?.data?.error_code === 'ITEM_LOGIN_REQUIRED') {
+                    await supabase
+                        .from('plaid_items')
+                        .update({ status: 'login_required' })
+                        .eq('item_id', item.item_id);
+                }
             }
         }
+
+        // Update last sync time
+        await supabase
+            .from('user_plaid_connections')
+            .update({ last_sync_at: new Date().toISOString() })
+            .eq('user_id', 'default_user');
 
         return NextResponse.json({ 
             accounts: allAccounts,

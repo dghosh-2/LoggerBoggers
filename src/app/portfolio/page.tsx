@@ -449,18 +449,24 @@ export default function PortfolioPage() {
                     maximumFractionDigits: 2 
                   })}
                 </h1>
-                <div className={`flex items-center gap-1 text-sm font-medium ${
-                  isPositive ? "text-success" : "text-destructive"
-                }`}>
-                  {isPositive ? (
-                    <TrendingUp className="w-4 h-4" />
-                  ) : (
-                    <TrendingDown className="w-4 h-4" />
-                  )}
-                  <span className="tabular-nums">+7.04%</span>
-                </div>
+                {summary?.netWorth > 0 && (
+                  <div className={`flex items-center gap-1 text-sm font-medium ${
+                    isPositive ? "text-success" : "text-destructive"
+                  }`}>
+                    {isPositive ? (
+                      <TrendingUp className="w-4 h-4" />
+                    ) : (
+                      <TrendingDown className="w-4 h-4" />
+                    )}
+                    <span className="tabular-nums">{isPositive ? '+' : ''}{percentageChange.toFixed(2)}%</span>
+                  </div>
+                )}
               </div>
-              <p className="text-[11px] text-foreground-muted mt-1">+$8,862 this month</p>
+              {summary?.netWorth > 0 && (
+                <p className="text-[11px] text-foreground-muted mt-1">
+                  {totalChange >= 0 ? '+' : ''}${Math.abs(totalChange).toLocaleString(undefined, { maximumFractionDigits: 0 })} this month
+                </p>
+              )}
             </div>
 
             {/* Summary Cards */}
@@ -526,33 +532,73 @@ export default function PortfolioPage() {
               </div>
             </div>
             
-            <p className="text-xs text-foreground-muted leading-relaxed mb-4">
-              Your net worth has grown 41% this year. Your emergency fund covers 4.2 months of expenses. 
-              Consider increasing your 401(k) contributions to maximize employer matching.
-            </p>
+            {summary?.netWorth > 0 ? (
+              <>
+                <p className="text-xs text-foreground-muted leading-relaxed mb-4">
+                  {summary.totalCash > 0 && summary.bankAccountsCount > 0 
+                    ? `You have $${summary.totalCash.toLocaleString()} in cash across ${summary.bankAccountsCount} account${summary.bankAccountsCount !== 1 ? 's' : ''}. `
+                    : ''}
+                  {summary.totalInvestments > 0 
+                    ? `Your investments total $${summary.totalInvestments.toLocaleString()}. `
+                    : ''}
+                  {summary.totalLoans > 0 
+                    ? `You have $${summary.totalLoans.toLocaleString()} in outstanding loans.`
+                    : 'You have no outstanding loans - great job!'}
+                </p>
 
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-foreground-muted">Risk Level</span>
-                <span className="font-medium text-warning">Moderate</span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-foreground-muted">Diversification</span>
-                <span className="font-medium text-success">Good</span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-foreground-muted">Debt-to-Asset</span>
-                <span className="font-medium text-success tabular-nums">17.5%</span>
-              </div>
-            </div>
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-foreground-muted">Risk Level</span>
+                    <span className={`font-medium ${summary.totalLoans > summary.totalCash ? 'text-destructive' : summary.totalLoans > 0 ? 'text-warning' : 'text-success'}`}>
+                      {summary.totalLoans > summary.totalCash ? 'High' : summary.totalLoans > 0 ? 'Moderate' : 'Low'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-foreground-muted">Diversification</span>
+                    <span className={`font-medium ${summary.investmentAccountsCount > 1 ? 'text-success' : summary.investmentAccountsCount === 1 ? 'text-warning' : 'text-foreground-muted'}`}>
+                      {summary.investmentAccountsCount > 1 ? 'Good' : summary.investmentAccountsCount === 1 ? 'Fair' : 'N/A'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-foreground-muted">Debt-to-Asset</span>
+                    <span className={`font-medium tabular-nums ${
+                      summary.netWorth > 0 
+                        ? (summary.totalLoans / (summary.totalCash + summary.totalInvestments)) * 100 < 20 
+                          ? 'text-success' 
+                          : 'text-warning'
+                        : 'text-foreground-muted'
+                    }`}>
+                      {summary.totalCash + summary.totalInvestments > 0 
+                        ? `${((summary.totalLoans / (summary.totalCash + summary.totalInvestments)) * 100).toFixed(1)}%`
+                        : 'N/A'}
+                    </span>
+                  </div>
+                </div>
 
-            <button 
-              onClick={() => setShowRecommendations(true)}
-              className="mt-4 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-secondary text-xs font-medium hover:bg-background-tertiary transition-colors duration-150 cursor-pointer"
-            >
-              View Recommendations
-              <ArrowUpRight className="w-3 h-3" />
-            </button>
+                <button 
+                  onClick={() => setShowRecommendations(true)}
+                  className="mt-4 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-secondary text-xs font-medium hover:bg-background-tertiary transition-colors duration-150 cursor-pointer"
+                >
+                  View Recommendations
+                  <ArrowUpRight className="w-3 h-3" />
+                </button>
+              </>
+            ) : (
+              <div className="text-center py-4">
+                <p className="text-xs text-foreground-muted mb-3">
+                  Connect your accounts to see AI-powered insights about your portfolio.
+                </p>
+                <PlaidLinkButton 
+                  onSuccess={() => {
+                    loadData();
+                    fetchRealAccounts();
+                  }}
+                  buttonText="Connect Account"
+                  buttonVariant="primary"
+                  buttonSize="sm"
+                />
+              </div>
+            )}
           </GlassCard>
         </div>
 

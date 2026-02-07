@@ -111,9 +111,9 @@ export const useUserStore = create<UserState>((set) => ({
   // Start with zeros - data loads after Plaid connection
   portfolioValue: 0,
   portfolioChange: 0,
-  holdings: [],
-  transactions: [],
-  insights: [],
+  holdings: [], // Empty until connected
+  transactions: [], // Empty until connected
+  insights: [], // Empty until connected
   netCashflow: 0,
   netCashflowChange: 0,
   totalSubscriptions: 0,
@@ -131,6 +131,7 @@ export const useUserStore = create<UserState>((set) => ({
   addInsight: (insight) =>
     set((state) => ({ insights: [...state.insights, insight] })),
 
+  // Load sample data only when explicitly called (for demo purposes)
   loadSampleData: () =>
     set({
       holdings: sampleHoldings,
