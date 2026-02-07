@@ -8,6 +8,7 @@ import { useFinancialData } from '@/hooks/useFinancialData';
 import { Link2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { GlassButton } from '@/components/ui/glass-button';
+import { getTopCategories, isOtherCategory, MAX_DISPLAYED_CATEGORIES } from '@/lib/categories';
 
 // Monochrome + accent palette
 const LIGHT_COLORS = [
@@ -17,6 +18,10 @@ const LIGHT_COLORS = [
     '#16A34A', // green
     '#71717A', // zinc mid
     '#A1A1AA', // zinc light
+    '#EC4899', // pink
+    '#F59E0B', // amber
+    '#06B6D4', // cyan
+    '#8B5CF6', // violet
 ];
 
 const DARK_COLORS = [
@@ -26,6 +31,10 @@ const DARK_COLORS = [
     '#4ADE80', // green
     '#71717A', // zinc mid
     '#52525B', // zinc dark
+    '#F472B6', // pink
+    '#FBBF24', // amber
+    '#22D3EE', // cyan
+    '#A78BFA', // violet
 ];
 
 interface CategoryData {
@@ -72,40 +81,36 @@ export function ExpensesPieChart() {
             categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount;
         });
 
+        // Use centralized logic to determine top categories
+        const topCategories = getTopCategories(categoryTotals, MAX_DISPLAYED_CATEGORIES);
+
         // Sort by value and get total
         let sortedData = Object.entries(categoryTotals)
             .map(([name, value]) => ({
-                name,
+                name: isOtherCategory(name, topCategories) ? 'Other' : name,
                 value: Math.round(value * 100) / 100,
             }))
+            .reduce((acc, curr) => {
+                const existing = acc.find(item => item.name === curr.name);
+                if (existing) {
+                    existing.value += curr.value;
+                } else {
+                    acc.push(curr);
+                }
+                return acc;
+            }, [] as { name: string, value: number }[])
             .sort((a, b) => b.value - a.value);
 
         const total = sortedData.reduce((sum, cat) => sum + cat.value, 0);
 
-        // Keep top 5 categories, group rest into "Other"
-        const MAX_CATEGORIES = 5;
         let finalData: CategoryData[] = [];
-        let otherTotal = 0;
 
         sortedData.forEach((item, index) => {
-            if (index < MAX_CATEGORIES) {
-                finalData.push({
-                    ...item,
-                    color: COLORS[index % COLORS.length]
-                });
-            } else {
-                otherTotal += item.value;
-            }
-        });
-
-        // Add "Other" category if there are more than MAX_CATEGORIES
-        if (otherTotal > 0) {
             finalData.push({
-                name: 'Other',
-                value: Math.round(otherTotal * 100) / 100,
-                color: theme === 'dark' ? '#6b6860' : '#9ca3af'
+                ...item,
+                color: item.name === 'Other' ? '#71717A' : COLORS[index % COLORS.length]
             });
-        }
+        });
 
         return finalData;
     }, [selectedRange, mounted, COLORS, theme, transactions, isConnected]);
@@ -151,8 +156,8 @@ export function ExpensesPieChart() {
                 <p className="text-sm text-foreground-muted text-center mb-6 max-w-[300px]">
                     Link your bank accounts via Plaid to see your spending breakdown and insights
                 </p>
-                <GlassButton 
-                    variant="primary" 
+                <GlassButton
+                    variant="primary"
                     size="md"
                     onClick={() => router.push('/imports')}
                 >
@@ -209,7 +214,7 @@ export function ExpensesPieChart() {
                                 stroke={selectedCategory === entry.name ? 'var(--background)' : 'transparent'}
                                 strokeWidth={selectedCategory === entry.name ? 3 : 0}
                                 opacity={selectedCategory && selectedCategory !== entry.name ? 0.3 : 1}
-                                style={{ 
+                                style={{
                                     transition: 'opacity 0.3s ease, stroke-width 0.2s ease',
                                 }}
                             />

@@ -8,24 +8,28 @@ import { cn } from '@/lib/utils';
 import { ViewSwitcher } from './ViewSwitcher';
 import { CalendarView } from './CalendarView';
 import { AnalysisView } from './AnalysisView';
+import { SubscriptionsView } from './SubscriptionsView';
 
 export function CenterPanel() {
-    const { currentView, selectedCategory } = useInsightsStore();
+    const { currentView, selectedCategory, selectedDate } = useInsightsStore();
+
+    // Show side panel if either a category or date is selected
+    const showSidePanel = selectedCategory || selectedDate;
 
     return (
         <section className={cn(
             "flex flex-col relative card-elevated h-full overflow-hidden transition-all duration-300",
-            selectedCategory ? "col-span-9" : "col-span-12"
+            showSidePanel ? "col-span-9" : "col-span-12"
         )}>
             {/* Switcher Floating on Top */}
             <ViewSwitcher />
 
             {/* Subtle Grid Pattern Background */}
-            <div 
+            <div
                 className="absolute inset-0 z-0 opacity-[0.03] dark:opacity-[0.02] pointer-events-none"
-                style={{ 
-                    backgroundImage: 'radial-gradient(circle at 1px 1px, var(--foreground-muted) 1px, transparent 0)', 
-                    backgroundSize: '24px 24px' 
+                style={{
+                    backgroundImage: 'radial-gradient(circle at 1px 1px, var(--foreground-muted) 1px, transparent 0)',
+                    backgroundSize: '24px 24px'
                 }}
             />
 
@@ -34,6 +38,7 @@ export function CenterPanel() {
                 {currentView === 'graph' && <ExpensesPieChart />}
                 {currentView === 'calendar' && <CalendarView />}
                 {currentView === 'analysis' && <AnalysisView />}
+                {currentView === 'subscriptions' && <SubscriptionsView />}
             </div>
 
             {/* Range Selector - Bottom Bar */}

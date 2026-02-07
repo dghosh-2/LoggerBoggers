@@ -66,6 +66,15 @@ export async function POST(request: NextRequest) {
             // Store accounts in Supabase
             // Note: For demo purposes, we adjust balances to show a positive net worth
             // In production, you'd use the actual Plaid balances
+            
+            // Default locations for different account types
+            const accountLocations: Record<string, string> = {
+                'depository': '600 Grant St, Pittsburgh, PA 15219',
+                'investment': '1 PPG Pl, Pittsburgh, PA 15222',
+                'loan': '525 William Penn Pl, Pittsburgh, PA 15219',
+                'credit': '420 Fort Duquesne Blvd, Pittsburgh, PA 15222',
+            };
+            
             for (const account of plaidAccounts) {
                 let adjustedBalance = account.balances.current || 0;
                 
@@ -94,6 +103,7 @@ export async function POST(request: NextRequest) {
                     credit_limit: account.balances.limit,
                     mask: account.mask,
                     iso_currency_code: account.balances.iso_currency_code || 'USD',
+                    location: accountLocations[account.type] || '600 Grant St, Pittsburgh, PA 15219',
                     last_synced_at: new Date().toISOString(),
                 }, {
                     onConflict: 'plaid_account_id',

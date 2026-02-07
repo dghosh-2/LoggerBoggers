@@ -19,16 +19,18 @@ import { Link2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { GlassButton } from '@/components/ui/glass-button';
 
-// Category to icon mapping
+import { getTopCategories, isOtherCategory, MAX_DISPLAYED_CATEGORIES, STANDARD_CATEGORIES } from '@/lib/categories';
+
+// Category to icon mapping - synced with STANDARD_CATEGORIES
 const CATEGORY_ICONS: Record<string, string> = {
-  'Shopping': 'ShoppingBag',
   'Food & Drink': 'Utensils',
-  'Bills & Utilities': 'Zap',
   'Transportation': 'Car',
-  'Health & Fitness': 'Heart',
+  'Shopping': 'ShoppingBag',
   'Entertainment': 'Tv',
-  'Personal Care': 'Sparkles',
+  'Bills & Utilities': 'Zap',
+  'Health & Fitness': 'Dumbbell',
   'Travel': 'Plane',
+  'Personal Care': 'Sparkles',
   'Education': 'GraduationCap',
   'Other': 'MoreHorizontal',
 };
@@ -43,7 +45,8 @@ export function FinancialGraph() {
   // Generate dynamic nodes and edges based on real data
   const { dynamicNodes, dynamicEdges, totalIncome, totalExpenses } = useMemo(() => {
     const now = new Date();
-    
+
+
     // Filter transactions by range
     const rangeTransactions = transactions.filter(t => {
       const date = new Date(t.date);
@@ -66,21 +69,36 @@ export function FinancialGraph() {
     rangeTransactions.forEach(t => {
       categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount;
     });
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7245/ingest/2d405ccf-cb3f-4611-bc27-f95a616c15c9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'financial-graph.tsx:68',message:'Graph data computed',data:{selectedRange,totalTx:transactions.length,filteredTx:rangeTransactions.length,categoryTotals,now:now.toISOString()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D,E'})}).catch(()=>{});
-    // #endregion
 
     const totalExp = Object.values(categoryTotals).reduce((a, b) => a + b, 0);
+
     // Use real income from summary if available
-    const totalInc = summary?.monthly_income 
+    const totalInc = summary?.monthly_income
       ? (selectedRange === 'MTD' ? summary.monthly_income : summary.monthly_income * (selectedRange === '3M' ? 3 : 12))
       : Math.round(totalExp * 1.2);
 
-    // Sort categories by amount and take top 6
-    const sortedCategories = Object.entries(categoryTotals)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 6);
+    // Use centralized logic to determine groupings
+    // We use MAX_DISPLAYED_CATEGORIES to match other views
+    const topCategories = getTopCategories(categoryTotals, MAX_DISPLAYED_CATEGORIES);
+
+    const finalCategories: Record<string, number> = {};
+    let otherTotal = 0;
+
+    Object.entries(categoryTotals).forEach(([cat, amount]) => {
+      if (isOtherCategory(cat, topCategories)) {
+        otherTotal += amount;
+      } else {
+        finalCategories[cat] = amount;
+      }
+    });
+
+    if (otherTotal > 0) {
+      finalCategories['Other'] = otherTotal;
+    }
+
+    // Sort for display (largest first)
+    const sortedCategories = Object.entries(finalCategories)
+      .sort((a, b) => b[1] - a[1]);
 
     // Create nodes
     const nodes: Node[] = [];
@@ -91,11 +109,11 @@ export function FinancialGraph() {
       id: 'income',
       type: 'custom',
       position: { x: 350, y: 0 },
-      data: { 
-        label: 'Income', 
-        amount: isConnected ? `$${Math.round(totalInc).toLocaleString()}` : '$0', 
-        type: 'income', 
-        icon: 'Wallet' 
+      data: {
+        label: 'Income',
+        amount: isConnected ? `$${Math.round(totalInc).toLocaleString()}` : '$0',
+        type: 'income',
+        icon: 'Wallet'
       }
     });
 
@@ -104,11 +122,11 @@ export function FinancialGraph() {
       id: 'account',
       type: 'custom',
       position: { x: 350, y: 150 },
-      data: { 
-        label: 'Main Account', 
-        amount: isConnected ? `$${Math.round(totalInc - totalExp).toLocaleString()}` : '$0', 
-        type: 'account', 
-        icon: 'CreditCard' 
+      data: {
+        label: 'Main Account',
+        amount: isConnected ? `$${Math.round(totalInc - totalExp).toLocaleString()}` : '$0',
+        type: 'account',
+        icon: 'CreditCard'
       }
     });
 
@@ -124,7 +142,7 @@ export function FinancialGraph() {
     // Create expense category nodes
     const startX = 0;
     const spacing = 140;
-    
+
     sortedCategories.forEach(([category, amount], index) => {
       const nodeId = `cat-${index}`;
       nodes.push({
@@ -175,11 +193,11 @@ export function FinancialGraph() {
       });
     }
 
-    return { 
-      dynamicNodes: nodes, 
-      dynamicEdges: edges, 
-      totalIncome: totalInc, 
-      totalExpenses: totalExp 
+    return {
+      dynamicNodes: nodes,
+      dynamicEdges: edges,
+      totalIncome: totalInc,
+      totalExpenses: totalExp
     };
   }, [selectedRange, transactions, summary, isConnected, isDark]);
 
@@ -221,7 +239,7 @@ export function FinancialGraph() {
 
   useEffect(() => {
     const edgeColor = isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.15)';
-    
+
     if (!selectedInsightId && !selectedCategory) {
       // Reset styles if nothing selected
       setNodes((nds) =>
@@ -321,10 +339,10 @@ export function FinancialGraph() {
         defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
         proOptions={{ hideAttribution: true }}
       >
-        <Background 
-          gap={20} 
-          size={1} 
-          color={isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'} 
+        <Background
+          gap={20}
+          size={1}
+          color={isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'}
         />
         <Controls
           className="!bg-card !border-border !rounded-lg !shadow-md [&>button]:!bg-card [&>button]:!border-border [&>button]:!text-foreground-muted [&>button:hover]:!bg-secondary"
