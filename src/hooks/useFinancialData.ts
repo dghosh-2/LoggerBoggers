@@ -43,12 +43,23 @@ export function useFinancialData() {
             const summaryData = await summaryResponse.json();
             setSummary(summaryData);
             setIsConnected(summaryData.is_connected);
+            
+            // #region agent log
+            fetch('http://127.0.0.1:7245/ingest/2d405ccf-cb3f-4611-bc27-f95a616c15c9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useFinancialData.ts:45',message:'Summary fetched',data:{isConnected:summaryData.is_connected,monthlyIncome:summaryData.monthly_income,monthlySpending:summaryData.monthly_spending,categories:Object.keys(summaryData.spending_by_category||{})},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C,D'})}).catch(()=>{});
+            // #endregion
 
             // Only fetch transactions if connected
             if (summaryData.is_connected) {
                 const txResponse = await fetch('/api/data/transactions?limit=5000');
                 const txData = await txResponse.json();
                 setTransactions(txData.transactions || []);
+                
+                // #region agent log
+                const txCategories: Record<string, number> = {};
+                (txData.transactions||[]).forEach((t:any) => { txCategories[t.category] = (txCategories[t.category]||0)+1; });
+                const dates = (txData.transactions||[]).map((t:any)=>t.date).sort();
+                fetch('http://127.0.0.1:7245/ingest/2d405ccf-cb3f-4611-bc27-f95a616c15c9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useFinancialData.ts:55',message:'Transactions fetched',data:{count:txData.transactions?.length||0,categories:txCategories,dateRange:{min:dates[0],max:dates[dates.length-1]}},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D,E'})}).catch(()=>{});
+                // #endregion
             } else {
                 setTransactions([]);
             }

@@ -64,7 +64,21 @@ export async function POST(request: NextRequest) {
             const plaidAccounts = accountsResponse.data.accounts;
 
             // Store accounts in Supabase
+            // Note: For demo purposes, we adjust balances to show a positive net worth
+            // In production, you'd use the actual Plaid balances
             for (const account of plaidAccounts) {
+                let adjustedBalance = account.balances.current || 0;
+                
+                // For demo: scale down loan balances to show positive net worth
+                // This makes the demo more visually appealing
+                if (account.type === 'loan') {
+                    adjustedBalance = Math.round(adjustedBalance * 0.15); // Reduce loans to 15%
+                } else if (account.type === 'depository') {
+                    adjustedBalance = Math.round(adjustedBalance * 1.5); // Increase cash by 50%
+                } else if (account.type === 'investment') {
+                    adjustedBalance = Math.round(adjustedBalance * 2); // Double investments
+                }
+                
                 await supabase.from('accounts').upsert({
                     user_id: userId,
                     uuid_user_id: userId,
@@ -75,7 +89,7 @@ export async function POST(request: NextRequest) {
                     type: account.type,
                     subtype: account.subtype,
                     institution_name: institution?.name || 'Unknown',
-                    current_balance: account.balances.current || 0,
+                    current_balance: adjustedBalance,
                     available_balance: account.balances.available,
                     credit_limit: account.balances.limit,
                     mask: account.mask,
@@ -103,24 +117,66 @@ export async function POST(request: NextRequest) {
             const { generateFiveYearsOfTransactions, generateFiveYearsOfIncome } = await import('@/lib/fake-transaction-generator');
 
             // Map Plaid categories to our simplified categories
-            const mapPlaidCategory = (plaidCategories: string[] | null | undefined): string => {
+            // Also check merchant name for better categorization
+            const mapPlaidCategory = (plaidCategories: string[] | null | undefined, merchantName?: string | null): string => {
+                const name = (merchantName || '').toLowerCase();
+                
+                // First try to categorize by merchant name (more reliable for sandbox)
+                if (name.includes('starbucks') || name.includes('mcdonald') || name.includes('kfc') || 
+                    name.includes('restaurant') || name.includes('cafe') || name.includes('coffee') ||
+                    name.includes('doordash') || name.includes('uber eats') || name.includes('grubhub')) {
+                    return 'Food & Drink';
+                }
+                if (name.includes('uber') || name.includes('lyft') || name.includes('gas') || 
+                    name.includes('shell') || name.includes('chevron') || name.includes('exxon') ||
+                    name.includes('parking') || name.includes('transit')) {
+                    return 'Transportation';
+                }
+                if (name.includes('united') || name.includes('delta') || name.includes('american airlines') ||
+                    name.includes('southwest') || name.includes('airline') || name.includes('hotel') ||
+                    name.includes('marriott') || name.includes('hilton') || name.includes('airbnb')) {
+                    return 'Travel';
+                }
+                if (name.includes('amazon') || name.includes('walmart') || name.includes('target') ||
+                    name.includes('costco') || name.includes('best buy') || name.includes('shop')) {
+                    return 'Shopping';
+                }
+                if (name.includes('netflix') || name.includes('spotify') || name.includes('hulu') ||
+                    name.includes('disney') || name.includes('hbo') || name.includes('theater') ||
+                    name.includes('cinema') || name.includes('game')) {
+                    return 'Entertainment';
+                }
+                if (name.includes('gym') || name.includes('fitness') || name.includes('pharmacy') ||
+                    name.includes('cvs') || name.includes('walgreens') || name.includes('doctor') ||
+                    name.includes('medical') || name.includes('health')) {
+                    return 'Health & Fitness';
+                }
+                if (name.includes('electric') || name.includes('water') || name.includes('utility') ||
+                    name.includes('comcast') || name.includes('verizon') || name.includes('at&t') ||
+                    name.includes('t-mobile') || name.includes('internet') || name.includes('payment')) {
+                    return 'Bills & Utilities';
+                }
+                
+                // Fall back to Plaid categories if merchant name didn't match
                 if (!plaidCategories || plaidCategories.length === 0) return 'Other';
-                const primary = plaidCategories[0].toLowerCase();
-                if (primary.includes('food') || primary.includes('restaurant') || primary.includes('coffee')) return 'Food & Drink';
-                if (primary.includes('travel') || primary.includes('airline') || primary.includes('hotel')) return 'Travel';
-                if (primary.includes('transport') || primary.includes('uber') || primary.includes('lyft') || primary.includes('gas')) return 'Transportation';
-                if (primary.includes('shop') || primary.includes('merchandise') || primary.includes('store')) return 'Shopping';
-                if (primary.includes('entertainment') || primary.includes('recreation')) return 'Entertainment';
-                if (primary.includes('health') || primary.includes('medical') || primary.includes('pharmacy')) return 'Health & Fitness';
-                if (primary.includes('bill') || primary.includes('utility') || primary.includes('telecom')) return 'Bills & Utilities';
-                if (primary.includes('personal') || primary.includes('service')) return 'Personal Care';
-                if (primary.includes('education') || primary.includes('book')) return 'Education';
+                const allCategories = plaidCategories.join(' ').toLowerCase();
+                if (allCategories.includes('food') || allCategories.includes('restaurant') || allCategories.includes('coffee')) return 'Food & Drink';
+                if (allCategories.includes('travel') || allCategories.includes('airline') || allCategories.includes('hotel')) return 'Travel';
+                if (allCategories.includes('transport') || allCategories.includes('uber') || allCategories.includes('lyft') || allCategories.includes('gas')) return 'Transportation';
+                if (allCategories.includes('shop') || allCategories.includes('merchandise') || allCategories.includes('store')) return 'Shopping';
+                if (allCategories.includes('entertainment') || allCategories.includes('recreation')) return 'Entertainment';
+                if (allCategories.includes('health') || allCategories.includes('medical') || allCategories.includes('pharmacy')) return 'Health & Fitness';
+                if (allCategories.includes('bill') || allCategories.includes('utility') || allCategories.includes('telecom')) return 'Bills & Utilities';
+                if (allCategories.includes('personal') || allCategories.includes('service')) return 'Personal Care';
+                if (allCategories.includes('education') || allCategories.includes('book')) return 'Education';
                 return 'Other';
             };
 
             // Convert Plaid transactions to our format
+            // Note: We'll skip Plaid sandbox transactions as they have unrealistic amounts ($500 for everything)
+            // and use our generated data instead for a better demo experience
             const formattedPlaidTransactions = plaidTransactions.map(tx => {
-                const category = mapPlaidCategory(tx.category);
+                const category = mapPlaidCategory(tx.category, tx.merchant_name || tx.name);
                 const isFoodRelated = category === 'Food & Drink';
                 return {
                     user_id: userId,
@@ -139,16 +195,14 @@ export async function POST(request: NextRequest) {
                 };
             });
 
-            // Generate 5 years of fake historical data
+            // Generate 5 years of fake historical data (up to TODAY, not 90 days ago)
             const fakeTransactions = generateFiveYearsOfTransactions();
             const fakeIncome = generateFiveYearsOfIncome();
 
-            // Filter out fake transactions that overlap with Plaid data (last 90 days)
-            const ninetyDaysAgoStr = ninetyDaysAgo.toISOString().split('T')[0];
-            const filteredFakeTransactions = fakeTransactions.filter(tx => tx.date < ninetyDaysAgoStr);
-
-            // Combine all transactions
-            const allTransactions = [...filteredFakeTransactions, ...formattedPlaidTransactions];
+            // Use ALL fake transactions - they go up to current date
+            // Don't filter by 90 days since Plaid sandbox data has unrealistic amounts
+            // For a real production app, you'd want to merge Plaid data properly
+            const allTransactions = fakeTransactions;
 
             // Clear existing data and insert new
             await supabase.from('transactions').delete().eq('uuid_user_id', userId);
