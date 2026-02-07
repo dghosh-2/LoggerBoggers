@@ -1,50 +1,55 @@
 'use client';
 
 import React from 'react';
+import { motion } from 'framer-motion';
+import { Sparkles, Lightbulb, Shield } from 'lucide-react';
 
 interface AIRecommendationsProps {
     recommendations: any | null;
     loading: boolean;
+    useLiquidGlass?: boolean;
 }
 
-export default function AIRecommendations({ recommendations, loading }: AIRecommendationsProps) {
+export default function AIRecommendations({ recommendations, loading, useLiquidGlass = false }: AIRecommendationsProps) {
+    const containerClass = useLiquidGlass ? "liquid-glass p-6 rounded-3xl" : "card-elevated p-6 rounded-2xl";
+    const borderClass = useLiquidGlass ? "border-primary/10" : "border-border";
+    const bgClass = useLiquidGlass ? "bg-primary/5 border-primary/10" : "bg-secondary border-border";
+
     if (loading) {
         return (
-            <div className="ios-glass rounded-[28px] p-6">
-                <style jsx>{`
-                    .ios-glass {
-                        background: rgba(255, 255, 255, 0.15);
-                        backdrop-filter: saturate(180%) blur(30px);
-                        -webkit-backdrop-filter: saturate(180%) blur(30px);
-                        border: 0.5px solid rgba(255, 255, 255, 0.3);
-                        box-shadow: 0 8px 32px rgba(31, 38, 135, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.4);
-                    }
-                `}</style>
-                <h2 className="text-lg font-semibold text-white mb-4">AI Analysis</h2>
-                <div className="animate-pulse space-y-3">
-                    <div className="h-3 bg-white/20 rounded w-full" />
-                    <div className="h-3 bg-white/20 rounded w-4/5" />
-                    <div className="h-3 bg-white/20 rounded w-3/4" />
+            <motion.div 
+                className={containerClass}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
+            >
+                <div className="flex items-center gap-2 mb-4 relative z-10">
+                    <Sparkles className="w-5 h-5 text-primary" />
+                    <h2 className="text-lg font-semibold">AI Analysis</h2>
                 </div>
-            </div>
+                <div className="animate-pulse space-y-3 relative z-10">
+                    <div className="h-3 bg-secondary rounded w-full" />
+                    <div className="h-3 bg-secondary rounded w-4/5" />
+                    <div className="h-3 bg-secondary rounded w-3/4" />
+                </div>
+            </motion.div>
         );
     }
 
     if (!recommendations) {
         return (
-            <div className="ios-glass rounded-[28px] p-6">
-                <style jsx>{`
-                    .ios-glass {
-                        background: rgba(255, 255, 255, 0.15);
-                        backdrop-filter: saturate(180%) blur(30px);
-                        -webkit-backdrop-filter: saturate(180%) blur(30px);
-                        border: 0.5px solid rgba(255, 255, 255, 0.3);
-                        box-shadow: 0 8px 32px rgba(31, 38, 135, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.4);
-                    }
-                `}</style>
-                <h2 className="text-lg font-semibold text-white mb-2">AI Analysis</h2>
-                <p className="text-sm text-white/60">Search for stocks to get AI insights</p>
-            </div>
+            <motion.div 
+                className={containerClass}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
+            >
+                <div className="flex items-center gap-2 mb-2 relative z-10">
+                    <Sparkles className="w-5 h-5 text-primary" />
+                    <h2 className="text-lg font-semibold">AI Analysis</h2>
+                </div>
+                <p className="text-sm text-foreground-muted relative z-10">Search for stocks to get AI insights</p>
+            </motion.div>
         );
     }
 
@@ -63,63 +68,56 @@ export default function AIRecommendations({ recommendations, loading }: AIRecomm
     }
 
     return (
-        <>
-            <style jsx>{`
-                .ios-glass {
-                    background: rgba(255, 255, 255, 0.15);
-                    backdrop-filter: saturate(180%) blur(30px);
-                    -webkit-backdrop-filter: saturate(180%) blur(30px);
-                    border: 0.5px solid rgba(255, 255, 255, 0.3);
-                    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.4);
-                }
-                .ios-metric-card {
-                    background: rgba(255, 255, 255, 0.2);
-                    backdrop-filter: saturate(180%) blur(20px);
-                    -webkit-backdrop-filter: saturate(180%) blur(20px);
-                    border: 0.5px solid rgba(255, 255, 255, 0.35);
-                }
-            `}</style>
+        <motion.div 
+            className={containerClass}
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
+        >
+            <div className="flex items-center gap-2 mb-5 relative z-10">
+                <Sparkles className="w-5 h-5 text-primary" />
+                <h2 className="text-lg font-semibold">AI Analysis</h2>
+            </div>
 
-            <div className="ios-glass rounded-[28px] p-6 relative overflow-hidden">
-                {/* Gradient overlay */}
-                <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-white/10 pointer-events-none rounded-[28px]" />
+            {/* Key Points */}
+            <div className="space-y-3 mb-5 relative z-10">
+                {keyPoints.map((point, idx) => (
+                    <p key={idx} className="text-sm text-foreground-secondary leading-relaxed">
+                        <span className="font-semibold text-foreground">{point.label}:</span>{' '}
+                        {point.content}
+                    </p>
+                ))}
+            </div>
 
-                <div className="relative">
-                    <h2 className="text-lg font-semibold text-white mb-5">AI Analysis</h2>
-
-                    {/* Key Points */}
-                    <div className="space-y-3 mb-5">
-                        {keyPoints.map((point, idx) => (
-                            <p key={idx} className="text-sm text-white/90 leading-relaxed">
-                                <span className="font-semibold text-white">{point.label}:</span>{' '}
-                                {point.content}
-                            </p>
+            {/* Numerical Key Insights */}
+            {recommendations.insights && recommendations.insights.length > 0 && (
+                <div className={`border-t ${borderClass} pt-4 relative z-10`}>
+                    <div className="flex items-center gap-2 mb-3">
+                        <Lightbulb className="w-4 h-4 text-accent" />
+                        <h3 className="text-sm font-semibold">Key Metrics</h3>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        {recommendations.insights.slice(0, 4).map((insight: any, idx: number) => (
+                            <div key={idx} className={`${bgClass} rounded-xl px-3 py-2.5 border`}>
+                                <p className="text-xs text-foreground-muted mb-1">{insight.title}</p>
+                                <p className="text-sm font-semibold truncate">{insight.description}</p>
+                            </div>
                         ))}
                     </div>
-
-                    {/* Numerical Key Insights */}
-                    {recommendations.insights && recommendations.insights.length > 0 && (
-                        <div className="border-t border-white/20 pt-4">
-                            <h3 className="text-sm font-semibold text-white mb-3">Key Metrics</h3>
-                            <div className="grid grid-cols-2 gap-3">
-                                {recommendations.insights.slice(0, 4).map((insight: any, idx: number) => (
-                                    <div key={idx} className="ios-metric-card rounded-[16px] px-3 py-2.5">
-                                        <p className="text-xs text-white/70 mb-1">{insight.title}</p>
-                                        <p className="text-sm font-semibold text-white truncate">{insight.description}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Risk note */}
-                    {recommendations.riskAlignment && (
-                        <p className="text-xs text-white/60 mt-4 pt-3 border-t border-white/20">
-                            {recommendations.riskAlignment.slice(0, 100)}...
-                        </p>
-                    )}
                 </div>
-            </div>
-        </>
+            )}
+
+            {/* Risk note */}
+            {recommendations.riskAlignment && (
+                <div className={`mt-4 pt-3 border-t ${borderClass} relative z-10`}>
+                    <div className="flex items-start gap-2">
+                        <Shield className="w-4 h-4 text-foreground-muted mt-0.5" />
+                        <p className="text-xs text-foreground-muted">
+                            {recommendations.riskAlignment.slice(0, 150)}...
+                        </p>
+                    </div>
+                </div>
+            )}
+        </motion.div>
     );
 }
