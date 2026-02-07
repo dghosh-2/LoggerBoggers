@@ -6,13 +6,11 @@ import {
   LayoutDashboard,
   Sparkles,
   TrendingUp,
-  Upload,
   Briefcase,
   Mic,
   User,
   LineChart,
   Clock,
-  Settings
 } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
 import { useUIStore } from "@/stores/ui-store";
@@ -24,7 +22,6 @@ const navItems = [
   { name: "Time Machine", href: "/timemachine", icon: Clock },
   { name: "Insights", href: "/insights", icon: TrendingUp },
   { name: "Stocks", href: "/stocks", icon: LineChart },
-  { name: "Imports", href: "/imports", icon: Upload },
   { name: "Portfolio", href: "/portfolio", icon: Briefcase },
 ];
 
