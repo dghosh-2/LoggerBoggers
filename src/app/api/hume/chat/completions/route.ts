@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { cerebras } from '@/lib/cerebras';
 import { getConciseFinancialContext } from '@/lib/financial-context';
+import { getUserIdFromRequest } from '@/lib/auth';
 
 /**
  * Custom Language Model endpoint for Hume EVI
@@ -21,40 +22,18 @@ export async function POST(req: NextRequest) {
             );
         }
 
+        // Get authenticated user ID
+        const userId = await getUserIdFromRequest(req);
+
         // Fetch concise financial context for voice conversations
-        const financialContext = await getConciseFinancialContext();
+        const financialContext = await getConciseFinancialContext(userId || undefined);
 
         // Add financial assistant system context with real data
         const systemPrompt = {
             role: 'system',
-            content: `You are ScotBot, a personal financial assistant with direct access to the user's financial data stored on their account.
+            content: `You are ScotBot, a financial advisor. Answer ONLY what the user asks. Be extremely concise - 1-2 sentences max. Use specific numbers from the data below. No filler words, no "hmm", no hedging. For non-financial topics: "I only help with finances."
 
-SCOPE OF ASSISTANCE:
-You have access to and can help with:
-- User's transaction history and spending patterns
-- Account balances and net worth
-- Investment portfolio holdings and performance
-- Budget categories and expense tracking
-- Financial goals and progress
-
-Your role is EXCLUSIVELY to assist with the user's personal financial data. You:
-- Analyze their specific spending, investments, and financial trends
-- Provide personalized insights based on THEIR data
-- Offer actionable advice tailored to THEIR financial situation
-- Answer questions about THEIR accounts, transactions, and portfolio
-
-You do NOT:
-- Provide general financial advice unrelated to their data
-- Discuss topics outside of their personal finances
-- Offer services beyond financial data analysis and insights
-
-${financialContext}
-
-Communication style:
-- Conversational and empathetic
-- Concise responses (2-3 sentences for voice, can be longer if detailed analysis requested)
-- Reference specific data points from their account when relevant
-- Warm and friendly tone`
+${financialContext}`
         };
 
         // Prepare messages with system prompt

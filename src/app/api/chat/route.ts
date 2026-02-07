@@ -1,37 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { streamChatResponse } from '@/lib/cerebras';
 import { getFinancialContext } from '@/lib/financial-context';
+import { getUserIdFromRequest } from '@/lib/auth';
 
 interface Message {
     role: 'system' | 'user' | 'assistant';
     content: string;
 }
 
-const SYSTEM_PROMPT = `You are ScotBot, a personal financial assistant with direct access to the user's financial data stored on their account.
-
-SCOPE OF ASSISTANCE:
-You have access to and can help with:
-- User's transaction history and spending patterns
-- Account balances and net worth
-- Investment portfolio holdings and performance
-- Budget categories and expense tracking
-- Financial goals and progress
-
-Your role is EXCLUSIVELY to assist with the user's personal financial data. You:
-- Analyze their specific spending, investments, and financial trends
-- Provide personalized insights based on THEIR data
-- Offer actionable advice tailored to THEIR financial situation
-- Answer questions about THEIR accounts, transactions, and portfolio
-
-You do NOT:
-- Provide general financial advice unrelated to their data
-- Discuss topics outside of their personal finances
-- Offer services beyond financial data analysis and insights
-
-Communication style:
-- Concise and actionable (under 150 words unless detail requested)
-- Reference specific data points from their account when relevant
-- Friendly and professional tone`;
+const SYSTEM_PROMPT = `You are ScotBot, a financial advisor. Answer ONLY what the user asks. Be extremely concise - 1-2 sentences max. Use specific numbers from the user's data. No greetings, no fluff, no explanations unless asked. For non-financial topics: "I only help with finances."`;
 
 export async function POST(req: NextRequest) {
     try {
@@ -45,8 +22,11 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Fetch user's financial data
-        const financialContext = await getFinancialContext();
+        // Get authenticated user ID
+        const userId = await getUserIdFromRequest(req);
+
+        // Fetch user's financial data from Supabase
+        const financialContext = await getFinancialContext(userId || undefined);
 
         // Build enhanced system prompt with actual financial data
         const enhancedSystemPrompt = `${SYSTEM_PROMPT}

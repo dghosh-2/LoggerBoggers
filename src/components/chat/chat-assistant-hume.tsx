@@ -49,7 +49,7 @@ function ChatAssistantContent() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Hume Voice integration
-  const { status, connect, disconnect, sendSessionSettings, messages: voiceMessages } = useVoice();
+  const { status, connect, disconnect } = useVoice();
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isVoiceMode, setIsVoiceMode] = useState(false);
   const [configId, setConfigId] = useState<string | null>(null);
@@ -182,38 +182,53 @@ function ChatAssistantContent() {
     }
   };
 
-  const fetchOrCreateConfig = async () => {
+  const fetchOrCreateConfig = async (): Promise<{ configId: string; configVersion?: number } | null> => {
     try {
-      // Check localStorage for existing config
+      // Always clear and create fresh config for debugging
       const storedConfigId = localStorage.getItem('hume_scotbot_config_id');
       if (storedConfigId) {
-        console.log('Using stored config:', storedConfigId);
-        setConfigId(storedConfigId);
-        return storedConfigId;
+        console.log('Clearing stored config to create fresh one');
+        localStorage.removeItem('hume_scotbot_config_id');
       }
 
-      // Create new config with financial assistant prompt (no custom LLM)
-      console.log('Creating new Hume config...');
-      const response = await fetch('/api/hume/config?useCustomLLM=false', {
-        method: 'POST',
-      });
+      // Create new config with financial assistant prompt
+      console.log('Creating new Hume config with ScotBot financial advisor prompt...');
+      let response;
+      try {
+        response = await fetch('/api/hume/config?useCustomLLM=false', {
+          method: 'POST',
+        });
+        console.log('Config API response status:', response.status);
+      } catch (fetchError) {
+        console.error('Network error calling config API:', fetchError);
+        return null;
+      }
 
       if (!response.ok) {
         const error = await response.text();
-        console.error('Failed to create config:', error);
+        console.error('Config API returned error:', response.status, error);
         return null;
       }
 
       const data = await response.json();
-      const newConfigId = data.configId;
+      console.log('Full config API response:', JSON.stringify(data, null, 2));
 
-      console.log('Created config:', newConfigId);
+      const newConfigId = data.configId;
+      const configVersion = data.versionId;
+
+      // Validate the new config ID before storing
+      if (!newConfigId || newConfigId === 'undefined' || newConfigId === 'null') {
+        console.error('Received invalid config ID from server:', newConfigId);
+        return null;
+      }
+
+      console.log('Created config:', newConfigId, 'version:', configVersion);
 
       // Store for future use
       localStorage.setItem('hume_scotbot_config_id', newConfigId);
       setConfigId(newConfigId);
 
-      return newConfigId;
+      return { configId: newConfigId, configVersion };
     } catch (error) {
       console.error('Error fetching/creating config:', error);
       return null;
@@ -231,39 +246,48 @@ function ChatAssistantContent() {
         setIsVoiceMode(true);
 
         // Get access token
+        console.log('Fetching access token...');
         const token = await fetchAccessToken();
+        if (!token) {
+          throw new Error('Failed to get access token');
+        }
         setAccessToken(token);
+        console.log('Got access token');
 
         // Get or create config with financial assistant prompt
-        const config = await fetchOrCreateConfig();
+        console.log('Getting config...');
+        const configResult = await fetchOrCreateConfig();
+        console.log('Config result:', configResult || 'failed - using Hume default');
 
-        // Fetch user's financial data
-        const financialDataResponse = await fetch('/api/user/financial-context');
-        const financialData = await financialDataResponse.json();
-
-        // Connect to Hume EVI
+        // Connect to Hume EVI with timeout
         const connectOptions: any = {
           auth: { type: 'accessToken', value: token },
         };
 
         // Use config with financial assistant prompt if available
-        if (config) {
-          connectOptions.configId = config;
-          console.log('Connecting with ScotBot config:', config);
-        } else {
-          console.warn('No config available, using Hume default');
+        if (configResult) {
+          connectOptions.configId = configResult.configId;
+          if (configResult.configVersion) {
+            connectOptions.configVersion = configResult.configVersion;
+          }
         }
 
-        await connect(connectOptions);
-
-        // Send financial context via session settings
-        await sendSessionSettings({
-          context: {
-            text: financialData.context || 'No financial data available yet.',
-          },
+        console.log('Connecting to Hume EVI with options:', {
+          hasAuth: !!connectOptions.auth,
+          configId: connectOptions.configId || 'none (using Hume default)',
+          configVersion: connectOptions.configVersion || 'latest',
         });
 
-        console.log('Connected to Hume EVI with financial context');
+        // Add timeout for connection
+        const connectionTimeout = setTimeout(() => {
+          console.error('Connection timeout');
+          setIsVoiceMode(false);
+        }, 10000);
+
+        await connect(connectOptions);
+        clearTimeout(connectionTimeout);
+
+        console.log('Connected to Hume EVI');
       } catch (error) {
         console.error('Voice connection error:', error);
         setIsVoiceMode(false);
@@ -557,6 +581,15 @@ function ChatAssistantContent() {
 
 export function ChatAssistant() {
   const { chatHidden } = useUIStore();
+
+  // Clear any invalid stored config on mount
+  useEffect(() => {
+    const storedConfigId = localStorage.getItem('hume_scotbot_config_id');
+    if (storedConfigId === 'undefined' || storedConfigId === 'null' || (storedConfigId && storedConfigId.length < 10)) {
+      console.log('Clearing invalid stored Hume config on mount:', storedConfigId);
+      localStorage.removeItem('hume_scotbot_config_id');
+    }
+  }, []);
 
   if (chatHidden) return null;
 
