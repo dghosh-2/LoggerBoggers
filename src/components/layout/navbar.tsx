@@ -10,7 +10,8 @@ import {
   Briefcase,
   Mic,
   User,
-  LineChart
+  LineChart,
+  Clock
 } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
 import { useUIStore } from "@/stores/ui-store";
@@ -18,6 +19,7 @@ import { useUIStore } from "@/stores/ui-store";
 const navItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Studio", href: "/studio", icon: Sparkles },
+  { name: "Time Machine", href: "/timemachine", icon: Clock },
   { name: "Insights", href: "/insights", icon: TrendingUp },
   { name: "Stocks", href: "/stocks", icon: LineChart },
   { name: "Imports", href: "/imports", icon: Upload },
@@ -69,8 +71,8 @@ export function Navbar() {
                       key={item.href}
                       onClick={() => handleNavClick(item.href)}
                       className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${isActive
-                        ? "text-foreground bg-secondary"
-                        : "text-foreground-muted hover:text-foreground hover:bg-secondary/50"
+                          ? "text-foreground bg-secondary"
+                          : "text-foreground-muted hover:text-foreground hover:bg-secondary/50"
                         }`}
                     >
                       <Icon className="w-4 h-4" />
