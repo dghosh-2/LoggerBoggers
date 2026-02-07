@@ -4,9 +4,11 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getUserIdFromRequest } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
+    console.log('=== EXCHANGE TOKEN API CALLED ===');
     try {
         // Get authenticated user ID
         const userId = await getUserIdFromRequest(request);
+        console.log('User ID from request:', userId);
         
         if (!userId) {
             console.error('Authentication failed: No user ID found');
@@ -16,7 +18,9 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const { public_token, institution } = await request.json();
+        const body = await request.json();
+        const { public_token, institution } = body;
+        console.log('Request body received:', { hasPublicToken: !!public_token, institution });
 
         if (!public_token) {
             console.error('Missing public_token in request');
