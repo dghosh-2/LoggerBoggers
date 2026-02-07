@@ -33,47 +33,47 @@ const SUGGESTED_PROMPTS = [
   "Analyze my portfolio risk",
 ];
 
-// Animated blob entity for call mode
+// CMU-themed compact blob for call mode
 const BlobEntity = ({ status }: { status: string }) => {
   const isActive = status === 'speaking' || status === 'listening';
   const isSpeaking = status === 'speaking';
   const isThinking = status === 'thinking';
 
-  // Color palette based on status
+  // CMU red/black palette
   const colors = {
-    speaking: { primary: '#3B82F6', secondary: '#60A5FA', glow: 'rgba(59,130,246,0.4)' },
-    listening: { primary: '#22C55E', secondary: '#4ADE80', glow: 'rgba(34,197,94,0.4)' },
-    thinking: { primary: '#F59E0B', secondary: '#FBBF24', glow: 'rgba(245,158,11,0.4)' },
-    idle: { primary: '#64748B', secondary: '#94A3B8', glow: 'rgba(100,116,139,0.3)' },
-    connecting: { primary: '#64748B', secondary: '#94A3B8', glow: 'rgba(100,116,139,0.3)' },
+    speaking: { primary: '#C41230', secondary: '#E8395B', glow: 'rgba(196,18,48,0.4)' },
+    listening: { primary: '#C41230', secondary: '#E8395B', glow: 'rgba(196,18,48,0.3)' },
+    thinking: { primary: '#8B0D24', secondary: '#C41230', glow: 'rgba(139,13,36,0.35)' },
+    idle: { primary: '#2D2D2D', secondary: '#4A4A4A', glow: 'rgba(45,45,45,0.3)' },
+    connecting: { primary: '#2D2D2D', secondary: '#4A4A4A', glow: 'rgba(45,45,45,0.3)' },
   };
 
   const c = colors[status as keyof typeof colors] || colors.idle;
 
   return (
-    <div className="relative w-48 h-48 flex items-center justify-center">
-      {/* Outer ambient glow */}
+    <div className="relative w-16 h-16 flex items-center justify-center">
+      {/* Glow */}
       <motion.div
         className="absolute rounded-full"
         style={{
-          width: 280,
-          height: 280,
+          width: 90,
+          height: 90,
           background: `radial-gradient(circle, ${c.glow} 0%, transparent 70%)`,
         }}
         animate={{
           scale: isActive ? [1, 1.2, 1] : [1, 1.05, 1],
-          opacity: isActive ? [0.6, 1, 0.6] : [0.3, 0.5, 0.3],
+          opacity: isActive ? [0.5, 0.9, 0.5] : [0.2, 0.4, 0.2],
         }}
         transition={{ duration: isActive ? 1.5 : 3, repeat: Infinity, ease: "easeInOut" }}
       />
 
-      {/* Blob layer 3 (outermost) */}
+      {/* Outer blob */}
       <motion.div
         className="absolute"
-        style={{ width: 180, height: 180 }}
+        style={{ width: 56, height: 56 }}
         animate={{
-          scale: isSpeaking ? [1, 1.15, 0.95, 1.1, 1] : isThinking ? [1, 1.05, 1] : [1, 1.08, 1],
-          rotate: isThinking ? [0, 360] : isSpeaking ? [0, 10, -10, 5, 0] : [0, 5, -5, 0],
+          scale: isSpeaking ? [1, 1.15, 0.95, 1.1, 1] : isThinking ? [1, 1.05, 1] : [1, 1.06, 1],
+          rotate: isThinking ? [0, 360] : isSpeaking ? [0, 10, -10, 5, 0] : [0, 3, -3, 0],
         }}
         transition={{
           duration: isSpeaking ? 0.8 : isThinking ? 4 : 3,
@@ -84,92 +84,50 @@ const BlobEntity = ({ status }: { status: string }) => {
         <svg viewBox="0 0 200 200" className="w-full h-full">
           <motion.path
             fill={c.secondary}
-            fillOpacity={0.3}
+            fillOpacity={0.35}
             animate={{
               d: isActive ? [
                 "M 100 30 C 140 30, 170 60, 170 100 C 170 140, 140 170, 100 170 C 60 170, 30 140, 30 100 C 30 60, 60 30, 100 30",
                 "M 100 25 C 150 35, 175 55, 175 100 C 175 145, 145 175, 100 175 C 55 175, 25 145, 25 100 C 25 55, 50 25, 100 25",
-                "M 100 35 C 135 25, 165 65, 170 100 C 175 135, 145 170, 100 165 C 55 160, 35 135, 30 100 C 25 65, 65 35, 100 35",
                 "M 100 30 C 140 30, 170 60, 170 100 C 170 140, 140 170, 100 170 C 60 170, 30 140, 30 100 C 30 60, 60 30, 100 30",
               ] : [
                 "M 100 30 C 140 30, 170 60, 170 100 C 170 140, 140 170, 100 170 C 60 170, 30 140, 30 100 C 30 60, 60 30, 100 30",
-                "M 100 35 C 138 32, 168 62, 168 100 C 168 138, 138 168, 100 168 C 62 168, 32 138, 32 100 C 32 62, 62 35, 100 35",
+                "M 100 34 C 138 32, 168 62, 168 100 C 168 138, 138 168, 100 168 C 62 168, 32 138, 32 100 C 32 62, 62 34, 100 34",
                 "M 100 30 C 140 30, 170 60, 170 100 C 170 140, 140 170, 100 170 C 60 170, 30 140, 30 100 C 30 60, 60 30, 100 30",
               ],
             }}
-            transition={{ duration: isActive ? 1.2 : 4, repeat: Infinity, ease: "easeInOut" }}
+            transition={{ duration: isActive ? 1 : 4, repeat: Infinity, ease: "easeInOut" }}
           />
         </svg>
       </motion.div>
 
-      {/* Blob layer 2 (middle) */}
+      {/* Core blob */}
       <motion.div
         className="absolute"
-        style={{ width: 150, height: 150 }}
+        style={{ width: 40, height: 40 }}
         animate={{
-          scale: isSpeaking ? [1, 1.2, 0.9, 1.15, 1] : isThinking ? [1, 1.08, 1] : [1, 1.05, 1],
-          rotate: isThinking ? [0, -180] : isSpeaking ? [0, -8, 12, -5, 0] : [0, -3, 3, 0],
-          y: isActive ? [0, -6, 4, -3, 0] : [0, -3, 0],
-        }}
-        transition={{
-          duration: isSpeaking ? 0.7 : isThinking ? 3 : 4,
-          repeat: Infinity,
-          ease: "easeInOut",
-          delay: 0.1,
-        }}
-      >
-        <svg viewBox="0 0 200 200" className="w-full h-full">
-          <motion.path
-            fill={c.primary}
-            fillOpacity={0.5}
-            animate={{
-              d: isActive ? [
-                "M 100 35 C 135 35, 165 65, 165 100 C 165 135, 135 165, 100 165 C 65 165, 35 135, 35 100 C 35 65, 65 35, 100 35",
-                "M 100 30 C 145 40, 170 60, 168 100 C 166 140, 140 172, 100 170 C 60 168, 32 140, 30 100 C 28 60, 55 30, 100 30",
-                "M 100 40 C 130 28, 162 68, 165 100 C 168 132, 142 165, 100 162 C 58 159, 38 130, 35 100 C 32 70, 70 40, 100 40",
-                "M 100 35 C 135 35, 165 65, 165 100 C 165 135, 135 165, 100 165 C 65 165, 35 135, 35 100 C 35 65, 65 35, 100 35",
-              ] : [
-                "M 100 35 C 135 35, 165 65, 165 100 C 165 135, 135 165, 100 165 C 65 165, 35 135, 35 100 C 35 65, 65 35, 100 35",
-                "M 100 38 C 133 36, 163 66, 163 100 C 163 134, 133 163, 100 163 C 67 163, 37 134, 37 100 C 37 66, 67 38, 100 38",
-                "M 100 35 C 135 35, 165 65, 165 100 C 165 135, 135 165, 100 165 C 65 165, 35 135, 35 100 C 35 65, 65 35, 100 35",
-              ],
-            }}
-            transition={{ duration: isActive ? 1 : 5, repeat: Infinity, ease: "easeInOut", delay: 0.15 }}
-          />
-        </svg>
-      </motion.div>
-
-      {/* Blob layer 1 (innermost / core) */}
-      <motion.div
-        className="absolute"
-        style={{ width: 110, height: 110 }}
-        animate={{
-          scale: isSpeaking ? [1, 1.25, 0.85, 1.2, 1] : isThinking ? [1, 1.1, 1] : [1, 1.03, 1],
-          rotate: isThinking ? [0, 120] : isSpeaking ? [0, 15, -15, 8, 0] : [0, 2, -2, 0],
-          x: isActive ? [0, 3, -3, 2, 0] : [0],
-          y: isActive ? [0, -4, 5, -2, 0] : [0, -2, 0],
+          scale: isSpeaking ? [1, 1.2, 0.88, 1.15, 1] : isThinking ? [1, 1.08, 1] : [1, 1.03, 1],
+          rotate: isSpeaking ? [0, 12, -12, 6, 0] : [0, 2, -2, 0],
         }}
         transition={{
           duration: isSpeaking ? 0.6 : isThinking ? 2.5 : 5,
           repeat: Infinity,
           ease: "easeInOut",
-          delay: 0.2,
         }}
       >
         <svg viewBox="0 0 200 200" className="w-full h-full">
           <defs>
-            <radialGradient id="blobGradient" cx="40%" cy="40%">
-              <stop offset="0%" stopColor="#fff" stopOpacity="0.3" />
+            <radialGradient id="blobGradientCmu" cx="40%" cy="40%">
+              <stop offset="0%" stopColor="#fff" stopOpacity="0.2" />
               <stop offset="100%" stopColor={c.primary} stopOpacity="0.9" />
             </radialGradient>
           </defs>
           <motion.path
-            fill="url(#blobGradient)"
+            fill="url(#blobGradientCmu)"
             animate={{
               d: isActive ? [
                 "M 100 40 C 130 40, 160 70, 160 100 C 160 130, 130 160, 100 160 C 70 160, 40 130, 40 100 C 40 70, 70 40, 100 40",
                 "M 100 35 C 140 45, 165 65, 162 100 C 159 135, 135 168, 100 165 C 65 162, 38 135, 35 100 C 32 65, 60 35, 100 35",
-                "M 100 45 C 125 32, 158 72, 160 100 C 162 128, 138 162, 100 158 C 62 154, 42 128, 40 100 C 38 72, 75 45, 100 45",
                 "M 100 40 C 130 40, 160 70, 160 100 C 160 130, 130 160, 100 160 C 70 160, 40 130, 40 100 C 40 70, 70 40, 100 40",
               ] : [
                 "M 100 40 C 130 40, 160 70, 160 100 C 160 130, 130 160, 100 160 C 70 160, 40 130, 40 100 C 40 70, 70 40, 100 40",
@@ -177,35 +135,31 @@ const BlobEntity = ({ status }: { status: string }) => {
                 "M 100 40 C 130 40, 160 70, 160 100 C 160 130, 130 160, 100 160 C 70 160, 40 130, 40 100 C 40 70, 70 40, 100 40",
               ],
             }}
-            transition={{ duration: isActive ? 0.8 : 6, repeat: Infinity, ease: "easeInOut", delay: 0.25 }}
+            transition={{ duration: isActive ? 0.8 : 6, repeat: Infinity, ease: "easeInOut" }}
           />
         </svg>
       </motion.div>
 
-      {/* Floating particles when active */}
+      {/* Tiny particles */}
       {isActive && (
         <>
-          {[...Array(6)].map((_, i) => (
+          {[...Array(4)].map((_, i) => (
             <motion.div
               key={i}
-              className="absolute w-1.5 h-1.5 rounded-full"
+              className="absolute w-1 h-1 rounded-full"
               style={{ backgroundColor: c.secondary }}
-              initial={{
-                x: 0,
-                y: 0,
-                opacity: 0,
-              }}
+              initial={{ x: 0, y: 0, opacity: 0 }}
               animate={{
-                x: [0, Math.cos(i * 60 * Math.PI / 180) * (60 + Math.random() * 30), 0],
-                y: [0, Math.sin(i * 60 * Math.PI / 180) * (60 + Math.random() * 30), 0],
-                opacity: [0, 0.8, 0],
-                scale: [0.5, 1.2, 0.5],
+                x: [0, Math.cos(i * 90 * Math.PI / 180) * 28, 0],
+                y: [0, Math.sin(i * 90 * Math.PI / 180) * 28, 0],
+                opacity: [0, 0.7, 0],
+                scale: [0.5, 1, 0.5],
               }}
               transition={{
-                duration: 2 + Math.random(),
+                duration: 1.8 + Math.random() * 0.5,
                 repeat: Infinity,
                 ease: "easeInOut",
-                delay: i * 0.3,
+                delay: i * 0.35,
               }}
             />
           ))}
@@ -619,118 +573,46 @@ export function ChatAssistant() {
 
   return (
     <>
-      {/* Call Mode - Full Screen Blob Interface */}
-      <AnimatePresence>
-        {isCallMode && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 flex flex-col items-center justify-center"
-          >
-            {/* Background glow */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-              <motion.div
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full"
-                style={{
-                  background: callStatus === 'speaking'
-                    ? 'radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)'
-                    : callStatus === 'listening'
-                    ? 'radial-gradient(circle, rgba(34,197,94,0.15) 0%, transparent 70%)'
-                    : 'radial-gradient(circle, rgba(148,163,184,0.1) 0%, transparent 70%)'
-                }}
-                animate={{ scale: [1, 1.15, 1] }}
-                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              />
-            </div>
-
-            {/* Animated Blob Entity */}
-            <BlobEntity status={callStatus} />
-
-            {/* Status Text */}
-            <motion.p
-              className="mt-6 text-lg font-medium text-white/90"
-              key={callStatus}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              {callStatus === 'connecting' && 'Connecting...'}
-              {callStatus === 'listening' && 'Listening...'}
-              {callStatus === 'thinking' && 'Thinking...'}
-              {callStatus === 'speaking' && 'ScotBot'}
-              {callStatus === 'idle' && 'Ready'}
-            </motion.p>
-
-            <p className="mt-1.5 text-sm text-slate-500">
-              {callStatus === 'listening' && 'Speak your question'}
-              {callStatus === 'speaking' && 'Speaking...'}
-              {callStatus === 'thinking' && 'Processing your request'}
-            </p>
-
-            {/* End Call Button */}
-            <motion.button
-              onClick={toggleCallMode}
-              className="mt-10 w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-lg shadow-red-500/20 transition-colors cursor-pointer"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <PhoneOff className="w-6 h-6 text-white" />
-            </motion.button>
-            <p className="mt-3 text-xs text-slate-600">Tap to end call</p>
-
-            {/* Mute button */}
-            <button
-              onClick={() => { stopSpeaking(); setSpeechEnabled(!speechEnabled); }}
-              className="absolute top-6 right-6 p-3 rounded-full bg-slate-800/60 hover:bg-slate-700 transition-colors cursor-pointer"
-            >
-              {speechEnabled ? <Volume2 className="w-5 h-5 text-white/70" /> : <VolumeX className="w-5 h-5 text-white/70" />}
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Floating Chat Button — top right */}
-      {!isCallMode && (
-        <motion.button
-          onClick={() => setIsOpen(!isOpen)}
-          className={cn(
-            "fixed top-5 right-6 z-[60] w-10 h-10 rounded-full flex items-center justify-center transition-colors duration-150 cursor-pointer shadow-md",
-            isOpen
-              ? "bg-foreground text-background"
-              : "bg-card border border-border text-foreground hover:bg-secondary"
+      <motion.button
+        onClick={() => setIsOpen(!isOpen)}
+        className={cn(
+          "fixed top-5 right-6 z-[60] w-10 h-10 rounded-full flex items-center justify-center transition-colors duration-150 cursor-pointer shadow-md",
+          isOpen
+            ? "bg-foreground text-background"
+            : "bg-card border border-border text-foreground hover:bg-secondary"
+        )}
+        whileTap={{ scale: 0.92 }}
+        aria-label={isOpen ? "Close assistant" : "Open assistant"}
+      >
+        <AnimatePresence mode="wait">
+          {isOpen ? (
+            <motion.div
+              key="close"
+              initial={{ rotate: -90, opacity: 0 }}
+              animate={{ rotate: 0, opacity: 1 }}
+              exit={{ rotate: 90, opacity: 0 }}
+              transition={{ duration: 0.15 }}
+            >
+              <X className="w-4 h-4" />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="open"
+              initial={{ scale: 0.6, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.6, opacity: 0 }}
+              transition={{ duration: 0.15 }}
+            >
+              <MessageCircle className="w-4 h-4" />
+            </motion.div>
           )}
-          whileTap={{ scale: 0.92 }}
-          aria-label={isOpen ? "Close assistant" : "Open assistant"}
-        >
-          <AnimatePresence mode="wait">
-            {isOpen ? (
-              <motion.div
-                key="close"
-                initial={{ rotate: -90, opacity: 0 }}
-                animate={{ rotate: 0, opacity: 1 }}
-                exit={{ rotate: 90, opacity: 0 }}
-                transition={{ duration: 0.15 }}
-              >
-                <X className="w-4 h-4" />
-              </motion.div>
-            ) : (
-              <motion.div
-                key="open"
-                initial={{ scale: 0.6, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.6, opacity: 0 }}
-                transition={{ duration: 0.15 }}
-              >
-                <MessageCircle className="w-4 h-4" />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.button>
-      )}
+        </AnimatePresence>
+      </motion.button>
 
       {/* Chat Panel */}
       <AnimatePresence>
-        {isOpen && !isCallMode && (
+        {isOpen && (
           <motion.div
             initial={{ opacity: 0, y: 12, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -769,9 +651,9 @@ export function ChatAssistant() {
               </div>
             </div>
 
-            {/* Voice Listening Overlay */}
+            {/* Voice Listening Overlay — only in text chat, not during call */}
             <AnimatePresence>
-              {isListening && (
+              {isListening && !isCallMode && (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -897,59 +779,92 @@ export function ChatAssistant() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input */}
-            <div className="px-3 py-3 border-t border-border shrink-0">
-              <div className="flex items-center gap-2">
-                {/* Call button */}
-                <button
-                  onClick={toggleCallMode}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-green-500 text-white hover:bg-green-600 transition-colors cursor-pointer"
-                  aria-label="Start voice call"
-                  title="Start voice call"
-                >
-                  <Phone className="w-3.5 h-3.5" />
-                </button>
-                {/* Mic button */}
-                <button
-                  onClick={toggleVoice}
-                  className={cn(
-                    "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors cursor-pointer",
-                    isListening
-                      ? "bg-red-500 text-white animate-pulse"
-                      : "bg-secondary text-foreground-muted hover:text-foreground"
-                  )}
-                  aria-label="Voice input"
-                >
-                  {isListening ? (
-                    <MicOff className="w-3.5 h-3.5" />
-                  ) : (
-                    <Mic className="w-3.5 h-3.5" />
-                  )}
-                </button>
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Ask about your finances..."
-                  className="flex-1 bg-secondary rounded-lg px-3 py-2 text-[13px] placeholder:text-foreground-muted outline-none focus:ring-1 focus:ring-foreground/10 transition-shadow"
-                />
-                <button
-                  onClick={handleSend}
-                  disabled={!input.trim()}
-                  className={cn(
-                    "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors cursor-pointer",
-                    input.trim()
-                      ? "bg-foreground text-background"
-                      : "bg-secondary text-foreground-muted"
-                  )}
-                  aria-label="Send message"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                </button>
+            {/* Bottom bar — switches between input and call mode */}
+            {isCallMode ? (
+              <div className="px-3 py-2.5 border-t border-border shrink-0 bg-[#1A1A1A]">
+                <div className="flex items-center justify-between">
+                  {/* Status label */}
+                  <motion.span
+                    key={callStatus}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-[11px] font-medium text-white/50 uppercase tracking-wider"
+                  >
+                    {callStatus === 'connecting' && 'Connecting...'}
+                    {callStatus === 'listening' && 'Listening...'}
+                    {callStatus === 'thinking' && 'Thinking...'}
+                    {callStatus === 'speaking' && 'Speaking...'}
+                    {callStatus === 'idle' && 'Ready'}
+                  </motion.span>
+
+                  {/* Blob + end call row */}
+                  <div className="flex items-center gap-3">
+                    <BlobEntity status={callStatus} />
+                    <motion.button
+                      onClick={toggleCallMode}
+                      className="w-9 h-9 rounded-full bg-[#C41230] hover:bg-[#A50E28] flex items-center justify-center transition-colors cursor-pointer"
+                      whileTap={{ scale: 0.9 }}
+                      title="End call"
+                    >
+                      <PhoneOff className="w-4 h-4 text-white" />
+                    </motion.button>
+                  </div>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="px-3 py-3 border-t border-border shrink-0">
+                <div className="flex items-center gap-2">
+                  {/* Call button */}
+                  <button
+                    onClick={toggleCallMode}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-emerald-400 text-white hover:bg-emerald-500 transition-colors cursor-pointer"
+                    aria-label="Start voice call"
+                    title="Start voice call"
+                  >
+                    <Phone className="w-3.5 h-3.5" />
+                  </button>
+                  {/* Mic button */}
+                  <button
+                    onClick={toggleVoice}
+                    className={cn(
+                      "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors cursor-pointer",
+                      isListening
+                        ? "bg-red-500 text-white animate-pulse"
+                        : "bg-secondary text-foreground-muted hover:text-foreground"
+                    )}
+                    aria-label="Voice input"
+                  >
+                    {isListening ? (
+                      <MicOff className="w-3.5 h-3.5" />
+                    ) : (
+                      <Mic className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Ask about your finances..."
+                    className="flex-1 bg-secondary rounded-lg px-3 py-2 text-[13px] placeholder:text-foreground-muted outline-none focus:ring-1 focus:ring-foreground/10 transition-shadow"
+                  />
+                  <button
+                    onClick={handleSend}
+                    disabled={!input.trim()}
+                    className={cn(
+                      "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors cursor-pointer",
+                      input.trim()
+                        ? "bg-foreground text-background"
+                        : "bg-secondary text-foreground-muted"
+                    )}
+                    aria-label="Send message"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
