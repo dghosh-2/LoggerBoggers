@@ -10,6 +10,10 @@ export async function POST(request: NextRequest) {
     // Comprehensive system prompt for flexible visualization
     const systemPrompt = `You are a financial data orchestrator that converts natural language queries into comprehensive visualization configurations.
 
+The UI has TWO COLUMNS:
+- LEFT PANEL: Charts, statistics, and visual data only
+- RIGHT PANEL: AI Sidebar with summary, insights, risk analysis, and answers to user questions
+
 STOCK SYMBOL MAPPING:
 Apple→AAPL, Google/Alphabet→GOOGL, Tesla→TSLA, Microsoft→MSFT, Amazon→AMZN, Meta/Facebook→META, NVIDIA→NVDA, AMD→AMD, Netflix→NFLX, Disney→DIS, Intel→INTC, IBM→IBM, Salesforce→CRM, Adobe→ADBE, PayPal→PYPL, Uber→UBER, Airbnb→ABNB, Spotify→SPOT, Zoom→ZM, Shopify→SHOP
 
@@ -23,11 +27,17 @@ QUERY TYPE DETECTION:
 - "risk_analysis": Focus on risk metrics (e.g., "how risky is", "volatility of")
 - "performance": Performance tracking (e.g., "how did X perform", "returns of")
 
+QUESTION EXTRACTION:
+Extract any questions the user is asking that should be answered in the AI sidebar. Examples:
+- "How risky is NVIDIA?" → extractedQuestions: ["How risky is NVIDIA?"]
+- "Compare Apple and Google, which is better for long-term?" → extractedQuestions: ["Which stock is better for long-term investment?"]
+- "Is Tesla overvalued?" → extractedQuestions: ["Is Tesla overvalued?"]
+
 LAYOUT RULES:
 - If user wants "separate graphs" or "side by side" → layout.type = "split", create multiple chart configs
 - If user wants "one graph" or "overlay" or "combined" → layout.type = "single", one chart with multiple series
 - If comparing 3+ stocks → consider layout.type = "grid"
-- For risk-focused queries → include riskLayout = "detailed" or "comparison"
+- Risk information goes in the sidebar by default (riskLayout = "sidebar_only")
 
 CHART CONFIGURATION:
 - Each chart needs: id, title, chartType (line/area/comparison/bar), series array
@@ -59,19 +69,23 @@ Respond with this JSON structure:
       "showLegend": true
     }
   ],
-  "riskLayout": "compact|detailed|comparison",
+  "extractedQuestions": ["Any questions from the user to answer in sidebar"],
+  "riskLayout": "sidebar_only",
   "features": {
     "showRiskMetrics": true,
     "showRecommendations": true,
     "showStatistics": true,
-    "enableDeepDive": true
+    "enableDeepDive": true,
+    "showAISidebar": true,
+    "showRiskInSidebar": true,
+    "showPersonalizedInsights": true
   }
 }
 
 EXAMPLES:
 - "Compare Apple and Google over 5 years" → comparison, 1 chart with 2 series, chartType="comparison"
 - "Show me Apple and Tesla in separate graphs" → split layout, 2 charts each with 1 series
-- "How risky is NVIDIA?" → risk_analysis, 1 chart, riskLayout="detailed"
+- "How risky is NVIDIA?" → risk_analysis, 1 chart, extractedQuestions=["How risky is NVIDIA?"]
 - "Apple vs Microsoft vs Google side by side" → grid layout, 3 charts or 1 comparison chart
 - "Show Tesla stock with area chart" → single_stock, chartType="area"`;
 
@@ -105,12 +119,16 @@ EXAMPLES:
         columns: parsed.layout?.columns || (parsed.symbols?.length > 2 ? 2 : 1),
       },
       charts: normalizeCharts(parsed.charts, parsed.symbols),
-      riskLayout: parsed.riskLayout || 'detailed',
+      extractedQuestions: parsed.extractedQuestions || [],
+      riskLayout: parsed.riskLayout || 'sidebar_only',
       features: {
         showRiskMetrics: parsed.features?.showRiskMetrics ?? true,
         showRecommendations: parsed.features?.showRecommendations ?? true,
         showStatistics: parsed.features?.showStatistics ?? true,
         enableDeepDive: parsed.features?.enableDeepDive ?? true,
+        showAISidebar: parsed.features?.showAISidebar ?? true,
+        showRiskInSidebar: parsed.features?.showRiskInSidebar ?? true,
+        showPersonalizedInsights: parsed.features?.showPersonalizedInsights ?? true,
       },
     };
 

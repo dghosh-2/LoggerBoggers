@@ -1,40 +1,82 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
   TrendingUp, 
   TrendingDown, 
-  PieChart,
-  BarChart3,
+  Building2,
+  Wallet,
+  PiggyBank,
+  LineChart,
+  GraduationCap,
+  Home,
+  Car,
+  RefreshCw,
+  Plus,
+  Link2,
+  CheckCircle,
+  AlertCircle,
+  ChevronRight,
+  DollarSign,
+  Percent,
+  Calendar,
+  FileSpreadsheet,
   Sparkles,
   ArrowUpRight,
-  Target,
   Shield,
+  Target,
   Zap,
-  ChevronRight
+  PieChart,
+  BarChart3
 } from "lucide-react";
 import { PageTransition } from "@/components/layout/page-transition";
 import { GlassCard } from "@/components/ui/glass-card";
-import { HoldingCard } from "@/components/cards/holding-card";
-import { PortfolioChart } from "@/components/charts/portfolio-chart";
+import { GlassButton } from "@/components/ui/glass-button";
 import { Modal } from "@/components/ui/modal";
 import { toast } from "@/components/ui/toast";
+import { UploadCard } from "@/components/cards/upload-card";
+import { PortfolioChart } from "@/components/charts/portfolio-chart";
+import { HoldingCard } from "@/components/cards/holding-card";
 import { useUserStore } from "@/stores/user-store";
+import {
+  getConnectedInstitutions,
+  getBankAccounts,
+  getInvestmentAccounts,
+  getInvestmentHoldings,
+  getLoans,
+  getFinancialSummary,
+  syncInstitution,
+  syncAllInstitutions,
+  type PlaidInstitution,
+  type PlaidAccount,
+  type PlaidInvestmentHolding,
+  type PlaidLoan,
+  type FinancialSummary
+} from "@/lib/plaid";
 
 const portfolioHistory = [
-  { date: "Jan", value: 45000 },
-  { date: "Feb", value: 47500 },
-  { date: "Mar", value: 46200 },
-  { date: "Apr", value: 49800 },
-  { date: "May", value: 52100 },
-  { date: "Jun", value: 54750 },
-  { date: "Jul", value: 53200 },
-  { date: "Aug", value: 56400 },
-  { date: "Sep", value: 58100 },
-  { date: "Oct", value: 61200 },
-  { date: "Nov", value: 59800 },
-  { date: "Dec", value: 63450 },
+  { date: "Jan", value: 95000 },
+  { date: "Feb", value: 98500 },
+  { date: "Mar", value: 96200 },
+  { date: "Apr", value: 102800 },
+  { date: "May", value: 108100 },
+  { date: "Jun", value: 112750 },
+  { date: "Jul", value: 110200 },
+  { date: "Aug", value: 118400 },
+  { date: "Sep", value: 122100 },
+  { date: "Oct", value: 128200 },
+  { date: "Nov", value: 125800 },
+  { date: "Dec", value: 134662 },
+];
+
+const popularBanks = [
+  { id: "chase", name: "Chase", logo: "C", color: "#117ACA" },
+  { id: "bofa", name: "Bank of America", logo: "B", color: "#E31837" },
+  { id: "wells", name: "Wells Fargo", logo: "W", color: "#D71E28" },
+  { id: "citi", name: "Citibank", logo: "Ci", color: "#003B70" },
+  { id: "capital", name: "Capital One", logo: "CO", color: "#D03027" },
+  { id: "fidelity", name: "Fidelity", logo: "F", color: "#4AA74A" },
 ];
 
 const recommendations = [
@@ -64,12 +106,30 @@ const recommendations = [
   },
 ];
 
+const loanTypeIcons: Record<string, typeof GraduationCap> = {
+  student: GraduationCap,
+  mortgage: Home,
+  auto: Car,
+  personal: DollarSign,
+  other: DollarSign,
+};
+
 export default function PortfolioPage() {
   const { holdings } = useUserStore();
-  const [selectedView, setSelectedView] = useState<"holdings" | "allocation">("holdings");
+  const [institutions, setInstitutions] = useState<PlaidInstitution[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<PlaidAccount[]>([]);
+  const [investmentAccounts, setInvestmentAccounts] = useState<PlaidAccount[]>([]);
+  const [plaidHoldings, setPlaidHoldings] = useState<PlaidInvestmentHolding[]>([]);
+  const [loans, setLoans] = useState<PlaidLoan[]>([]);
+  const [summary, setSummary] = useState<FinancialSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [syncingInstitutions, setSyncingInstitutions] = useState<Set<string>>(new Set());
+  const [showAddAccount, setShowAddAccount] = useState(false);
   const [showRecommendations, setShowRecommendations] = useState(false);
-  const [selectedHolding, setSelectedHolding] = useState<typeof portfolio[0] | null>(null);
-  
+  const [selectedView, setSelectedView] = useState<"holdings" | "allocation">("holdings");
+  const [selectedHolding, setSelectedHolding] = useState<any | null>(null);
+
+  // Portfolio from user store
   const portfolio = holdings.map(h => ({
     id: h.id,
     symbol: h.symbol,
@@ -80,26 +140,199 @@ export default function PortfolioPage() {
     price: h.price,
   }));
   
-  const totalValue = portfolio.reduce((sum, h) => sum + h.value, 0);
-  const totalChange = portfolio.reduce((sum, h) => sum + (h.value * h.change / 100), 0);
-  const percentageChange = totalValue > 0 ? (totalChange / (totalValue - totalChange)) * 100 : 0;
-  const isPositive = percentageChange >= 0;
+  const totalStockValue = portfolio.reduce((sum, h) => sum + h.value, 0);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [inst, bank, invest, hold, loan, sum] = await Promise.all([
+        getConnectedInstitutions(),
+        getBankAccounts(),
+        getInvestmentAccounts(),
+        getInvestmentHoldings(),
+        getLoans(),
+        getFinancialSummary(),
+      ]);
+      setInstitutions(inst);
+      setBankAccounts(bank);
+      setInvestmentAccounts(invest);
+      setPlaidHoldings(hold);
+      setLoans(loan);
+      setSummary(sum);
+    } catch (error) {
+      toast.error("Failed to load financial data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSyncInstitution = async (institutionId: string) => {
+    setSyncingInstitutions(prev => new Set([...prev, institutionId]));
+    toast.info("Syncing account...");
+    
+    try {
+      await syncInstitution(institutionId);
+      await loadData();
+      toast.success("Account synced successfully!");
+    } catch (error) {
+      toast.error("Failed to sync account");
+    } finally {
+      setSyncingInstitutions(prev => {
+        const next = new Set(prev);
+        next.delete(institutionId);
+        return next;
+      });
+    }
+  };
+
+  const handleSyncAll = async () => {
+    const allIds = institutions.map(i => i.id);
+    setSyncingInstitutions(new Set(allIds));
+    toast.info("Syncing all accounts...");
+    
+    try {
+      await syncAllInstitutions();
+      await loadData();
+      toast.success("All accounts synced!");
+    } catch (error) {
+      toast.error("Failed to sync accounts");
+    } finally {
+      setSyncingInstitutions(new Set());
+    }
+  };
+
+  const handleBankConnect = (bankName: string) => {
+    toast.info(`Connecting to ${bankName}...`);
+    setShowAddAccount(false);
+    
+    // In production, this would open Plaid Link
+    setTimeout(() => {
+      toast.success(`${bankName} connected successfully!`);
+      loadData();
+    }, 1500);
+  };
 
   const handleApplyRecommendation = (rec: typeof recommendations[0]) => {
     toast.success(`${rec.title} applied to your portfolio`);
   };
 
+  const totalChange = portfolio.reduce((sum, h) => sum + (h.value * h.change / 100), 0);
+  const percentageChange = totalStockValue > 0 ? (totalChange / (totalStockValue - totalChange)) * 100 : 0;
+  const isPositive = percentageChange >= 0;
+
+  if (loading) {
+    return (
+      <PageTransition>
+        <div className="space-y-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-24 rounded-xl bg-secondary/50 animate-pulse" />
+          ))}
+        </div>
+      </PageTransition>
+    );
+  }
+
   return (
     <PageTransition>
       <div className="space-y-6">
-        {/* Header with Total Value */}
-        <GlassCard>
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* ═══════════════════════════════════════════════════════════════════
+            SECTION 1: CONNECTED ACCOUNTS (IMPORTS)
+        ═══════════════════════════════════════════════════════════════════ */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
             <div>
-              <p className="text-xs text-foreground-muted mb-1 uppercase tracking-wider">Total Portfolio Value</p>
+              <h2 className="text-sm font-semibold">Connected Accounts</h2>
+              <p className="text-[11px] text-foreground-muted">
+                {institutions.length} institution{institutions.length !== 1 ? 's' : ''} connected via Plaid
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <GlassButton 
+                variant="secondary" 
+                size="sm"
+                onClick={handleSyncAll}
+                disabled={syncingInstitutions.size > 0}
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${syncingInstitutions.size > 0 ? "animate-spin" : ""}`} />
+                Sync All
+              </GlassButton>
+              <GlassButton variant="primary" size="sm" onClick={() => setShowAddAccount(true)}>
+                <Plus className="w-3.5 h-3.5" />
+                Add Account
+              </GlassButton>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {institutions.map((institution) => {
+              const isSyncing = syncingInstitutions.has(institution.id);
+              const accountCount = institution.accounts.length;
+              const totalBalance = institution.accounts.reduce((sum, acc) => sum + acc.currentBalance, 0);
+              
+              return (
+                <GlassCard key={institution.id}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div 
+                        className="w-9 h-9 rounded-lg flex items-center justify-center text-white font-bold text-sm"
+                        style={{ backgroundColor: institution.primaryColor || '#6366f1' }}
+                      >
+                        {institution.name.charAt(0)}
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-semibold">{institution.name}</h3>
+                        <p className="text-[11px] text-foreground-muted">
+                          {accountCount} account{accountCount !== 1 ? 's' : ''} · Last synced {institution.lastSync}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <div className={`flex items-center gap-1 ${
+                          institution.status === 'connected' ? 'text-success' : 'text-destructive'
+                        }`}>
+                          {institution.status === 'connected' ? (
+                            <CheckCircle className="w-3 h-3" />
+                          ) : (
+                            <AlertCircle className="w-3 h-3" />
+                          )}
+                          <span className="text-[11px] font-medium capitalize">{institution.status}</span>
+                        </div>
+                        <p className="text-xs font-medium tabular-nums">
+                          ${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      
+                      <button 
+                        onClick={() => handleSyncInstitution(institution.id)}
+                        className="p-1.5 rounded-md hover:bg-secondary transition-colors duration-150 cursor-pointer"
+                        disabled={isSyncing}
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 text-foreground-muted ${isSyncing ? "animate-spin" : ""}`} />
+                      </button>
+                    </div>
+                  </div>
+                </GlassCard>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ═══════════════════════════════════════════════════════════════════
+            SECTION 2: NET WORTH SUMMARY
+        ═══════════════════════════════════════════════════════════════════ */}
+        <GlassCard>
+          <div className="space-y-4">
+            <div>
+              <p className="text-[11px] text-foreground-muted mb-1 uppercase tracking-wider">Total Net Worth</p>
               <div className="flex items-baseline gap-3">
                 <h1 className="text-3xl font-semibold tabular-nums">
-                  ${totalValue.toLocaleString(undefined, { 
+                  ${summary?.netWorth.toLocaleString(undefined, { 
                     minimumFractionDigits: 2, 
                     maximumFractionDigits: 2 
                   })}
@@ -112,52 +345,64 @@ export default function PortfolioPage() {
                   ) : (
                     <TrendingDown className="w-4 h-4" />
                   )}
-                  <span className="tabular-nums">
-                    {isPositive ? "+" : ""}{percentageChange.toFixed(2)}%
-                  </span>
+                  <span className="tabular-nums">+7.04%</span>
                 </div>
               </div>
-              <p className="text-xs text-foreground-muted mt-1">
-                {isPositive ? "+" : "-"}${Math.abs(totalChange).toLocaleString(undefined, { maximumFractionDigits: 0 })} this month
-              </p>
+              <p className="text-[11px] text-foreground-muted mt-1">+$8,862 this month</p>
             </div>
 
-            {/* View Toggle */}
-            <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-secondary">
-              <button
-                onClick={() => setSelectedView("holdings")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 cursor-pointer ${
-                  selectedView === "holdings"
-                    ? "bg-card text-foreground shadow-sm"
-                    : "text-foreground-muted hover:text-foreground"
-                }`}
-              >
-                <BarChart3 className="w-3.5 h-3.5" />
-                Holdings
-              </button>
-              <button
-                onClick={() => setSelectedView("allocation")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 cursor-pointer ${
-                  selectedView === "allocation"
-                    ? "bg-card text-foreground shadow-sm"
-                    : "text-foreground-muted hover:text-foreground"
-                }`}
-              >
-                <PieChart className="w-3.5 h-3.5" />
-                Allocation
-              </button>
+            {/* Summary Cards */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="p-3 rounded-lg bg-success/10">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Wallet className="w-4 h-4 text-success" />
+                  <span className="text-[11px] font-medium text-success">Cash</span>
+                </div>
+                <p className="text-lg font-semibold tabular-nums">
+                  ${summary?.totalCash.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </p>
+                <p className="text-[10px] text-foreground-muted">
+                  {summary?.bankAccountsCount} account{summary?.bankAccountsCount !== 1 ? 's' : ''}
+                </p>
+              </div>
+
+              <div className="p-3 rounded-lg bg-primary/10">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <LineChart className="w-4 h-4 text-primary" />
+                  <span className="text-[11px] font-medium text-primary">Investments</span>
+                </div>
+                <p className="text-lg font-semibold tabular-nums">
+                  ${summary?.totalInvestments.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </p>
+                <p className="text-[10px] text-foreground-muted">
+                  {summary?.investmentAccountsCount} account{summary?.investmentAccountsCount !== 1 ? 's' : ''}
+                </p>
+              </div>
+
+              <div className="p-3 rounded-lg bg-destructive/10">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <PiggyBank className="w-4 h-4 text-destructive" />
+                  <span className="text-[11px] font-medium text-destructive">Loans</span>
+                </div>
+                <p className="text-lg font-semibold tabular-nums">
+                  -${summary?.totalLoans.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </p>
+                <p className="text-[10px] text-foreground-muted">
+                  {summary?.loansCount} loan{summary?.loansCount !== 1 ? 's' : ''}
+                </p>
+              </div>
             </div>
           </div>
         </GlassCard>
 
-        {/* Main Content */}
+        {/* ═══════════════════════════════════════════════════════════════════
+            SECTION 3: NET WORTH CHART + AI INSIGHT
+        ═══════════════════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Chart */}
           <div className="lg:col-span-2">
             <PortfolioChart data={portfolioHistory} />
           </div>
 
-          {/* AI Insight */}
           <GlassCard>
             <div className="flex items-start gap-2.5 mb-3">
               <div className="p-1.5 rounded-md bg-secondary">
@@ -170,22 +415,22 @@ export default function PortfolioPage() {
             </div>
             
             <p className="text-xs text-foreground-muted leading-relaxed mb-4">
-              Your portfolio has grown 41% this year, outperforming the S&P 500 by 12%. 
-              Consider rebalancing your tech allocation which is now 45% of your portfolio.
+              Your net worth has grown 41% this year. Your emergency fund covers 4.2 months of expenses. 
+              Consider increasing your 401(k) contributions to maximize employer matching.
             </p>
 
             <div className="space-y-2.5">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-foreground-muted">Risk Level</span>
-                <span className="font-medium text-warning">Moderate-High</span>
+                <span className="font-medium text-warning">Moderate</span>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-foreground-muted">Diversification</span>
                 <span className="font-medium text-success">Good</span>
               </div>
               <div className="flex items-center justify-between text-xs">
-                <span className="text-foreground-muted">YTD Return</span>
-                <span className="font-medium text-success tabular-nums">+41.0%</span>
+                <span className="text-foreground-muted">Debt-to-Asset</span>
+                <span className="font-medium text-success tabular-nums">17.5%</span>
               </div>
             </div>
 
@@ -199,198 +444,466 @@ export default function PortfolioPage() {
           </GlassCard>
         </div>
 
-        {/* Holdings or Allocation View */}
-        {selectedView === "holdings" ? (
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold">Your Holdings</h2>
-              <span className="text-xs text-foreground-muted">
-                {portfolio.length} assets
-              </span>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {portfolio.map((holding) => (
-                <div 
-                  key={holding.id} 
-                  onClick={() => setSelectedHolding(holding)}
-                  className="cursor-pointer"
-                >
-                  <HoldingCard
-                    symbol={holding.symbol}
-                    name={holding.name}
-                    value={holding.value}
-                    change={holding.change}
-                    percentage={Math.round((holding.value / totalValue) * 100)}
-                  />
-                </div>
-              ))}
-            </div>
+        {/* ═══════════════════════════════════════════════════════════════════
+            SECTION 4: BANK ACCOUNTS
+        ═══════════════════════════════════════════════════════════════════ */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <Wallet className="w-4 h-4 text-foreground-muted" />
+            <h2 className="text-sm font-semibold">Bank Accounts</h2>
           </div>
-        ) : (
-          <GlassCard>
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-sm font-semibold">Portfolio Allocation</h2>
-              <span className="text-xs text-foreground-muted">
-                By asset value
-              </span>
-            </div>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Allocation Pie Chart */}
-              <div className="h-[280px] flex items-center justify-center">
-                <div className="relative w-[240px] h-[240px]">
-                  <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                    {portfolio.reduce((acc, holding, index) => {
-                      const percentage = (holding.value / totalValue) * 100;
-                      const previousPercentages = portfolio
-                        .slice(0, index)
-                        .reduce((sum, h) => sum + (h.value / totalValue) * 100, 0);
-                      
-                      const colors = [
-                        'var(--primary)',
-                        'var(--success)',
-                        'var(--warning)',
-                        'var(--destructive)',
-                        'var(--accent)',
-                        '#8b5cf6',
-                        '#ec4899',
-                        '#14b8a6',
-                      ];
-                      
-                      const circumference = 2 * Math.PI * 40;
-                      const strokeDasharray = `${(percentage / 100) * circumference} ${circumference}`;
-                      const strokeDashoffset = -((previousPercentages / 100) * circumference);
-                      
-                      acc.push(
-                        <circle
-                          key={holding.id}
-                          cx="50"
-                          cy="50"
-                          r="40"
-                          fill="none"
-                          stroke={colors[index % colors.length]}
-                          strokeWidth="18"
-                          strokeDasharray={strokeDasharray}
-                          strokeDashoffset={strokeDashoffset}
-                          className="transition-all duration-500 cursor-pointer hover:opacity-80"
-                          onClick={() => setSelectedHolding(holding)}
-                        />
-                      );
-                      return acc;
-                    }, [] as React.JSX.Element[])}
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <p className="text-xl font-semibold tabular-nums">${(totalValue / 1000).toFixed(1)}k</p>
-                    <p className="text-[11px] text-foreground-muted">Total Value</p>
+
+          <div className="space-y-2">
+            {bankAccounts.map((account) => (
+              <GlassCard key={account.id} interactive>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-success/10 flex items-center justify-center">
+                      {account.subtype === 'checking' ? (
+                        <Wallet className="w-4 h-4 text-success" />
+                      ) : (
+                        <PiggyBank className="w-4 h-4 text-success" />
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold">{account.name}</h3>
+                      <p className="text-[11px] text-foreground-muted">
+                        {account.institution} · ••••{account.mask}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <p className="text-base font-semibold tabular-nums">
+                      ${account.currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </p>
+                    {account.availableBalance !== null && account.availableBalance !== account.currentBalance && (
+                      <p className="text-[10px] text-foreground-muted tabular-nums">
+                        ${account.availableBalance.toLocaleString()} available
+                      </p>
+                    )}
                   </div>
                 </div>
-              </div>
+              </GlassCard>
+            ))}
+          </div>
+        </div>
 
-              {/* Legend */}
-              <div className="space-y-2">
-                {portfolio.map((holding, index) => {
-                  const percentage = (holding.value / totalValue) * 100;
-                  const colors = [
-                    'bg-primary',
-                    'bg-success',
-                    'bg-warning',
-                    'bg-destructive',
-                    'bg-accent',
-                    'bg-violet-500',
-                    'bg-pink-500',
-                    'bg-teal-500',
-                  ];
-                  
-                  return (
-                    <motion.div
-                      key={holding.id}
-                      initial={{ opacity: 0, x: -8 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.03 }}
-                      className="flex items-center justify-between p-2.5 rounded-lg hover:bg-secondary/60 cursor-pointer transition-colors duration-150"
-                      onClick={() => setSelectedHolding(holding)}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className={`w-2.5 h-2.5 rounded-full ${colors[index % colors.length]}`} />
-                        <div>
-                          <p className="font-medium text-xs">{holding.symbol}</p>
-                          <p className="text-[11px] text-foreground-muted">{holding.name}</p>
-                        </div>
+        {/* ═══════════════════════════════════════════════════════════════════
+            SECTION 5: INVESTMENT ACCOUNTS & HOLDINGS
+        ═══════════════════════════════════════════════════════════════════ */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <LineChart className="w-4 h-4 text-foreground-muted" />
+            <h2 className="text-sm font-semibold">Investment Accounts</h2>
+          </div>
+
+          <div className="space-y-3">
+            {investmentAccounts.map((account) => {
+              const accountHoldings = plaidHoldings.filter(h => h.accountId === account.id);
+              
+              return (
+                <GlassCard key={account.id}>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <LineChart className="w-4 h-4 text-primary" />
                       </div>
-                      <div className="text-right">
-                        <p className="font-medium text-xs tabular-nums">{percentage.toFixed(1)}%</p>
-                        <p className="text-[11px] text-foreground-muted tabular-nums">
-                          ${holding.value.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      <div>
+                        <h3 className="text-sm font-semibold">{account.name}</h3>
+                        <p className="text-[11px] text-foreground-muted">
+                          {account.institution} · {account.subtype.toUpperCase()} · ••••{account.mask}
                         </p>
                       </div>
-                    </motion.div>
-                  );
-                })}
+                    </div>
+
+                    <div className="text-right">
+                      <p className="text-base font-semibold tabular-nums">
+                        ${account.currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Holdings */}
+                  {accountHoldings.length > 0 && (
+                    <div className="border-t border-border pt-3">
+                      <p className="text-[11px] font-medium text-foreground-muted mb-2">Holdings</p>
+                      <div className="space-y-1.5">
+                        {accountHoldings.map((holding) => (
+                          <div 
+                            key={holding.id}
+                            className="flex items-center justify-between p-2.5 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors duration-150"
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-md bg-card flex items-center justify-center font-semibold text-[11px]">
+                                {holding.symbol.slice(0, 3)}
+                              </div>
+                              <div>
+                                <p className="font-medium text-xs">{holding.symbol}</p>
+                                <p className="text-[10px] text-foreground-muted tabular-nums">{holding.quantity} shares @ ${holding.price.toFixed(2)}</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-medium text-xs tabular-nums">
+                                ${holding.value.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              </p>
+                              {holding.gainLossPercent !== null && (
+                                <p className={`text-[10px] tabular-nums ${holding.gainLossPercent >= 0 ? 'text-success' : 'text-destructive'}`}>
+                                  {holding.gainLossPercent >= 0 ? '+' : ''}{holding.gainLossPercent.toFixed(2)}%
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </GlassCard>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ═══════════════════════════════════════════════════════════════════
+            SECTION 6: LOANS
+        ═══════════════════════════════════════════════════════════════════ */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <PiggyBank className="w-4 h-4 text-foreground-muted" />
+            <h2 className="text-sm font-semibold">Loans</h2>
+          </div>
+
+          <div className="space-y-2">
+            {loans.map((loan) => {
+              const LoanIcon = loanTypeIcons[loan.type] || DollarSign;
+              const paidOff = loan.originalPrincipal - loan.currentBalance;
+              const paidOffPercent = (paidOff / loan.originalPrincipal) * 100;
+              
+              return (
+                <GlassCard key={loan.id}>
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-destructive/10 flex items-center justify-center">
+                        <LoanIcon className="w-4 h-4 text-destructive" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-semibold">{loan.name}</h3>
+                        <p className="text-[11px] text-foreground-muted">
+                          {loan.institution} · {loan.type.charAt(0).toUpperCase() + loan.type.slice(1)} Loan
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <p className="text-base font-semibold text-destructive tabular-nums">
+                        -${loan.currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </p>
+                      <p className="text-[10px] text-foreground-muted tabular-nums">
+                        of ${loan.originalPrincipal.toLocaleString()} original
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="mb-3">
+                    <div className="flex items-center justify-between text-[10px] text-foreground-muted mb-1">
+                      <span>{paidOffPercent.toFixed(1)}% paid off</span>
+                      <span className="tabular-nums">${paidOff.toLocaleString()} paid</span>
+                    </div>
+                    <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-success rounded-full transition-all duration-500"
+                        style={{ width: `${paidOffPercent}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Loan Details */}
+                  <div className="grid grid-cols-3 gap-3 pt-3 border-t border-border">
+                    <div className="flex items-center gap-1.5">
+                      <Percent className="w-3 h-3 text-foreground-muted" />
+                      <div>
+                        <p className="text-[10px] text-foreground-muted">Interest Rate</p>
+                        <p className="text-xs font-medium tabular-nums">{loan.interestRate}%</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <DollarSign className="w-3 h-3 text-foreground-muted" />
+                      <div>
+                        <p className="text-[10px] text-foreground-muted">Min Payment</p>
+                        <p className="text-xs font-medium tabular-nums">${loan.minimumPayment}/mo</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Calendar className="w-3 h-3 text-foreground-muted" />
+                      <div>
+                        <p className="text-[10px] text-foreground-muted">Next Due</p>
+                        <p className="text-xs font-medium">
+                          {loan.nextPaymentDueDate 
+                            ? new Date(loan.nextPaymentDueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                            : 'N/A'
+                          }
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </GlassCard>
+              );
+            })}
+
+            {loans.length === 0 && (
+              <GlassCard>
+                <div className="text-center py-6">
+                  <CheckCircle className="w-10 h-10 text-success mx-auto mb-2" />
+                  <h3 className="text-sm font-semibold mb-1">No Outstanding Loans</h3>
+                  <p className="text-[11px] text-foreground-muted">You're debt-free! Keep up the great work.</p>
+                </div>
+              </GlassCard>
+            )}
+          </div>
+        </div>
+
+        {/* ═══════════════════════════════════════════════════════════════════
+            SECTION 7: STOCK HOLDINGS (from user store)
+        ═══════════════════════════════════════════════════════════════════ */}
+        {portfolio.length > 0 && (
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-foreground-muted" />
+                <h2 className="text-sm font-semibold">Stock Holdings</h2>
+              </div>
+              <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-secondary">
+                <button
+                  onClick={() => setSelectedView("holdings")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 cursor-pointer ${
+                    selectedView === "holdings"
+                      ? "bg-card text-foreground shadow-sm"
+                      : "text-foreground-muted hover:text-foreground"
+                  }`}
+                >
+                  <BarChart3 className="w-3.5 h-3.5" />
+                  Holdings
+                </button>
+                <button
+                  onClick={() => setSelectedView("allocation")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 cursor-pointer ${
+                    selectedView === "allocation"
+                      ? "bg-card text-foreground shadow-sm"
+                      : "text-foreground-muted hover:text-foreground"
+                  }`}
+                >
+                  <PieChart className="w-3.5 h-3.5" />
+                  Allocation
+                </button>
               </div>
             </div>
 
-            {/* Allocation Breakdown */}
-            <div className="mt-6 pt-5 border-t border-border">
-              <h3 className="text-xs font-medium mb-3">Asset Type Breakdown</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {[
-                  { type: 'Tech', percentage: 45, color: 'bg-primary' },
-                  { type: 'Finance', percentage: 25, color: 'bg-success' },
-                  { type: 'Healthcare', percentage: 15, color: 'bg-warning' },
-                  { type: 'Other', percentage: 15, color: 'bg-secondary' },
-                ].map((sector) => (
-                  <div key={sector.type} className="text-center">
-                    <div className="h-1.5 rounded-full bg-secondary mb-1.5 overflow-hidden">
-                      <div 
-                        className={`h-full rounded-full ${sector.color}`} 
-                        style={{ width: `${sector.percentage}%` }}
-                      />
-                    </div>
-                    <p className="text-[11px] text-foreground-muted">{sector.type}</p>
-                    <p className="text-xs font-medium tabular-nums">{sector.percentage}%</p>
+            {selectedView === "holdings" ? (
+              <div className="space-y-2">
+                {portfolio.map((holding) => (
+                  <div 
+                    key={holding.id} 
+                    onClick={() => setSelectedHolding(holding)}
+                    className="cursor-pointer"
+                  >
+                    <HoldingCard
+                      symbol={holding.symbol}
+                      name={holding.name}
+                      value={holding.value}
+                      change={holding.change}
+                      percentage={Math.round((holding.value / totalStockValue) * 100)}
+                    />
                   </div>
                 ))}
               </div>
-            </div>
-          </GlassCard>
+            ) : (
+              <GlassCard>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Pie Chart */}
+                  <div className="h-[240px] flex items-center justify-center">
+                    <div className="relative w-[200px] h-[200px]">
+                      <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                        {portfolio.reduce((acc, holding, index) => {
+                          const percentage = (holding.value / totalStockValue) * 100;
+                          const previousPercentages = portfolio
+                            .slice(0, index)
+                            .reduce((sum, h) => sum + (h.value / totalStockValue) * 100, 0);
+                          
+                          const colors = [
+                            'var(--primary)',
+                            'var(--success)',
+                            'var(--warning)',
+                            'var(--destructive)',
+                            '#8b5cf6',
+                            '#ec4899',
+                          ];
+                          
+                          const circumference = 2 * Math.PI * 40;
+                          const strokeDasharray = `${(percentage / 100) * circumference} ${circumference}`;
+                          const strokeDashoffset = -((previousPercentages / 100) * circumference);
+                          
+                          acc.push(
+                            <circle
+                              key={holding.id}
+                              cx="50"
+                              cy="50"
+                              r="40"
+                              fill="none"
+                              stroke={colors[index % colors.length]}
+                              strokeWidth="18"
+                              strokeDasharray={strokeDasharray}
+                              strokeDashoffset={strokeDashoffset}
+                              className="transition-all duration-500 cursor-pointer hover:opacity-80"
+                              onClick={() => setSelectedHolding(holding)}
+                            />
+                          );
+                          return acc;
+                        }, [] as React.JSX.Element[])}
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <p className="text-lg font-semibold tabular-nums">${(totalStockValue / 1000).toFixed(1)}k</p>
+                        <p className="text-[10px] text-foreground-muted">Total Value</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Legend */}
+                  <div className="space-y-1.5">
+                    {portfolio.map((holding, index) => {
+                      const percentage = (holding.value / totalStockValue) * 100;
+                      const colors = ['bg-primary', 'bg-success', 'bg-warning', 'bg-destructive', 'bg-violet-500', 'bg-pink-500'];
+                      
+                      return (
+                        <motion.div
+                          key={holding.id}
+                          initial={{ opacity: 0, x: -8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.03 }}
+                          className="flex items-center justify-between p-2 rounded-lg hover:bg-secondary/60 cursor-pointer transition-colors duration-150"
+                          onClick={() => setSelectedHolding(holding)}
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full ${colors[index % colors.length]}`} />
+                            <div>
+                              <p className="font-medium text-xs">{holding.symbol}</p>
+                              <p className="text-[10px] text-foreground-muted">{holding.name}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium text-xs tabular-nums">{percentage.toFixed(1)}%</p>
+                            <p className="text-[10px] text-foreground-muted tabular-nums">
+                              ${holding.value.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                            </p>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </GlassCard>
+            )}
+          </div>
         )}
 
-        {/* Performance Prediction */}
-        <GlassCard>
-          <h3 className="text-sm font-semibold mb-3">12-Month Prediction</h3>
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { label: "Conservative", value: 68500, change: 8 },
-              { label: "Expected", value: 76200, change: 20 },
-              { label: "Optimistic", value: 85100, change: 34 },
-            ].map((prediction) => (
-              <div
-                key={prediction.label}
-                className="p-3.5 rounded-lg bg-secondary text-center cursor-pointer hover:bg-background-tertiary transition-colors duration-150"
-                onClick={() => toast.info(`${prediction.label} scenario: $${prediction.value.toLocaleString()} projected`)}
-              >
-                <p className="text-[11px] text-foreground-muted mb-1">{prediction.label}</p>
-                <p className="text-lg font-semibold tabular-nums">${(prediction.value / 1000).toFixed(1)}k</p>
-                <div className="mt-2 h-1 bg-background rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-primary"
-                    style={{ width: `${prediction.change}%` }}
-                  />
-                </div>
-                <p className="text-[11px] text-success mt-1 tabular-nums">+{prediction.change}%</p>
-              </div>
-            ))}
+        {/* ═══════════════════════════════════════════════════════════════════
+            SECTION 8: MANUAL IMPORT
+        ═══════════════════════════════════════════════════════════════════ */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <FileSpreadsheet className="w-4 h-4 text-foreground-muted" />
+            <h2 className="text-sm font-semibold">Manual Import</h2>
           </div>
-        </GlassCard>
+
+          <UploadCard
+            title="Import Financial Data"
+            description="Upload CSV, OFX, or QFX files from your bank or brokerage"
+            acceptedFormats={["CSV", "OFX", "QFX", "PDF"]}
+            onUpload={(file) => {
+              toast.success(`${file.name} uploaded successfully!`);
+            }}
+          />
+        </div>
       </div>
 
-      {/* Recommendations Modal */}
+      {/* ═══════════════════════════════════════════════════════════════════
+          MODAL: ADD ACCOUNT (PLAID LINK)
+      ═══════════════════════════════════════════════════════════════════ */}
+      <Modal
+        isOpen={showAddAccount}
+        onClose={() => setShowAddAccount(false)}
+        title="Connect Account"
+        subtitle="Link your bank or financial institution via Plaid"
+        size="md"
+      >
+        <div className="p-5 space-y-5">
+          <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+            <div className="flex items-center gap-2 mb-1">
+              <Link2 className="w-4 h-4 text-primary" />
+              <span className="font-medium text-sm">Powered by Plaid</span>
+            </div>
+            <p className="text-[11px] text-foreground-muted">
+              Securely connect to 10,000+ financial institutions. Your credentials are never stored on our servers.
+            </p>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-medium mb-2.5">Popular Institutions</h4>
+            <div className="grid grid-cols-2 gap-2">
+              {popularBanks.map((bank) => (
+                <button
+                  key={bank.id}
+                  onClick={() => handleBankConnect(bank.name)}
+                  className="flex items-center gap-2.5 p-2.5 rounded-lg bg-secondary hover:bg-background-tertiary transition-colors duration-150 text-left cursor-pointer"
+                >
+                  <div 
+                    className="w-8 h-8 rounded-md flex items-center justify-center text-white font-bold text-xs"
+                    style={{ backgroundColor: bank.color }}
+                  >
+                    {bank.logo}
+                  </div>
+                  <span className="font-medium text-xs">{bank.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-[10px] uppercase tracking-wider">
+              <span className="bg-card px-2 text-foreground-muted">or search</span>
+            </div>
+          </div>
+
+          <div>
+            <input
+              type="text"
+              placeholder="Search for your institution..."
+              className="w-full px-3.5 py-2.5 rounded-lg bg-secondary border border-border focus:border-primary focus:outline-none transition-colors text-sm"
+              onChange={(e) => {
+                if (e.target.value.length > 2) {
+                  toast.info(`Searching for "${e.target.value}"...`);
+                }
+              }}
+            />
+          </div>
+
+          <p className="text-[10px] text-foreground-muted text-center">
+            We use bank-level 256-bit encryption to keep your data safe.
+          </p>
+        </div>
+      </Modal>
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          MODAL: AI RECOMMENDATIONS
+      ═══════════════════════════════════════════════════════════════════ */}
       <Modal
         isOpen={showRecommendations}
         onClose={() => setShowRecommendations(false)}
         title="AI Recommendations"
-        subtitle="Personalized suggestions to optimize your portfolio"
+        subtitle="Personalized suggestions to optimize your finances"
         size="lg"
       >
         <div className="p-5 space-y-3">
@@ -462,7 +975,9 @@ export default function PortfolioPage() {
         </div>
       </Modal>
 
-      {/* Holding Details Modal */}
+      {/* ═══════════════════════════════════════════════════════════════════
+          MODAL: HOLDING DETAILS
+      ═══════════════════════════════════════════════════════════════════ */}
       <Modal
         isOpen={selectedHolding !== null}
         onClose={() => setSelectedHolding(null)}
@@ -498,7 +1013,7 @@ export default function PortfolioPage() {
               </div>
               <div className="flex justify-between items-center py-2.5 border-b border-border">
                 <span className="text-xs text-foreground-muted">Portfolio %</span>
-                <span className="text-sm font-medium tabular-nums">{Math.round((selectedHolding.value / totalValue) * 100)}%</span>
+                <span className="text-sm font-medium tabular-nums">{Math.round((selectedHolding.value / totalStockValue) * 100)}%</span>
               </div>
               <div className="flex justify-between items-center py-2.5">
                 <span className="text-xs text-foreground-muted">Day Change</span>
