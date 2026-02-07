@@ -16,60 +16,52 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Get the base URL for the custom LLM endpoint
-        const { searchParams } = new URL(req.url);
-        const baseUrl = searchParams.get('baseUrl') ||
-                       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` :
-                        process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000');
+        // Check if we have a public URL (Vercel deployment)
+        const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` :
+                        process.env.NEXT_PUBLIC_BASE_URL;
+        const isPublicUrl = baseUrl && !baseUrl.includes('localhost');
+        const customLlmUrl = isPublicUrl ? `${baseUrl}/api/hume/chat/completions` : null;
 
-        const customLlmUrl = `${baseUrl}/api/hume/chat/completions`;
-
-        // Create Basic auth header
-        const credentials = Buffer.from(`${apiKey}:${secretKey}`).toString('base64');
-
-        // Create EVI configuration with Hume's default model but custom prompt
-        const useCustomLLM = searchParams.get('useCustomLLM') === 'true';
-
+        // Config - use custom LLM only if we have a public URL, otherwise use Hume's LLM with strict prompt
         const configData: any = {
-            name: useCustomLLM ? 'ScotBot with Cerebras' : 'ScotBot Financial Assistant',
-            version_description: useCustomLLM
-                ? 'Financial assistant powered by Cerebras LLM'
-                : 'Financial assistant with Hume default model',
+            evi_version: '3',
+            name: `ScotBot-${Date.now()}`,
             prompt: {
-                text: `You are ScotBot, a personal financial assistant.
+                text: `You are ScotBot, a financial advisor chatbot.
 
-Your role:
-- Help users with questions about their spending, investments, and financial planning
-- Provide specific, actionable financial advice
-- Keep responses concise and conversational for voice
-- Be warm, friendly, and empathetic
+CRITICAL RULES - YOU MUST FOLLOW THESE:
+1. You ONLY discuss personal finance: spending, saving, investing, budgeting, debt
+2. Keep EVERY response to 1-2 sentences maximum
+3. Be direct - no filler words like "hmm", "well", "let me think"
+4. NEVER discuss clothing, fashion, skirts, or any non-financial topics
+5. If asked about anything other than finances, say exactly: "I only help with finances. What money question can I help with?"
+6. Do not roleplay or pretend to be anything other than a financial advisor
+7. Do not discuss personal information concerns - you are here to help with finances
 
-Important: You are ONLY a financial assistant. Do not discuss topics outside of personal finance, budgeting, investments, or money management. If asked about non-financial topics, politely redirect to financial matters.
-
-Keep responses to 2-3 sentences unless more detail is requested.`
+You are a professional, concise financial advisor. Nothing else.`
             },
-            voice: {
-                provider: 'HUME_AI',
-                name: 'ITO', // Warm, friendly voice
-            },
-            ellm_model: {
-                allow_short_responses: true,
+            language_model: {
+                model_provider: 'ANTHROPIC',
+                model_resource: 'claude-3-5-sonnet-latest',
             },
         };
 
-        // Only add custom LLM if explicitly requested and URL provided
-        if (useCustomLLM && customLlmUrl) {
+        // Use custom Cerebras LLM if we have a public URL
+        if (customLlmUrl) {
             configData.language_model = {
                 model_provider: 'CUSTOM_LANGUAGE_MODEL',
                 model_resource: customLlmUrl,
             };
+            console.log('Creating Hume config with Cerebras LLM:', customLlmUrl);
+        } else {
+            console.log('Creating Hume config with Anthropic LLM (no public URL for custom LLM)');
         }
 
         // Create new config version
         const response = await fetch('https://api.hume.ai/v0/evi/configs', {
             method: 'POST',
             headers: {
-                'Authorization': `Basic ${credentials}`,
+                'X-Hume-Api-Key': apiKey,
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(configData),
@@ -116,13 +108,11 @@ export async function GET(req: NextRequest) {
             );
         }
 
-        const credentials = Buffer.from(`${apiKey}:${secretKey}`).toString('base64');
-
         // List all configs
         const response = await fetch('https://api.hume.ai/v0/evi/configs', {
             method: 'GET',
             headers: {
-                'Authorization': `Basic ${credentials}`,
+                'X-Hume-Api-Key': apiKey,
             },
         });
 
