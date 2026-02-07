@@ -1,8 +1,8 @@
 # User Profile
-- **Age**: 20
-- **Location**: San Jose, ca
-- **Risk Tolerance**: Medium
-- **Debt Profile**: poops and farts
-- **Income Status**: poops
-- **Additional Requests**: farts
-- **Updated At**: 2026-02-06T02:46:40.334Z
+- **Age**: N/A
+- **Location**: N/A
+- **Risk Tolerance**: Moderate
+- **Debt Profile**: N/A
+- **Income Status**: N/A
+- **Additional Requests**: N/A
+- **Updated At**: 2026-02-07T01:24:06.074Z

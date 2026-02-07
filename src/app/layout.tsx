@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AmbientBackground } from "@/components/layout/ambient-background";
 import { Navbar } from "@/components/layout/navbar";
+import { MainContent } from "@/components/layout/main-content";
 import { DemoMode } from "@/components/demo/demo-mode";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { ToastContainer } from "@/components/ui/toast";
@@ -36,11 +37,7 @@ export default function RootLayout({
         <ThemeProvider>
           <AmbientBackground />
           <Navbar />
-          <main className="relative z-10 md:ml-[200px] px-6 md:px-8 py-6 md:py-8 pb-20 md:pb-8 min-h-screen">
-            <div className="max-w-6xl mx-auto">
-              {children}
-            </div>
-          </main>
+          <MainContent>{children}</MainContent>
           <ChatAssistant />
           <DemoMode />
           <ToastContainer />
