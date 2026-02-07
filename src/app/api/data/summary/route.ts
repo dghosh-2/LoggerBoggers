@@ -7,6 +7,10 @@ export async function GET(request: NextRequest) {
         // Get authenticated user ID
         const userId = await getUserIdFromRequest(request);
         
+        // #region agent log
+        fetch('http://127.0.0.1:7245/ingest/2d405ccf-cb3f-4611-bc27-f95a616c15c9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'summary/route.ts:12',message:'Summary API called',data:{userId:userId||'null'},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+        
         if (!userId) {
             // Return zeros if not authenticated
             return NextResponse.json({
@@ -131,6 +135,10 @@ export async function GET(request: NextRequest) {
             category: tx.category,
             date: tx.date,
         }));
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7245/ingest/2d405ccf-cb3f-4611-bc27-f95a616c15c9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'summary/route.ts:138',message:'Summary data computed',data:{txCount:transactions.length,incomeCount:income.length,categories:Object.keys(spendingByCategory),recentTxSample:recentTransactions.slice(0,3)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         
         return NextResponse.json({
             is_connected: true,
