@@ -17,7 +17,7 @@ export interface Transaction {
     tax?: number | null;
     date: string;
     account_id?: string;
-    source: 'plaid' | 'manual' | 'receipt_scan' | 'generated';
+    source: 'plaid' | 'manual' | 'receipt_scan' | 'generated' | 'capital_one';
     merchant_name?: string;
     location?: string;
     pending?: boolean;
