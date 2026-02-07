@@ -1,10 +1,7 @@
+import { STANDARD_CATEGORIES } from './categories';
 
-// Updated Mock Data with User-Specified Categories
-
-export const CATEGORIES = [
-    'Groceries', 'Food', 'Rent', 'Subscriptions', 'Entertainment',
-    'Shopping', 'Education', 'Insurance', 'Bills'
-];
+// Updated Mock Data with User-Specified Categories - Now Synced with Single Source of Truth
+export const CATEGORIES = [...STANDARD_CATEGORIES];
 
 // Generator for realistic transaction history
 const generateTransactions = () => {

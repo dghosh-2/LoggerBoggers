@@ -10,6 +10,7 @@ import { useFinancialData } from '@/hooks/useFinancialData';
 import { Link2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { GlassButton } from '@/components/ui/glass-button';
+import { getTopCategories, MAX_DISPLAYED_CATEGORIES } from '@/lib/categories';
 
 // Monochrome + accent palette
 const LIGHT_COLORS = [
@@ -19,6 +20,10 @@ const LIGHT_COLORS = [
     '#16A34A', // green
     '#71717A', // zinc mid
     '#A1A1AA', // zinc light
+    '#EC4899', // pink
+    '#F59E0B', // amber
+    '#06B6D4', // cyan
+    '#8B5CF6', // violet
 ];
 
 const DARK_COLORS = [
@@ -28,6 +33,10 @@ const DARK_COLORS = [
     '#4ADE80', // green
     '#71717A', // zinc mid
     '#52525B', // zinc dark
+    '#F472B6', // pink
+    '#FBBF24', // amber
+    '#22D3EE', // cyan
+    '#A78BFA', // violet
 ];
 
 export function AnalysisView() {
@@ -41,22 +50,19 @@ export function AnalysisView() {
     // Get top 5 categories by total spend from real data
     const topCategories = useMemo(() => {
         if (!isConnected || transactions.length === 0) return [];
-        
+
         const categoryTotals: Record<string, number> = {};
         transactions.forEach(t => {
             categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount;
         });
-        
-        return Object.entries(categoryTotals)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 5)
-            .map(([name]) => name);
+
+        return getTopCategories(categoryTotals, MAX_DISPLAYED_CATEGORIES);
     }, [transactions, isConnected]);
 
     // 1. Aggregate Transactions by Month, condensing small categories into "Other"
     const chartData = useMemo(() => {
         if (!isConnected || transactions.length === 0) return [];
-        
+
         const dataMap = new Map<string, any>();
 
         transactions.forEach(t => {
@@ -64,11 +70,11 @@ export function AnalysisView() {
             const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
             const monthLabel = date.toLocaleString('default', { month: 'short', year: '2-digit' });
 
-            if (selectedRange === '3M') {
-                const cutoff = new Date();
-                cutoff.setMonth(cutoff.getMonth() - 3);
-                if (date < cutoff) return;
-            }
+            // ALWAYS show last 12 months for Analysis view
+            // Ignore the global selectedRange state
+            const cutoff = new Date();
+            cutoff.setMonth(cutoff.getMonth() - 12);
+            if (date < cutoff) return;
 
             if (!dataMap.has(monthKey)) {
                 dataMap.set(monthKey, {
@@ -79,7 +85,7 @@ export function AnalysisView() {
             }
 
             const entry = dataMap.get(monthKey);
-            
+
             // Group into top categories or "Other"
             const category = topCategories.includes(t.category) ? t.category : 'Other';
             entry[category] = (entry[category] || 0) + t.amount;
@@ -119,8 +125,8 @@ export function AnalysisView() {
                     <p className="text-sm text-foreground-muted text-center mb-6 max-w-[400px]">
                         Link your bank accounts via Plaid to see spending analysis
                     </p>
-                    <GlassButton 
-                        variant="primary" 
+                    <GlassButton
+                        variant="primary"
                         size="md"
                         onClick={() => router.push('/imports')}
                     >
@@ -191,9 +197,9 @@ export function AnalysisView() {
                                 return null;
                             }}
                         />
-                        <Legend 
-                            wrapperStyle={{ paddingTop: '16px' }} 
-                            formatter={(value) => <span className="text-xs text-foreground-muted">{value}</span>} 
+                        <Legend
+                            wrapperStyle={{ paddingTop: '16px' }}
+                            formatter={(value) => <span className="text-xs text-foreground-muted">{value}</span>}
                         />
                         {displayCategories.map((cat, index) => (
                             <Bar

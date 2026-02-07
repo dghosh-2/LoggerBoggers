@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { PieChart, CalendarDays, BarChart3 } from 'lucide-react';
+import { PieChart, CalendarDays, BarChart3, CreditCard } from 'lucide-react';
 import { useInsightsStore } from '@/stores/insights-store';
 import { cn } from '@/lib/utils';
 
@@ -13,6 +13,7 @@ export function ViewSwitcher() {
         { id: 'graph', label: 'Breakdown', icon: PieChart },
         { id: 'calendar', label: 'Calendar', icon: CalendarDays },
         { id: 'analysis', label: 'Analysis', icon: BarChart3 },
+        { id: 'subscriptions', label: 'Subscriptions', icon: CreditCard },
     ] as const;
 
     return (
