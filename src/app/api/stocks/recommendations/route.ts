@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateText } from '@/lib/openai';
-import { getUserContext } from '@/lib/user-profile';
 
 export async function POST(request: NextRequest) {
     try {
@@ -13,8 +12,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Get user profile context
-        const userContext = await getUserContext();
+        const userContext = 'No user profile available.';
 
         // Build stock summary
         const stockSummary = stocks.map((stock: any) => {
