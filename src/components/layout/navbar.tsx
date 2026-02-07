@@ -8,7 +8,6 @@ import {
   TrendingUp,
   Upload,
   Briefcase,
-  Mic,
   User,
   LineChart,
 } from "lucide-react";
@@ -79,10 +78,6 @@ export function Navbar() {
 
         {/* Bottom Section */}
         <div className="px-3 pb-3 space-y-0.5 border-t border-border pt-3 mt-auto">
-          <button className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-[13px] text-foreground-muted hover:text-foreground hover:bg-secondary/60 transition-colors duration-100 cursor-pointer">
-            <Mic className="w-4 h-4 shrink-0" />
-            <span>Voice</span>
-          </button>
           <div className="flex items-center justify-between px-3 py-2">
             <div className="flex items-center gap-2.5">
               <div className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center">
