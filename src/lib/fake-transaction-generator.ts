@@ -326,13 +326,17 @@ function generateMonthTransactions(year: number, month: number): Transaction[] {
 // Generate 5 years of transactions
 export function generateFiveYearsOfTransactions(): Transaction[] {
     const allTransactions: Transaction[] = [];
-    const endDate = new Date();
+    const now = new Date();
+    const endYear = now.getFullYear();
+    const endMonth = now.getMonth();
     const startDate = new Date();
     startDate.setFullYear(startDate.getFullYear() - 5);
     
     let currentDate = new Date(startDate);
     
-    while (currentDate < endDate) {
+    // Include current month by checking year/month, not just date
+    while (currentDate.getFullYear() < endYear || 
+           (currentDate.getFullYear() === endYear && currentDate.getMonth() <= endMonth)) {
         const monthTransactions = generateMonthTransactions(
             currentDate.getFullYear(),
             currentDate.getMonth()
@@ -347,13 +351,17 @@ export function generateFiveYearsOfTransactions(): Transaction[] {
 // Generate 5 years of income
 export function generateFiveYearsOfIncome(): Income[] {
     const allIncome: Income[] = [];
-    const endDate = new Date();
+    const now = new Date();
+    const endYear = now.getFullYear();
+    const endMonth = now.getMonth();
     const startDate = new Date();
     startDate.setFullYear(startDate.getFullYear() - 5);
     
     let currentDate = new Date(startDate);
     
-    while (currentDate < endDate) {
+    // Include current month
+    while (currentDate.getFullYear() < endYear || 
+           (currentDate.getFullYear() === endYear && currentDate.getMonth() <= endMonth)) {
         // Biweekly salary (2 per month)
         const salary = INCOME_SOURCES[0];
         const salaryAmount = randomVariation(salary.amount, 0.05); // Small variation for raises over time
