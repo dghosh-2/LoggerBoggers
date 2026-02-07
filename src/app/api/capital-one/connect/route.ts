@@ -230,125 +230,105 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        // Generate 5 years of fake historical data (same as Plaid flow)
-        // This matches Plaid's behavior - Plaid sandbox provides 30-90 days of real data,
-        // but we generate 5 years of historical data for a complete demo experience
-        console.log('=== CAPITAL ONE: GENERATING FAKE DATA ===');
-        const fakeTransactions = generateFiveYearsOfTransactions();
-        const fakeIncome = generateFiveYearsOfIncome();
-        console.log(`Generated ${fakeTransactions.length} transactions`);
-        console.log(`Generated ${fakeIncome.length} income records`);
+        // Only seed demo history once per user; never wipe existing history.
+        const [{ data: anyTx }, { data: anyIncome }] = await Promise.all([
+            supabaseAdmin.from('transactions').select('id').eq('uuid_user_id', userId).limit(1),
+            supabaseAdmin.from('income').select('id').eq('uuid_user_id', userId).limit(1),
+        ]);
+        const hasExistingFinancialData = (anyTx?.length ?? 0) > 0 || (anyIncome?.length ?? 0) > 0;
 
-        // Clear existing data and insert new
-        console.log('=== CAPITAL ONE: CLEARING EXISTING DATA ===');
-        await supabaseAdmin.from('transactions').delete().eq('uuid_user_id', userId);
-        await supabaseAdmin.from('income').delete().eq('uuid_user_id', userId);
-        console.log('Cleared existing transactions and income');
+        const BATCH_SIZE = 500;
+        let allTransactionsWithUser: any[] = [];
 
-        // Add user_id to fake transactions and income
-        // Use 'capital_one' as source to distinguish from Plaid transactions
-        // Distribute transactions across accounts realistically:
-        // - Most transactions go to checking
-        // - Credit card transactions go to credit card
-        // - Savings gets occasional transfers
-        const checkingAccountId = accountsToStore[0].plaid_account_id;
-        const savingsAccountId = accountsToStore[1].plaid_account_id;
-        const creditAccountId = accountsToStore[2].plaid_account_id;
-        
-        // Transform transactions to match actual database schema
-        // Actual schema: id, user_id, plaid_transaction_id, amount, category, name, date, account_id, source, merchant_name, pending, uuid_user_id, location
-        const allTransactionsWithUser = fakeTransactions.map((tx) => {
-            return {
+        if (!hasExistingFinancialData) {
+            // Generate 5 years of fake historical data (same as Plaid flow)
+            console.log('=== CAPITAL ONE: GENERATING FAKE DATA (FIRST TIME ONLY) ===');
+            const fakeTransactions = generateFiveYearsOfTransactions();
+            const fakeIncome = generateFiveYearsOfIncome();
+            console.log(`Generated ${fakeTransactions.length} transactions`);
+            console.log(`Generated ${fakeIncome.length} income records`);
+
+            // Transform transactions to match actual database schema
+            allTransactionsWithUser = fakeTransactions.map((tx) => {
+                return {
+                    user_id: userId,
+                    uuid_user_id: userId,
+                    merchant_name: tx.merchant_name || tx.name,
+                    name: tx.name || tx.merchant_name,
+                    amount: tx.amount,
+                    date: tx.date,           // Schema uses 'date' not 'transaction_date'
+                    category: tx.category,   // Schema uses 'category' (text) not 'category_id'
+                    source: 'capital_one',
+                    location: tx.location || null,
+                    pending: false,
+                };
+            });
+
+            // Transform income to match actual database schema
+            const fakeIncomeWithUser = fakeIncome.map(inc => ({
                 user_id: userId,
                 uuid_user_id: userId,
-                merchant_name: tx.merchant_name || tx.name,
-                name: tx.name || tx.merchant_name,
-                amount: tx.amount,
-                date: tx.date,           // Schema uses 'date' not 'transaction_date'
-                category: tx.category,   // Schema uses 'category' (text) not 'category_id'
-                source: 'capital_one',
-                location: tx.location || null,
-                pending: false,
-            };
-        });
+                amount: inc.amount,
+                source: inc.source || 'Salary',
+                name: inc.source || 'Salary',
+                date: inc.date,
+                recurring: true,
+                frequency: 'monthly',
+            }));
 
-        // Transform income to match actual database schema
-        // Actual schema: id, user_id, amount, source, name, date, recurring, frequency, uuid_user_id, location
-        const fakeIncomeWithUser = fakeIncome.map(inc => ({
-            user_id: userId,
-            uuid_user_id: userId,
-            amount: inc.amount,
-            source: inc.source || 'Salary',
-            name: inc.source || 'Salary',
-            date: inc.date,
-            recurring: true,
-            frequency: 'monthly',
-        }));
-
-        // Insert transactions in batches
-        console.log('=== CAPITAL ONE: INSERTING TRANSACTIONS ===');
-        const BATCH_SIZE = 500;
-        let insertedTx = 0;
-        
-        // #region agent log
-        const sampleTx = allTransactionsWithUser[0];
-        fetch('http://127.0.0.1:7245/ingest/2d405ccf-cb3f-4611-bc27-f95a616c15c9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'capital-one/connect/route.ts:295',message:'Sample transaction object keys',data:{keys:Object.keys(sampleTx||{}),sample:sampleTx},timestamp:Date.now(),hypothesisId:'A,B'})}).catch(()=>{});
-        // #endregion
-        
-        for (let i = 0; i < allTransactionsWithUser.length; i += BATCH_SIZE) {
-            const batch = allTransactionsWithUser.slice(i, i + BATCH_SIZE);
-            const { error: txError } = await supabaseAdmin.from('transactions').insert(batch);
-            if (txError) {
-                console.error('Error inserting transactions batch:', txError);
-                // #region agent log
-                fetch('http://127.0.0.1:7245/ingest/2d405ccf-cb3f-4611-bc27-f95a616c15c9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'capital-one/connect/route.ts:305',message:'Transaction insert error details',data:{error:txError,batchIndex:i,firstItemKeys:Object.keys(batch[0]||{})},timestamp:Date.now(),hypothesisId:'A,B'})}).catch(()=>{});
-                // #endregion
-            } else {
-                insertedTx += batch.length;
-            }
-        }
-        console.log(`Successfully inserted ${insertedTx} transactions`);
-
-        // Insert income
-        console.log('=== CAPITAL ONE: INSERTING INCOME ===');
-        let insertedIncome = 0;
-        
-        // #region agent log
-        const sampleIncome = fakeIncomeWithUser[0];
-        fetch('http://127.0.0.1:7245/ingest/2d405ccf-cb3f-4611-bc27-f95a616c15c9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'capital-one/connect/route.ts:320',message:'Sample income object keys',data:{keys:Object.keys(sampleIncome||{}),sample:sampleIncome},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
-        
-        for (let i = 0; i < fakeIncomeWithUser.length; i += BATCH_SIZE) {
-            const batch = fakeIncomeWithUser.slice(i, i + BATCH_SIZE);
-            const { error: incError } = await supabaseAdmin.from('income').insert(batch);
-            if (incError) {
-                console.error('Error inserting income batch:', incError);
-                // #region agent log
-                fetch('http://127.0.0.1:7245/ingest/2d405ccf-cb3f-4611-bc27-f95a616c15c9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'capital-one/connect/route.ts:330',message:'Income insert error',data:{error:incError},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
-                // #endregion
-            } else {
-                insertedIncome += batch.length;
-            }
-        }
-        console.log(`Successfully inserted ${insertedIncome} income records`);
-
-        // Sync some transactions to Capital One API (for demo purposes)
-        if (capitalOneData && capitalOneData.accounts.length > 0) {
-            const checkingAccount = capitalOneData.accounts.find(a => a.type === 'Checking');
-            if (checkingAccount) {
-                try {
-                    await syncTransactionsToCapitalOne(checkingAccount._id, allTransactionsWithUser);
-                } catch (e) {
-                    console.error('Error syncing to Capital One:', e);
+            // Insert transactions in batches
+            console.log('=== CAPITAL ONE: INSERTING TRANSACTIONS (SEED) ===');
+            let insertedTx = 0;
+            for (let i = 0; i < allTransactionsWithUser.length; i += BATCH_SIZE) {
+                const batch = allTransactionsWithUser.slice(i, i + BATCH_SIZE);
+                const { error: txError } = await supabaseAdmin.from('transactions').insert(batch);
+                if (txError) {
+                    console.error('Error inserting transactions batch:', txError);
+                } else {
+                    insertedTx += batch.length;
                 }
             }
+            console.log(`Successfully inserted ${insertedTx} transactions`);
+
+            // Insert income
+            console.log('=== CAPITAL ONE: INSERTING INCOME (SEED) ===');
+            let insertedIncome = 0;
+            for (let i = 0; i < fakeIncomeWithUser.length; i += BATCH_SIZE) {
+                const batch = fakeIncomeWithUser.slice(i, i + BATCH_SIZE);
+                const { error: incError } = await supabaseAdmin.from('income').insert(batch);
+                if (incError) {
+                    console.error('Error inserting income batch:', incError);
+                } else {
+                    insertedIncome += batch.length;
+                }
+            }
+            console.log(`Successfully inserted ${insertedIncome} income records`);
+
+            // Sync some transactions to Capital One API (demo only, best-effort)
+            if (capitalOneData && capitalOneData.accounts.length > 0) {
+                const checkingAccount = capitalOneData.accounts.find(a => a.type === 'Checking');
+                if (checkingAccount) {
+                    try {
+                        await syncTransactionsToCapitalOne(checkingAccount._id, allTransactionsWithUser);
+                    } catch (e) {
+                        console.error('Error syncing to Capital One:', e);
+                    }
+                }
+            }
+        } else {
+            console.log('Skipping demo data generation: existing financial data found for user:', userId);
         }
 
         // Generate and insert holdings for portfolio
         const fakeHoldings = generateHoldings();
         
-        // Clear existing holdings and insert new
-        await supabaseAdmin.from('holdings').delete().eq('uuid_user_id', userId);
+        // Seed holdings only if the user doesn't already have holdings.
+        const { data: anyHoldings } = await supabaseAdmin
+            .from('holdings')
+            .select('id')
+            .eq('uuid_user_id', userId)
+            .limit(1);
+        const hasExistingHoldings = (anyHoldings?.length ?? 0) > 0;
         
         const holdingsWithUser = fakeHoldings.map(holding => ({
             user_id: userId,
@@ -367,13 +347,15 @@ export async function POST(request: NextRequest) {
             last_updated_at: new Date().toISOString(),
         }));
         
-        if (holdingsWithUser.length > 0) {
+        if (!hasExistingHoldings && holdingsWithUser.length > 0) {
             const { error: holdingsError } = await supabaseAdmin.from('holdings').insert(holdingsWithUser);
             if (holdingsError) {
                 console.error('Error inserting holdings:', holdingsError);
             } else {
                 console.log(`Successfully inserted ${holdingsWithUser.length} holdings for Capital One user:`, userId);
             }
+        } else if (hasExistingHoldings) {
+            console.log('Skipping holdings seed: existing holdings found for user:', userId);
         }
 
         // Update user connection status - use select then insert/update for reliability

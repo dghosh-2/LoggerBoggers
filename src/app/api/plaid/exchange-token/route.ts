@@ -245,88 +245,98 @@ export async function POST(request: NextRequest) {
                 };
             });
 
-            // Generate 5 years of fake historical data (up to TODAY, not 90 days ago)
-            console.log('=== GENERATING FAKE DATA ===');
-            const fakeTransactions = generateFiveYearsOfTransactions();
-            const fakeIncome = generateFiveYearsOfIncome();
-            console.log(`Generated ${fakeTransactions.length} transactions`);
-            console.log(`Generated ${fakeIncome.length} income records`);
+            // Only seed demo data once per user; never wipe existing history.
+            const [{ data: anyTx }, { data: anyIncome }] = await Promise.all([
+                supabaseAdmin.from('transactions').select('id').eq('uuid_user_id', userId).limit(1),
+                supabaseAdmin.from('income').select('id').eq('uuid_user_id', userId).limit(1),
+            ]);
+            const hasExistingFinancialData = (anyTx?.length ?? 0) > 0 || (anyIncome?.length ?? 0) > 0;
 
-            // Use ALL fake transactions - they go up to current date
-            // Don't filter by 90 days since Plaid sandbox data has unrealistic amounts
-            // For a real production app, you'd want to merge Plaid data properly
-            const allTransactions = fakeTransactions;
+            const BATCH_SIZE = 500;
+            if (!hasExistingFinancialData) {
+                // Generate 5 years of fake historical data (up to TODAY, not 90 days ago)
+                console.log('=== GENERATING FAKE DATA (FIRST TIME ONLY) ===');
+                const fakeTransactions = generateFiveYearsOfTransactions();
+                const fakeIncome = generateFiveYearsOfIncome();
+                console.log(`Generated ${fakeTransactions.length} transactions`);
+                console.log(`Generated ${fakeIncome.length} income records`);
 
-            // Clear existing data and insert new
-            console.log('=== CLEARING EXISTING DATA ===');
-            await supabaseAdmin.from('transactions').delete().eq('uuid_user_id', userId);
-            await supabaseAdmin.from('income').delete().eq('uuid_user_id', userId);
-            console.log('Cleared existing transactions and income');
+                // Use ALL fake transactions - they go up to current date
+                // Don't filter by 90 days since Plaid sandbox data has unrealistic amounts
+                // For a real production app, you'd want to merge Plaid data properly
+                const allTransactions = fakeTransactions;
 
-            // Transform transactions to match actual database schema
-            // Actual schema: id, user_id, plaid_transaction_id, amount, category, name, date, account_id, source, merchant_name, pending, uuid_user_id, location
-            const allTransactionsWithUser = allTransactions.map(tx => {
-                return {
+                // Transform transactions to match actual database schema
+                // Actual schema: id, user_id, plaid_transaction_id, amount, category, name, date, account_id, source, merchant_name, pending, uuid_user_id, location
+                const allTransactionsWithUser = allTransactions.map(tx => {
+                    return {
+                        user_id: userId,
+                        uuid_user_id: userId,
+                        merchant_name: tx.merchant_name || tx.name,
+                        name: tx.name || tx.merchant_name,
+                        amount: tx.amount,
+                        date: tx.date,           // Schema uses 'date' not 'transaction_date'
+                        category: tx.category,   // Schema uses 'category' (text) not 'category_id'
+                        source: 'plaid',
+                        location: tx.location || null,
+                        pending: false,
+                    };
+                });
+
+                // Transform income to match actual schema
+                // Actual schema: id, user_id, amount, source, name, date, recurring, frequency, uuid_user_id, location
+                const fakeIncomeWithUser = fakeIncome.map(inc => ({
                     user_id: userId,
                     uuid_user_id: userId,
-                    merchant_name: tx.merchant_name || tx.name,
-                    name: tx.name || tx.merchant_name,
-                    amount: tx.amount,
-                    date: tx.date,           // Schema uses 'date' not 'transaction_date'
-                    category: tx.category,   // Schema uses 'category' (text) not 'category_id'
-                    source: 'plaid',
-                    location: tx.location || null,
-                    pending: false,
-                };
-            });
+                    amount: inc.amount,
+                    source: inc.source || 'Salary',
+                    name: inc.source || 'Salary',
+                    date: inc.date,
+                    recurring: true,
+                    frequency: 'monthly',
+                }));
 
-            // Transform income to match actual schema
-            // Actual schema: id, user_id, amount, source, name, date, recurring, frequency, uuid_user_id, location
-            const fakeIncomeWithUser = fakeIncome.map(inc => ({
-                user_id: userId,
-                uuid_user_id: userId,
-                amount: inc.amount,
-                source: inc.source || 'Salary',
-                name: inc.source || 'Salary',
-                date: inc.date,
-                recurring: true,
-                frequency: 'monthly',
-            }));
-
-            // Insert transactions in batches
-            console.log('=== INSERTING TRANSACTIONS ===');
-            const BATCH_SIZE = 500;
-            let insertedTx = 0;
-            for (let i = 0; i < allTransactionsWithUser.length; i += BATCH_SIZE) {
-                const batch = allTransactionsWithUser.slice(i, i + BATCH_SIZE);
-                const { error: txError } = await supabaseAdmin.from('transactions').insert(batch);
-                if (txError) {
-                    console.error(`Error inserting transaction batch ${i}:`, txError);
-                } else {
-                    insertedTx += batch.length;
+                // Insert transactions in batches
+                console.log('=== INSERTING TRANSACTIONS (SEED) ===');
+                let insertedTx = 0;
+                for (let i = 0; i < allTransactionsWithUser.length; i += BATCH_SIZE) {
+                    const batch = allTransactionsWithUser.slice(i, i + BATCH_SIZE);
+                    const { error: txError } = await supabaseAdmin.from('transactions').insert(batch);
+                    if (txError) {
+                        console.error(`Error inserting transaction batch ${i}:`, txError);
+                    } else {
+                        insertedTx += batch.length;
+                    }
                 }
-            }
-            console.log(`Successfully inserted ${insertedTx} transactions`);
+                console.log(`Successfully inserted ${insertedTx} transactions`);
 
-            // Insert income
-            console.log('=== INSERTING INCOME ===');
-            let insertedIncome = 0;
-            for (let i = 0; i < fakeIncomeWithUser.length; i += BATCH_SIZE) {
-                const batch = fakeIncomeWithUser.slice(i, i + BATCH_SIZE);
-                const { error: incError } = await supabaseAdmin.from('income').insert(batch);
-                if (incError) {
-                    console.error(`Error inserting income batch ${i}:`, incError);
-                } else {
-                    insertedIncome += batch.length;
+                // Insert income
+                console.log('=== INSERTING INCOME (SEED) ===');
+                let insertedIncome = 0;
+                for (let i = 0; i < fakeIncomeWithUser.length; i += BATCH_SIZE) {
+                    const batch = fakeIncomeWithUser.slice(i, i + BATCH_SIZE);
+                    const { error: incError } = await supabaseAdmin.from('income').insert(batch);
+                    if (incError) {
+                        console.error(`Error inserting income batch ${i}:`, incError);
+                    } else {
+                        insertedIncome += batch.length;
+                    }
                 }
+                console.log(`Successfully inserted ${insertedIncome} income records`);
+            } else {
+                console.log('Skipping demo data generation: existing financial data found for user:', userId);
             }
-            console.log(`Successfully inserted ${insertedIncome} income records`);
 
             // Generate and insert holdings for investment accounts
             const fakeHoldings = generateHoldings();
             
-            // Clear existing holdings and insert new
-            await supabaseAdmin.from('holdings').delete().eq('uuid_user_id', userId);
+            // Seed holdings only if the user doesn't already have holdings.
+            const { data: anyHoldings } = await supabaseAdmin
+                .from('holdings')
+                .select('id')
+                .eq('uuid_user_id', userId)
+                .limit(1);
+            const hasExistingHoldings = (anyHoldings?.length ?? 0) > 0;
             
             const holdingsWithUser = fakeHoldings.map(holding => ({
                 user_id: userId,
@@ -345,13 +355,15 @@ export async function POST(request: NextRequest) {
                 last_updated_at: new Date().toISOString(),
             }));
             
-            if (holdingsWithUser.length > 0) {
+            if (!hasExistingHoldings && holdingsWithUser.length > 0) {
                 const { error: holdingsError } = await supabaseAdmin.from('holdings').insert(holdingsWithUser);
                 if (holdingsError) {
                     console.error('Error inserting holdings:', holdingsError);
                 } else {
                     console.log(`Successfully inserted ${holdingsWithUser.length} holdings for user:`, userId);
                 }
+            } else if (hasExistingHoldings) {
+                console.log('Skipping holdings seed: existing holdings found for user:', userId);
             }
 
             // Update user connection status - use select then insert/update for reliability
