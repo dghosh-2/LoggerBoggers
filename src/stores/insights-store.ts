@@ -31,7 +31,7 @@ interface InsightsState {
 export const useInsightsStore = create<InsightsState>((set) => ({
     selectedInsightId: null,
     selectedCategory: null,
-    selectedMonth: new Date().toLocaleDateString('default', { month: 'short', year: 'numeric' }),
+    selectedMonth: new Date().toLocaleString('default', { month: 'short', year: 'numeric' }),
     selectedRange: 'MTD',
     currentView: 'graph',
     visibleGraphLayers: ['base'],
