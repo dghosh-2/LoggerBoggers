@@ -449,7 +449,7 @@ export default function PortfolioPage() {
                     maximumFractionDigits: 2 
                   })}
                 </h1>
-                {summary?.netWorth > 0 && (
+                {(summary?.netWorth ?? 0) > 0 && (
                   <div className={`flex items-center gap-1 text-sm font-medium ${
                     isPositive ? "text-success" : "text-destructive"
                   }`}>
@@ -462,7 +462,7 @@ export default function PortfolioPage() {
                   </div>
                 )}
               </div>
-              {summary?.netWorth > 0 && (
+              {(summary?.netWorth ?? 0) > 0 && (
                 <p className="text-[11px] text-foreground-muted mt-1">
                   {totalChange >= 0 ? '+' : ''}${Math.abs(totalChange).toLocaleString(undefined, { maximumFractionDigits: 0 })} this month
                 </p>
@@ -532,16 +532,16 @@ export default function PortfolioPage() {
               </div>
             </div>
             
-            {summary?.netWorth > 0 ? (
+            {summary && (summary.netWorth ?? 0) > 0 ? (
               <>
                 <p className="text-xs text-foreground-muted leading-relaxed mb-4">
-                  {summary.totalCash > 0 && summary.bankAccountsCount > 0 
+                  {summary.totalCash > 0 && summary.bankAccountsCount > 0
                     ? `You have $${summary.totalCash.toLocaleString()} in cash across ${summary.bankAccountsCount} account${summary.bankAccountsCount !== 1 ? 's' : ''}. `
                     : ''}
-                  {summary.totalInvestments > 0 
+                  {summary.totalInvestments > 0
                     ? `Your investments total $${summary.totalInvestments.toLocaleString()}. `
                     : ''}
-                  {summary.totalLoans > 0 
+                  {summary.totalLoans > 0
                     ? `You have $${summary.totalLoans.toLocaleString()} in outstanding loans.`
                     : 'You have no outstanding loans - great job!'}
                 </p>

@@ -7,7 +7,7 @@ import { useTimeMachineStore } from '@/stores/timemachine-store';
 import type { FinancialEvent, CounterfactualOp } from '@/lib/timemachine-engine';
 import { cn } from '@/lib/utils';
 
-const CATEGORY_ICONS: Record<string, React.ElementType> = {
+const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
     Shopping: ShoppingBag,
     Rent: Home,
     Food: Utensils,
