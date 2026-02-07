@@ -5,6 +5,8 @@ import { usePlaidLink, PlaidLinkOptions } from 'react-plaid-link';
 import { toast } from '@/components/ui/toast';
 import { GlassButton } from '@/components/ui/glass-button';
 import { Link2, Loader2 } from 'lucide-react';
+import { useFinancialDataStore } from '@/stores/financial-data-store';
+import { usePortfolioStore } from '@/stores/portfolio-store';
 
 interface PlaidLinkProps {
     onSuccess?: () => void;
@@ -42,6 +44,10 @@ function PlaidLinkButtonInner({
             if (!response.ok) {
                 throw new Error('Failed to exchange token');
             }
+
+            // Invalidate all caches so fresh data is fetched
+            useFinancialDataStore.getState().invalidateCache();
+            usePortfolioStore.getState().invalidateCache();
 
             toast.success(`${metadata.institution?.name || 'Account'} connected successfully!`);
             onSuccess?.();
