@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getUserIdFromRequest } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Check if user is connected
-        const { data: connectionData } = await supabase
+        const { data: connectionData } = await supabaseAdmin
             .from('user_plaid_connections')
             .select('is_connected')
             .eq('uuid_user_id', userId)
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Get holdings from Supabase
-        const { data: holdings, error } = await supabase
+        const { data: holdings, error } = await supabaseAdmin
             .from('holdings')
             .select(`
                 id,
