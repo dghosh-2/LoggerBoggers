@@ -1,10 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, Component, ReactNode } from 'react';
 import { usePlaidLink, PlaidLinkOptions } from 'react-plaid-link';
 import { toast } from '@/components/ui/toast';
 import { GlassButton } from '@/components/ui/glass-button';
-import { Link2, Loader2 } from 'lucide-react';
 import { useFinancialDataStore } from '@/stores/financial-data-store';
 import { usePortfolioStore } from '@/stores/portfolio-store';
 
@@ -15,6 +14,34 @@ interface PlaidLinkProps {
     buttonVariant?: 'primary' | 'secondary';
     buttonSize?: 'sm' | 'md' | 'lg';
     className?: string;
+}
+
+// Error boundary to catch Plaid errors
+interface ErrorBoundaryState {
+    hasError: boolean;
+    error?: Error;
+}
+
+class PlaidErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, ErrorBoundaryState> {
+    constructor(props: { children: ReactNode; fallback: ReactNode }) {
+        super(props);
+        this.state = { hasError: false };
+    }
+
+    static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+        return { hasError: true, error };
+    }
+
+    componentDidCatch(error: Error, errorInfo: any) {
+        console.error('Plaid Error Boundary caught error:', error, errorInfo);
+    }
+
+    render() {
+        if (this.state.hasError) {
+            return this.props.fallback;
+        }
+        return this.props.children;
+    }
 }
 
 // Inner component that uses the hook only when token is available
@@ -42,10 +69,19 @@ function PlaidLinkButtonInner({
             });
 
             if (!response.ok) {
-                // Parse error details from response
-                const errorData = await response.json();
-                console.error('Token exchange failed:', errorData);
-                throw new Error(errorData.error || 'Failed to exchange token');
+                // Try to parse JSON error details, but don't assume it's always JSON.
+                let errorData: any = null;
+                try {
+                    errorData = await response.json();
+                } catch {
+                    // ignore
+                }
+                console.error('Token exchange failed:', { status: response.status, errorData });
+                const message =
+                    errorData?.details ||
+                    errorData?.error ||
+                    `Failed to exchange token (HTTP ${response.status})`;
+                throw new Error(message);
             }
 
             // Invalidate all caches so fresh data is fetched
@@ -65,7 +101,7 @@ function PlaidLinkButtonInner({
 
     const handleOnExit = useCallback((err: any, metadata: any) => {
         if (err) {
-            console.error('Plaid Link error:', err);
+            console.error('Plaid Link exit error:', err);
         }
         onExit?.();
     }, [onExit]);
@@ -76,7 +112,13 @@ function PlaidLinkButtonInner({
         onExit: handleOnExit,
     };
 
-    const { open, ready } = usePlaidLink(config);
+    const { open, ready, error: plaidError } = usePlaidLink(config);
+
+    useEffect(() => {
+        if (plaidError) {
+            console.error('Plaid Link hook error:', plaidError);
+        }
+    }, [plaidError]);
 
     return (
         <GlassButton
@@ -101,25 +143,34 @@ export function PlaidLinkButton({
 }: PlaidLinkProps) {
     const [linkToken, setLinkToken] = useState<string | null>(null);
     const [tokenLoading, setTokenLoading] = useState(true);
+    const [tokenError, setTokenError] = useState<string | null>(null);
 
     // Fetch link token on mount
     useEffect(() => {
         const fetchLinkToken = async () => {
             try {
                 setTokenLoading(true);
+                setTokenError(null);
+                
                 const response = await fetch('/api/plaid/create-link-token', {
                     method: 'POST',
                 });
                 
                 if (!response.ok) {
-                    throw new Error('Failed to create link token');
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || 'Failed to create link token');
                 }
                 
                 const data = await response.json();
-                setLinkToken(data.link_token);
-            } catch (error) {
+                if (data.link_token) {
+                    setLinkToken(data.link_token);
+                } else {
+                    throw new Error('No link token received');
+                }
+            } catch (error: any) {
                 console.error('Error fetching link token:', error);
-                toast.error('Failed to initialize Plaid. Please try again.');
+                setTokenError(error.message);
+                toast.error('Failed to initialize Plaid. Please refresh and try again.');
             } finally {
                 setTokenLoading(false);
             }
@@ -129,7 +180,7 @@ export function PlaidLinkButton({
     }, []);
 
     // Show loading state while fetching token
-    if (tokenLoading || !linkToken) {
+    if (tokenLoading) {
         return (
             <GlassButton
                 variant={buttonVariant}
@@ -137,21 +188,49 @@ export function PlaidLinkButton({
                 disabled
                 className={className}
             >
-                {tokenLoading ? 'Loading...' : buttonText}
+                Loading...
             </GlassButton>
         );
     }
 
+    // If token failed to load, show disabled button with retry option
+    if (!linkToken || tokenError) {
+        return (
+            <GlassButton
+                variant={buttonVariant}
+                size={buttonSize}
+                disabled
+                className={className}
+            >
+                {buttonText}
+            </GlassButton>
+        );
+    }
+
+    // Wrap in error boundary to catch any Plaid initialization errors
     return (
-        <PlaidLinkButtonInner
-            linkToken={linkToken}
-            onSuccess={onSuccess}
-            onExit={onExit}
-            buttonText={buttonText}
-            buttonVariant={buttonVariant}
-            buttonSize={buttonSize}
-            className={className}
-        />
+        <PlaidErrorBoundary
+            fallback={
+                <GlassButton
+                    variant={buttonVariant}
+                    size={buttonSize}
+                    disabled
+                    className={className}
+                >
+                    {buttonText}
+                </GlassButton>
+            }
+        >
+            <PlaidLinkButtonInner
+                linkToken={linkToken}
+                onSuccess={onSuccess}
+                onExit={onExit}
+                buttonText={buttonText}
+                buttonVariant={buttonVariant}
+                buttonSize={buttonSize}
+                className={className}
+            />
+        </PlaidErrorBoundary>
     );
 }
 

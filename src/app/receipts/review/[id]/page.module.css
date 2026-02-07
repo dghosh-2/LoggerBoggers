@@ -1,24 +1,22 @@
 .container {
-    --bg-main: #f4f7f2;
-    --bg-soft: #edf3ea;
-    --surface: #ffffff;
-    --surface-muted: #f8fbf6;
-    --line: #d7e0d2;
-    --line-strong: #bac9b6;
-    --text: #172118;
-    --text-muted: #5d6a5f;
-    --accent: #234d2b;
-    --accent-soft: #e2f0e4;
-    --danger: #8f2a2a;
-    --shadow-soft: 0 16px 36px rgba(19, 39, 20, 0.08);
-    --shadow-receipt: 0 26px 44px rgba(18, 35, 18, 0.14);
+    /* Map the receipt review UI to the site's theme tokens (globals.css) */
+    --bg-main: var(--background);
+    --bg-soft: var(--background-secondary);
+    --surface: var(--card);
+    --surface-muted: var(--background-secondary);
+    --line: var(--border);
+    --line-strong: var(--border-strong);
+    --text: var(--foreground);
+    --text-muted: var(--foreground-muted);
+    --accent: var(--accent);
+    --accent-soft: var(--primary-soft);
+    --danger: var(--destructive);
+    --shadow-soft: var(--shadow-md);
+    --shadow-receipt: var(--shadow-lg);
     height: 100vh;
     display: flex;
     flex-direction: column;
-    background:
-        radial-gradient(circle at 15% 18%, #ddecdc 0%, transparent 42%),
-        radial-gradient(circle at 87% 82%, #d7e8d5 0%, transparent 36%),
-        var(--bg-main);
+    background: var(--bg-main);
     color: var(--text);
     overflow: hidden;
 }
@@ -115,28 +113,28 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    background: #ecf1ec;
-    color: #4a584c;
-    border: 1px solid #d4ddd3;
+    background: var(--secondary);
+    color: var(--text-muted);
+    border: 1px solid var(--line);
 }
 
 .statusBadge[data-status="ready"] {
-    background: #ddf3dd;
-    border-color: #b7dfb8;
-    color: #205b27;
+    background: var(--success-soft);
+    border-color: color-mix(in srgb, var(--success) 35%, var(--line));
+    color: var(--success);
 }
 
 .statusBadge[data-status="processing"],
 .statusBadge[data-status="pending"] {
-    background: #f8f1da;
-    border-color: #e8d9ad;
-    color: #725614;
+    background: var(--warning-soft);
+    border-color: color-mix(in srgb, var(--warning) 35%, var(--line));
+    color: var(--warning);
 }
 
 .statusBadge[data-status="failed"] {
-    background: #f7e5e5;
-    border-color: #eac4c4;
-    color: #8f2a2a;
+    background: var(--destructive-soft);
+    border-color: color-mix(in srgb, var(--destructive) 35%, var(--line));
+    color: var(--destructive);
 }
 
 .mainLayout {
@@ -157,8 +155,8 @@
             45deg,
             transparent 0,
             transparent 10px,
-            rgba(35, 77, 43, 0.03) 10px,
-            rgba(35, 77, 43, 0.03) 20px
+            color-mix(in srgb, var(--accent) 6%, transparent) 10px,
+            color-mix(in srgb, var(--accent) 6%, transparent) 20px
         ),
         var(--bg-soft);
 }
