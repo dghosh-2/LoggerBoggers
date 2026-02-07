@@ -6,8 +6,7 @@ interface InsightsState {
     selectedCategory: string | null;
     selectedMonth: string;
     selectedRange: 'MTD' | '3M' | 'YR' | 'All'; // Updated 12M -> YR
-    selectedDate: string | null; // NEW: Track selected date for calendar
-    currentView: 'graph' | 'calendar' | 'analysis' | 'trends' | 'subscriptions'; // NEW: Track active view
+    currentView: 'graph' | 'calendar' | 'analysis' | 'trends'; // NEW: Track active view
     visibleGraphLayers: string[]; // ['base', 'sandbox', 'overlay']
     explainingInsightId: string | null; // Controls the deep dive panel
     explainingItem: any | null; // Using any to avoid circular dependency
@@ -23,17 +22,15 @@ interface InsightsState {
     setReductionGoal: (category: string, percent: number) => void;
     clearReductionGoal: (category: string) => void;
     setSelectedCategory: (category: string | null) => void;
-    setSelectedDate: (date: string | null) => void; // NEW
     setSelectedMonth: (month: string) => void;
     setSelectedRange: (range: 'MTD' | '3M' | 'YR' | 'All') => void;
-    setCurrentView: (view: 'graph' | 'calendar' | 'analysis' | 'trends' | 'subscriptions') => void;
+    setCurrentView: (view: 'graph' | 'calendar' | 'analysis' | 'trends') => void;
     toggleGraphLayer: (layer: string) => void;
 }
 
 export const useInsightsStore = create<InsightsState>((set) => ({
     selectedInsightId: null,
     selectedCategory: null,
-    selectedDate: null,
     selectedMonth: new Date().toLocaleString('default', { month: 'short', year: 'numeric' }),
     selectedRange: 'MTD',
     currentView: 'graph',
@@ -44,7 +41,7 @@ export const useInsightsStore = create<InsightsState>((set) => ({
     budgets: {},
     reductionGoals: {},
 
-    setSelectedInsightId: (id) => set({ selectedInsightId: id, selectedCategory: null, selectedDate: null }),
+    setSelectedInsightId: (id) => set({ selectedInsightId: id, selectedCategory: null }),
     setExplainingInsightId: (id) => set({ explainingInsightId: id, explainingItem: null }), // Clear manual item if ID set
     setExplainingItem: (item) => set({ explainingItem: item, explainingInsightId: null }), // Clear ID if item set
     setActiveSim: (sim) => set({ activeSim: sim }),
@@ -54,8 +51,7 @@ export const useInsightsStore = create<InsightsState>((set) => ({
         const { [category]: _, ...rest } = state.reductionGoals;
         return { reductionGoals: rest };
     }),
-    setSelectedCategory: (category) => set({ selectedCategory: category, selectedInsightId: null, selectedDate: null }),
-    setSelectedDate: (date) => set({ selectedDate: date, selectedCategory: null, selectedInsightId: null }),
+    setSelectedCategory: (category) => set({ selectedCategory: category, selectedInsightId: null }),
     setSelectedMonth: (month) => set({ selectedMonth: month }),
     setSelectedRange: (range) => set({ selectedRange: range }),
     setCurrentView: (view) => set({ currentView: view }),

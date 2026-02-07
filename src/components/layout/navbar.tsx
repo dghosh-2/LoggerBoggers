@@ -15,7 +15,6 @@ import {
   LogOut,
   ChevronDown,
   UserCircle,
-  Globe,
 } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
 import { useUIStore } from "@/stores/ui-store";
@@ -26,7 +25,6 @@ const navItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Studio", href: "/studio", icon: Sparkles },
   { name: "Insights", href: "/insights", icon: TrendingUp },
-  { name: "Globe", href: "/globe", icon: Globe },
   { name: "Stocks", href: "/stocks", icon: LineChart },
   { name: "Imports", href: "/imports", icon: Upload },
   { name: "Portfolio", href: "/portfolio", icon: Briefcase },

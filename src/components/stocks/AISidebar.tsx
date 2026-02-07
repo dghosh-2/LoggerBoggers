@@ -14,6 +14,7 @@ import {
     Zap,
     Activity,
 } from 'lucide-react';
+import { DogRunnerSimple } from '@/components/ui/DogLoadingAnimation';
 
 interface AISidebarProps {
     recommendations: any | null;
@@ -197,24 +198,16 @@ export function AISidebar({
     // Loading state
     if (loading) {
         return (
-            <div className="glass-sidebar p-5 h-full">
-                <div className="flex items-center gap-2 mb-5">
+            <div className="p-5 h-full flex flex-col items-center justify-center">
+                <DogRunnerSimple size="sm" className="w-full mb-4" />
+                <div className="flex items-center gap-2">
                     <motion.div
                         animate={{ rotate: 360 }}
                         transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
                     >
-                        <Sparkles className="w-5 h-5 text-primary" />
+                        <Sparkles className="w-4 h-4 text-primary" />
                     </motion.div>
                     <span className="text-sm text-foreground-muted">Analyzing...</span>
-                </div>
-                <div className="space-y-4">
-                    {[1, 2, 3].map((i) => (
-                        <div key={i} className="animate-pulse">
-                            <div className="h-3 bg-primary/10 rounded w-1/3 mb-2" />
-                            <div className="h-3 bg-primary/10 rounded w-full mb-1" />
-                            <div className="h-3 bg-primary/10 rounded w-4/5" />
-                        </div>
-                    ))}
                 </div>
             </div>
         );
@@ -223,10 +216,10 @@ export function AISidebar({
     // Empty state
     if (!stocksData || stocksData.length === 0) {
         return (
-            <div className="glass-sidebar p-5 h-full">
+            <div className="p-5 h-full">
                 <div className="flex items-center gap-2 mb-4">
                     <Sparkles className="w-5 h-5 text-primary" />
-                    <span className="font-medium text-sm">Insights</span>
+                    <span className="font-medium text-sm">AI Insights</span>
                 </div>
                 <p className="text-sm text-foreground-muted">
                     Search for stocks to get personalized insights and analysis.
@@ -237,7 +230,7 @@ export function AISidebar({
 
     return (
         <motion.div 
-            className="glass-sidebar p-5 h-full flex flex-col overflow-y-auto"
+            className="p-5 h-full flex flex-col"
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.4, delay: 0.2 }}
