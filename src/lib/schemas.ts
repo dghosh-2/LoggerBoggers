@@ -122,16 +122,6 @@ export const DeepDiveSchema = z.object({
     context: z.string().describe('Broader market context for that period'),
 });
 
-// User Profile (from data.md)
-export const UserProfileSchema = z.object({
-    age: z.number(),
-    location: z.string(),
-    riskTolerance: z.enum(['Low', 'Medium', 'High', 'Aggressive']),
-    debtProfile: z.string(),
-    incomeStatus: z.string(),
-    customRequest: z.string().optional(),
-});
-
 // Type exports
 export type UserQuery = z.infer<typeof UserQuerySchema>;
 export type OrchestratorOutput = z.infer<typeof OrchestratorOutputSchema>;
@@ -142,4 +132,3 @@ export type Annotation = z.infer<typeof AnnotationSchema>;
 export type Recommendation = z.infer<typeof RecommendationSchema>;
 export type RiskMetrics = z.infer<typeof RiskMetricsSchema>;
 export type DeepDive = z.infer<typeof DeepDiveSchema>;
-export type UserProfile = z.infer<typeof UserProfileSchema>;
