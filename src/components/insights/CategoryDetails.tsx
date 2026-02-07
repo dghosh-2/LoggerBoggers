@@ -70,7 +70,7 @@ export function CategoryDetails() {
                                 </div>
                                 <div>
                                     <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
-                                        {t.merchant}
+                                        {t.merchant_name || t.name}
                                     </p>
                                     <p className="text-xs text-foreground-muted">{t.date}</p>
                                 </div>

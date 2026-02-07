@@ -48,19 +48,20 @@ export async function getFinancialContext(): Promise<string> {
         try {
             const historical = analyzeHistoricalData();
 
+            const totalSpent = historical.categoryBreakdown.reduce((sum, c) => sum + c.totalSpent, 0);
             const spendingContext = [
                 'HISTORICAL SPENDING DATA:',
                 `- Average Monthly Expenses: $${historical.avgMonthlyExpenses.toFixed(2)}`,
                 `- Average Monthly Savings: $${historical.avgMonthlySavings.toFixed(2)}`,
                 '',
                 'Top Spending Categories:',
-                ...historical.topCategories.map(cat =>
-                    `  - ${cat.name}: $${cat.total.toFixed(2)} (${cat.percentage.toFixed(1)}%)`
+                ...historical.categoryBreakdown.slice(0, 5).map(cat =>
+                    `  - ${cat.category}: $${cat.totalSpent.toFixed(2)} (${totalSpent > 0 ? ((cat.totalSpent / totalSpent) * 100).toFixed(1) : 0}%)`
                 ),
                 '',
                 'Monthly Trends:',
                 ...historical.monthlyTrends.slice(-3).map(trend =>
-                    `  - ${trend.month}: $${trend.totalSpent.toFixed(2)} spent, $${trend.saved.toFixed(2)} saved`
+                    `  - ${trend.month}: $${trend.expenses.toFixed(2)} spent, $${trend.savings.toFixed(2)} saved`
                 ),
             ];
 
@@ -110,7 +111,7 @@ export async function getConciseFinancialContext(): Promise<string> {
             const historical = analyzeHistoricalData();
             contextParts.push(
                 `Avg Monthly: $${historical.avgMonthlyExpenses.toFixed(0)} expenses, $${historical.avgMonthlySavings.toFixed(0)} savings`,
-                `Top categories: ${historical.topCategories.slice(0, 3).map(c => c.name).join(', ')}`
+                `Top categories: ${historical.topCategories.slice(0, 3).join(', ')}`
             );
         } catch (error) {
             console.error('Error fetching historical data:', error);

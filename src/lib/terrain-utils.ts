@@ -144,10 +144,10 @@ export function aggregateTransactionsByWeek(
         data.transactions.forEach(t => {
             if (t.amount > 500) {
                 events.push({
-                    id: t.id || `${weekKey}-${t.merchant}`,
+                    id: `${weekKey}-${t.description || t.category}`,
                     type: "expense",
                     amount: t.amount,
-                    description: t.merchant || t.category,
+                    description: t.description || t.category,
                     category: t.category,
                     date: new Date(t.date),
                 });
