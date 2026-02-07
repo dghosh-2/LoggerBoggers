@@ -6,7 +6,7 @@ import { Navbar } from "@/components/layout/navbar";
 import { DemoMode } from "@/components/demo/demo-mode";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { ToastContainer } from "@/components/ui/toast";
-import { ChatAssistant } from "@/components/chat/chat-assistant";
+import { ChatAssistant } from "@/components/chat/chat-assistant-hume";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

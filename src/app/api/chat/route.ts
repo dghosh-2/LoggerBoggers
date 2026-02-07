@@ -1,23 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { streamChatResponse } from '@/lib/cerebras';
-
-export const runtime = 'edge';
+import { getFinancialContext } from '@/lib/financial-context';
 
 interface Message {
     role: 'system' | 'user' | 'assistant';
     content: string;
 }
 
-const SYSTEM_PROMPT = `You are ScotBot, a friendly and knowledgeable financial assistant. You help users understand their finances, spending habits, and investment strategies.
+const SYSTEM_PROMPT = `You are ScotBot, a personal financial assistant with direct access to the user's financial data stored on their account.
 
-Your capabilities include:
-- Analyzing spending patterns and transactions
-- Providing insights on net worth and portfolio performance
-- Offering tips to reduce expenses and improve financial health
-- Explaining financial concepts in simple terms
-- Analyzing portfolio risk and suggesting rebalancing strategies
+SCOPE OF ASSISTANCE:
+You have access to and can help with:
+- User's transaction history and spending patterns
+- Account balances and net worth
+- Investment portfolio holdings and performance
+- Budget categories and expense tracking
+- Financial goals and progress
 
-Be concise, friendly, and actionable in your responses. Use specific numbers and data when available. Keep responses under 150 words unless more detail is specifically requested.`;
+Your role is EXCLUSIVELY to assist with the user's personal financial data. You:
+- Analyze their specific spending, investments, and financial trends
+- Provide personalized insights based on THEIR data
+- Offer actionable advice tailored to THEIR financial situation
+- Answer questions about THEIR accounts, transactions, and portfolio
+
+You do NOT:
+- Provide general financial advice unrelated to their data
+- Discuss topics outside of their personal finances
+- Offer services beyond financial data analysis and insights
+
+Communication style:
+- Concise and actionable (under 150 words unless detail requested)
+- Reference specific data points from their account when relevant
+- Friendly and professional tone`;
 
 export async function POST(req: NextRequest) {
     try {
@@ -31,9 +45,20 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Add system prompt if not present
+        // Fetch user's financial data
+        const financialContext = await getFinancialContext();
+
+        // Build enhanced system prompt with actual financial data
+        const enhancedSystemPrompt = `${SYSTEM_PROMPT}
+
+CURRENT FINANCIAL DATA:
+${financialContext}
+
+Use this data to provide specific, personalized insights. Reference actual numbers and categories when answering questions.`;
+
+        // Add system prompt with financial context
         const chatMessages: Message[] = [
-            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'system', content: enhancedSystemPrompt },
             ...messages,
         ];
 
