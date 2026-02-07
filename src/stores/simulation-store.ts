@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { SimulationOutput, NewsImpact } from "@/lib/simulation-engine";
 
 export interface SimulationScenario {
   id: string;
@@ -12,12 +13,14 @@ export interface SimulationScenario {
   createdAt: Date;
 }
 
-export interface SimulationResult {
-  months: number[];
-  cashBalance: number[];
-  savingsTrajectory: number[];
-  goalProgress: number;
-  riskOfNegative: number;
+export interface NewsInsight {
+  id: string;
+  title: string;
+  source: string;
+  impact: 'positive' | 'negative';
+  category: string;
+  summary: string;
+  suggestion: string;
 }
 
 interface SimulationState {
@@ -25,91 +28,75 @@ interface SimulationState {
   incomeChange: number;
   expenseChange: number;
   savingsRate: number;
-  
+  simulationMonths: number;
+
   // Scenarios
   scenarios: SimulationScenario[];
   activeScenario: string | null;
-  
-  // Results
-  results: SimulationResult | null;
+
+  // Custom Event Query
+  customEventQuery: string;
+
+  // AI Response
+  aiResponse: string | null;
+  isLoadingAI: boolean;
+
+  // News Insights
+  newsInsights: NewsInsight[];
+  isLoadingNews: boolean;
+
+  // Simulation Results
+  simulationResult: SimulationOutput | null;
   isSimulating: boolean;
-  
+
   // Actions
   setIncomeChange: (value: number) => void;
   setExpenseChange: (value: number) => void;
   setSavingsRate: (value: number) => void;
+  setSimulationMonths: (value: number) => void;
+  setCustomEventQuery: (query: string) => void;
   resetSimulation: () => void;
   toggleSimulation: () => void;
-  runSimulation: () => void;
+  runSimulation: () => Promise<void>;
+  fetchNews: () => Promise<void>;
+  askAI: (query: string) => Promise<void>;
   addScenario: (scenario: SimulationScenario) => void;
   setActiveScenario: (id: string | null) => void;
-}
-
-// Simple simulation function
-function simulateCashflow(
-  baseIncome: number,
-  baseExpenses: number,
-  incomeChange: number,
-  expenseChange: number,
-  savingsRate: number
-): SimulationResult {
-  const months = Array.from({ length: 12 }, (_, i) => i + 1);
-  const adjustedIncome = baseIncome * (1 + incomeChange / 100);
-  const adjustedExpenses = baseExpenses * (1 + expenseChange / 100);
-  const targetSavings = adjustedIncome * (savingsRate / 100);
-  
-  let balance = 5000; // Starting balance
-  let savings = 10000; // Starting savings
-  
-  const cashBalance: number[] = [];
-  const savingsTrajectory: number[] = [];
-  
-  for (let i = 0; i < 12; i++) {
-    const monthlyNet = adjustedIncome - adjustedExpenses;
-    const actualSavings = Math.min(targetSavings, Math.max(0, monthlyNet));
-    
-    balance += monthlyNet - actualSavings;
-    savings += actualSavings;
-    
-    cashBalance.push(Math.round(balance));
-    savingsTrajectory.push(Math.round(savings));
-  }
-  
-  const goalProgress = Math.min(100, (savings / 50000) * 100);
-  const riskOfNegative = cashBalance.some(b => b < 0) ? 
-    (cashBalance.filter(b => b < 0).length / 12) * 100 : 0;
-  
-  return {
-    months,
-    cashBalance,
-    savingsTrajectory,
-    goalProgress: Math.round(goalProgress),
-    riskOfNegative: Math.round(riskOfNegative),
-  };
 }
 
 export const useSimulationStore = create<SimulationState>((set, get) => ({
   incomeChange: 0,
   expenseChange: 0,
   savingsRate: 25,
+  simulationMonths: 12,
   scenarios: [],
   activeScenario: null,
-  results: null,
+  customEventQuery: '',
+  aiResponse: null,
+  isLoadingAI: false,
+  newsInsights: [],
+  isLoadingNews: false,
+  simulationResult: null,
   isSimulating: false,
 
   setIncomeChange: (value) => {
     set({ incomeChange: value });
-    get().runSimulation();
   },
 
   setExpenseChange: (value) => {
     set({ expenseChange: value });
-    get().runSimulation();
   },
 
   setSavingsRate: (value) => {
     set({ savingsRate: value });
-    get().runSimulation();
+  },
+
+  setSimulationMonths: (value) => {
+    set({ simulationMonths: value });
+  },
+
+  setCustomEventQuery: (query) => {
+    set({ customEventQuery: query });
   },
 
   resetSimulation: () => {
@@ -117,27 +104,76 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       incomeChange: 0,
       expenseChange: 0,
       savingsRate: 25,
+      simulationMonths: 12,
       isSimulating: false,
+      aiResponse: null,
+      simulationResult: null,
+      customEventQuery: '',
     });
-    get().runSimulation();
   },
 
   toggleSimulation: () => {
     set((state) => ({ isSimulating: !state.isSimulating }));
   },
 
-  runSimulation: () => {
-    const { incomeChange, expenseChange, savingsRate } = get();
-    
-    const results = simulateCashflow(
-      9500,  // base income
-      6400,  // base expenses
-      incomeChange,
-      expenseChange,
-      savingsRate
-    );
-    
-    set({ results });
+  runSimulation: async () => {
+    const { incomeChange, expenseChange, savingsRate, customEventQuery, simulationMonths } = get();
+    set({ isSimulating: true, isLoadingAI: customEventQuery ? true : false });
+
+    try {
+      const response = await fetch('/api/simulate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          incomeChangePercent: incomeChange,
+          expenseChangePercent: expenseChange,
+          savingsRatePercent: savingsRate,
+          userQuery: customEventQuery || null,
+          months: simulationMonths,
+          includeNews: true,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        set({
+          simulationResult: data.simulation,
+          aiResponse: data.aiResponse,
+          isLoadingAI: false,
+          isSimulating: false, // Reset after completion
+        });
+      } else {
+        set({ isLoadingAI: false, isSimulating: false });
+      }
+    } catch (error) {
+      console.error('Simulation error:', error);
+      set({ isLoadingAI: false, isSimulating: false });
+    }
+  },
+
+  fetchNews: async () => {
+    set({ isLoadingNews: true });
+
+    try {
+      const response = await fetch('/api/news');
+      const data = await response.json();
+
+      if (data.success) {
+        set({ newsInsights: data.news, isLoadingNews: false });
+      }
+    } catch (error) {
+      console.error('News fetch error:', error);
+      set({ isLoadingNews: false });
+    }
+  },
+
+  askAI: async (query: string) => {
+    // Set the query and trigger a new simulation
+    set({ customEventQuery: query });
+
+    // Automatically run simulation with the AI query
+    await get().runSimulation();
   },
 
   addScenario: (scenario) =>
@@ -146,7 +182,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   setActiveScenario: (id) => set({ activeScenario: id }),
 }));
 
-// Initialize with default simulation
+// Initialize with news on first load
 if (typeof window !== "undefined") {
-  useSimulationStore.getState().runSimulation();
+  useSimulationStore.getState().fetchNews();
 }
+
