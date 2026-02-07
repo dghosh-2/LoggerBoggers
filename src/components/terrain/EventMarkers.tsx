@@ -52,7 +52,7 @@ export function EventMarkers({ terrainWidth = 20 }: EventMarkersProps) {
                     type: "expense",
                     position: [x, y, z],
                     amount: t.amount,
-                    label: t.merchant_name || t.name || t.category,
+                    label: t.merchant || t.category,
                     color: "#FF6B6B",
                 });
             });

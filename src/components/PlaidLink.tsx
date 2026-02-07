@@ -42,7 +42,10 @@ function PlaidLinkButtonInner({
             });
 
             if (!response.ok) {
-                throw new Error('Failed to exchange token');
+                // Parse error details from response
+                const errorData = await response.json();
+                console.error('Token exchange failed:', errorData);
+                throw new Error(errorData.error || 'Failed to exchange token');
             }
 
             // Invalidate all caches so fresh data is fetched
@@ -51,9 +54,10 @@ function PlaidLinkButtonInner({
 
             toast.success(`${metadata.institution?.name || 'Account'} connected successfully!`);
             onSuccess?.();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error exchanging token:', error);
-            toast.error('Failed to connect account. Please try again.');
+            const errorMessage = error.message || 'Failed to connect account. Please try again.';
+            toast.error(errorMessage);
         } finally {
             setLoading(false);
         }
