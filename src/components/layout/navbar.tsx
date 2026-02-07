@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect, useRef } from "react";
 import {
   LayoutDashboard,
   Sparkles,
@@ -11,9 +12,13 @@ import {
   Briefcase,
   User,
   LineChart,
+  LogOut,
+  ChevronDown,
+  UserCircle,
 } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
 import { useUIStore } from "@/stores/ui-store";
+import { useAuthStore } from "@/stores/auth-store";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -29,11 +34,44 @@ export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const { navbarHidden } = useUIStore();
+  const { user, logout, checkSession, isInitialized } = useAuthStore();
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Check session on mount
+  useEffect(() => {
+    if (!isInitialized) {
+      checkSession();
+    }
+  }, [checkSession, isInitialized]);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   if (navbarHidden) return null;
 
   const handleNavClick = (href: string) => {
     router.push(href);
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    setShowUserMenu(false);
+    router.push('/');
+  };
+
+  const handleSwitchAccount = () => {
+    setShowUserMenu(false);
+    logout();
+    router.push('/');
   };
 
   return (
@@ -84,13 +122,85 @@ export function Navbar() {
 
         {/* Bottom Section */}
         <div className="px-3 pb-3 space-y-0.5 border-t border-border pt-3 mt-auto">
-          <div className="flex items-center justify-between px-3 py-2">
-            <div className="flex items-center gap-2.5">
-              <div className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center">
-                <User className="w-3 h-3 text-foreground-muted" />
+          {/* User Menu */}
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-md hover:bg-secondary/60 transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
+                  {user ? (
+                    <span className="text-xs font-semibold text-primary">
+                      {user.displayName?.charAt(0).toUpperCase() || user.username?.charAt(0).toUpperCase()}
+                    </span>
+                  ) : (
+                    <User className="w-3.5 h-3.5 text-foreground-muted" />
+                  )}
+                </div>
+                <div className="text-left">
+                  <span className="text-[13px] font-medium block leading-tight">
+                    {user ? user.displayName || user.username : 'Guest'}
+                  </span>
+                  {user && (
+                    <span className="text-[10px] text-foreground-muted">@{user.username}</span>
+                  )}
+                </div>
               </div>
-              <span className="text-[13px] text-foreground-muted">Account</span>
-            </div>
+              <ChevronDown className={cn(
+                "w-3.5 h-3.5 text-foreground-muted transition-transform",
+                showUserMenu && "rotate-180"
+              )} />
+            </button>
+
+            {/* Dropdown Menu */}
+            <AnimatePresence>
+              {showUserMenu && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute bottom-full left-0 right-0 mb-1 bg-card border border-border rounded-lg shadow-lg overflow-hidden"
+                >
+                  {user ? (
+                    <>
+                      <div className="px-3 py-2 border-b border-border">
+                        <p className="text-[11px] text-foreground-muted">Signed in as</p>
+                        <p className="text-xs font-medium truncate">{user.displayName || user.username}</p>
+                      </div>
+                      <button
+                        onClick={handleSwitchAccount}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-foreground-muted hover:bg-secondary hover:text-foreground transition-colors cursor-pointer"
+                      >
+                        <UserCircle className="w-3.5 h-3.5" />
+                        Switch Account
+                      </button>
+                      <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        Sign Out
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => router.push('/')}
+                      className="w-full flex items-center gap-2 px-3 py-2.5 text-[12px] font-medium hover:bg-secondary transition-colors cursor-pointer"
+                    >
+                      <User className="w-3.5 h-3.5" />
+                      Sign In
+                    </button>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Theme Toggle */}
+          <div className="flex items-center justify-between px-3 py-1.5">
+            <span className="text-[11px] text-foreground-muted">Theme</span>
             <ThemeToggle />
           </div>
         </div>
