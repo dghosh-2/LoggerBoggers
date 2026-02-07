@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createReceiptAndTriggerOcr } from '@/lib/receiptPipeline';
+import { getUserIdFromRequest } from '@/lib/auth';
 
 export async function POST(req: Request) {
     try {
@@ -14,7 +15,12 @@ export async function POST(req: Request) {
             console.log('[timing] client upload timings', client_timings);
         }
 
-        const receiptId = await createReceiptAndTriggerOcr(image_url);
+        const userId = await getUserIdFromRequest(req);
+        if (!userId) {
+            return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+        }
+
+        const receiptId = await createReceiptAndTriggerOcr(image_url, userId);
 
         // Fire-and-forget: run Dedalus OCR -> chat extraction and store results.
         // Use absolute URL derived from this request (works in local dev and deployments).

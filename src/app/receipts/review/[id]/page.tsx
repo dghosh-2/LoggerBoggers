@@ -4,19 +4,59 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@repo/core';
 import { autoCropReceiptFile } from '@/lib/receiptAutoCrop';
-import styles from './page.module.css';
+import {
+    detectReceiptCorners,
+    flattenReceiptFromCorners,
+    type NormalizedQuad,
+    type NormalizedPoint,
+} from '@/lib/receiptAutoCrop';
+import { DogLoadingAnimation } from '@/components/ui/DogLoadingAnimation';
+import { PageTransition } from "@/components/layout/page-transition";
+import { GlassCard } from "@/components/ui/glass-card";
+import { GlassButton } from "@/components/ui/glass-button";
+import { refreshGlobalFinancialData } from "@/hooks/useFinancialData";
+import { cn } from "@/lib/utils";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+    ArrowLeft,
+    CheckCircle2,
+    AlertTriangle,
+    ZoomIn,
+    ZoomOut,
+    RotateCcw,
+    ChevronDown,
+    Loader2,
+    Plus,
+    Trash2,
+    Crop,
+    X,
+} from "lucide-react";
 
 interface BBox {
-    value: any;
+    value: unknown;
     bbox: [number, number, number, number];
     confidence: number;
 }
+
+type ReceiptCorrections = Partial<{
+    merchant: string;
+    address: string;
+    date: string;
+    total: number;
+    subtotal: number;
+    tax: number;
+}>;
 
 interface ReceiptState {
     id: string;
     image_original_path: string;
     status: string;
+    merchant_name?: string | null;
+    transaction_date?: string | null;
     total_amount?: number | null;
+    subtotal_amount?: number | null;
+    tax_amount?: number | null;
+    currency?: string | null;
     receipt_extractions: Array<{
         extracted_json: {
             raw_text?: string;
@@ -81,6 +121,135 @@ interface EditableItem {
 
 const CATEGORY_OPTIONS = ['Groceries', 'Dining', 'Transport', 'Household', 'Health', 'Tech', 'Other'];
 
+type BboxTransformMode = 'none' | 'flipY' | 'rotate180' | 'rotate90cw' | 'rotate90ccw';
+type BboxModeOverride = 'auto' | BboxTransformMode;
+
+type ReceiptLineItem = {
+    lineIndex: number;
+    name: string;
+    price: number; // line total
+    quantity: number | null;
+    unitPrice: number | null;
+    category: string | null;
+    bbox: [number, number, number, number] | null;
+};
+
+function getErrorMessage(error: unknown, fallback: string) {
+    if (error instanceof Error) return error.message;
+    if (typeof error === 'string') return error;
+    return fallback;
+}
+
+function parseBboxModeOverride(value: string): BboxModeOverride {
+    if (
+        value === 'auto'
+        || value === 'none'
+        || value === 'flipY'
+        || value === 'rotate180'
+        || value === 'rotate90cw'
+        || value === 'rotate90ccw'
+    ) {
+        return value;
+    }
+    return 'auto';
+}
+
+function orderNormalizedQuad(points: NormalizedPoint[]): NormalizedQuad {
+    const mapped = points.map((p) => ({ x: p.x, y: p.y }));
+    const sums = mapped.map((p) => p.x + p.y);
+    const diffs = mapped.map((p) => p.x - p.y);
+    const tl = mapped[sums.indexOf(Math.min(...sums))];
+    const br = mapped[sums.indexOf(Math.max(...sums))];
+    const tr = mapped[diffs.indexOf(Math.max(...diffs))];
+    const bl = mapped[diffs.indexOf(Math.min(...diffs))];
+    return [tl, tr, br, bl];
+}
+
+function clamp01(n: number) {
+    return Math.max(0, Math.min(1, n));
+}
+
+function SkeletonLine({ className }: { className?: string }) {
+    return (
+        <div
+            className={cn(
+                "h-3 w-full rounded bg-foreground/10 dark:bg-foreground/15",
+                "animate-pulse-soft",
+                className
+            )}
+        />
+    );
+}
+
+function Stepper({ active }: { active: 1 | 2 | 3 }) {
+    const steps: Array<{ label: string }> = [
+        { label: "Upload" },
+        { label: "Extract" },
+        { label: "Review" },
+    ];
+
+    return (
+        <div className="mt-4 rounded-lg border border-border bg-background-secondary px-3 py-2">
+            <div className="flex items-center justify-between gap-3">
+                {steps.map((s, idx) => {
+                    const step = (idx + 1) as 1 | 2 | 3;
+                    const isActive = step === active;
+                    const isDone = step < active;
+                    return (
+                        <div key={s.label} className="flex items-center gap-2 min-w-0">
+                            <div
+                                className={cn(
+                                    "h-6 w-6 rounded-full border flex items-center justify-center text-[11px] font-semibold",
+                                    isDone && "border-success/30 bg-success-soft text-success",
+                                    isActive && "border-accent/30 bg-accent/10 text-foreground",
+                                    !isDone && !isActive && "border-border bg-background text-foreground-muted"
+                                )}
+                            >
+                                {isDone ? <CheckCircle2 className="h-4 w-4" /> : step}
+                            </div>
+                            <div className="min-w-0">
+                                <div
+                                    className={cn(
+                                        "text-[11px] font-semibold uppercase tracking-wide",
+                                        isActive ? "text-foreground" : "text-foreground-muted"
+                                    )}
+                                >
+                                    {s.label}
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
+function AnimatedNumber({
+    valueKey,
+    children,
+    className,
+}: {
+    valueKey: string | number;
+    children: React.ReactNode;
+    className?: string;
+}) {
+    return (
+        <AnimatePresence mode="popLayout" initial={false}>
+            <motion.span
+                key={String(valueKey)}
+                initial={{ opacity: 0, y: 4, scale: 0.985 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -4, scale: 0.99 }}
+                transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+                className={className}
+            >
+                {children}
+            </motion.span>
+        </AnimatePresence>
+    );
+}
+
 export default function ReceiptReviewPage() {
     const { id } = useParams();
     const receiptId = Array.isArray(id) ? id[0] : id;
@@ -91,16 +260,14 @@ export default function ReceiptReviewPage() {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [confirmError, setConfirmError] = useState<string | null>(null);
-    const [isLiveUpdating, setIsLiveUpdating] = useState(false);
-    const [corrections, setCorrections] = useState<any>({});
+    const [corrections, setCorrections] = useState<ReceiptCorrections>({});
     const [loadingStage, setLoadingStage] = useState<'active' | 'exiting' | 'hidden'>('active');
     const [displayImagePath, setDisplayImagePath] = useState<string | null>(null);
     const [editableItems, setEditableItems] = useState<EditableItem[]>([]);
     const [hasManualItemEdits, setHasManualItemEdits] = useState(false);
     const [activeItemEdit, setActiveItemEdit] = useState<number | null>(null);
     const [hoveredItemIndex, setHoveredItemIndex] = useState<number | null>(null);
-    const [bboxModeOverride, setBboxModeOverride] = useState<'auto' | 'none' | 'flipY' | 'rotate180' | 'rotate90cw' | 'rotate90ccw'>('auto');
-    const [totalsFlashKey, setTotalsFlashKey] = useState(0);
+    const [bboxModeOverride, setBboxModeOverride] = useState<BboxModeOverride>('auto');
     const [lineFlashKeys, setLineFlashKeys] = useState<Record<number, number>>({});
     const [debugRerunStatus, setDebugRerunStatus] = useState<string | null>(null);
     const [showConfirmSuccess, setShowConfirmSuccess] = useState(false);
@@ -113,20 +280,22 @@ export default function ReceiptReviewPage() {
     } | null>(null);
     const firstResultsRenderedRef = useRef(false);
     const pageLoadStartedAtRef = useRef<number>(Date.now());
-    const totalsSnapshotRef = useRef<{
-        itemSubtotal: number;
-        lineTax: number;
-        lineDiscount: number;
-        lineTip: number;
-        lineFees: number;
-        finalTotalValue: number;
-    } | null>(null);
 
     const receiptStageRef = useRef<HTMLDivElement | null>(null);
     const receiptWrapRef = useRef<HTMLDivElement | null>(null);
     const receiptImgRef = useRef<HTMLImageElement | null>(null);
     const baseReceiptSizeRef = useRef<{ w: number; h: number } | null>(null);
     const panStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
+
+    const [cropOpen, setCropOpen] = useState(false);
+    const [cropBusy, setCropBusy] = useState(false);
+    const [cropError, setCropError] = useState<string | null>(null);
+    const [cropSourceFile, setCropSourceFile] = useState<File | null>(null);
+    const [cropPreviewUrl, setCropPreviewUrl] = useState<string | null>(null);
+    const [cropQuad, setCropQuad] = useState<NormalizedQuad | null>(null);
+    const cropViewportRef = useRef<HTMLDivElement | null>(null);
+    const [cropDragIndex, setCropDragIndex] = useState<number | null>(null);
+    const [disableBboxOverlay, setDisableBboxOverlay] = useState(false);
 
     const [zoom, setZoom] = useState(1);
     const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -141,6 +310,12 @@ export default function ReceiptReviewPage() {
     useEffect(() => {
         panRef.current = pan;
     }, [pan]);
+
+    useEffect(() => {
+        return () => {
+            if (cropPreviewUrl) URL.revokeObjectURL(cropPreviewUrl);
+        };
+    }, [cropPreviewUrl]);
 
     const clampPan = useCallback((next: { x: number; y: number }, z: number) => {
         const stage = receiptStageRef.current;
@@ -213,7 +388,7 @@ export default function ReceiptReviewPage() {
 
         stage.addEventListener('wheel', onWheel, { passive: false });
         return () => {
-            stage.removeEventListener('wheel', onWheel as any);
+            stage.removeEventListener('wheel', onWheel);
         };
     }, [clampPan, displayImagePath, data?.image_original_path, loading]);
 
@@ -222,26 +397,26 @@ export default function ReceiptReviewPage() {
 
         try {
             const res = await fetch(`/api/receipts/${receiptId}`);
-            const json = await res.json();
-            if (json.error) throw new Error(json.error);
-            setData(json);
+            const json = (await res.json()) as ReceiptState | { error?: string };
+            if ("error" in json && json.error) throw new Error(json.error);
+            setData(json as ReceiptState);
             setError(null);
 
-            const ext = json.receipt_extractions?.[0]?.extracted_json?.extractions;
+            const ext = (json as ReceiptState).receipt_extractions?.[0]?.extracted_json?.extractions;
             if (ext) {
-                setCorrections((prev: any) => {
+                setCorrections((prev) => {
                     if (Object.keys(prev || {}).length > 0) return prev;
                     return {
-                        merchant: ext.merchant?.value,
-                        date: ext.date?.value,
-                        total: ext.total?.value,
-                        subtotal: ext.subtotal?.value,
-                        tax: ext.tax?.value,
+                        merchant: typeof ext.merchant?.value === 'string' ? ext.merchant.value : undefined,
+                        date: typeof ext.date?.value === 'string' ? ext.date.value : undefined,
+                        total: typeof ext.total?.value === 'number' ? ext.total.value : undefined,
+                        subtotal: typeof ext.subtotal?.value === 'number' ? ext.subtotal.value : undefined,
+                        tax: typeof ext.tax?.value === 'number' ? ext.tax.value : undefined,
                     };
                 });
             }
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError(getErrorMessage(err, 'Failed to fetch receipt'));
         } finally {
             setLoading(false);
         }
@@ -258,14 +433,13 @@ export default function ReceiptReviewPage() {
         setHoveredItemIndex(null);
         setZoom(1);
         setPan({ x: 0, y: 0 });
-        setTotalsFlashKey(0);
         setLineFlashKeys({});
         fetchReceiptData();
     }, [receiptId, fetchReceiptData]);
 
     const hasAnyItemBbox = useMemo(() => {
         const persisted = (data?.receipt_items ?? []).some((it) => Array.isArray(it?.bbox) && it.bbox.length === 4);
-        const extracted = (data?.receipt_extractions?.[0]?.extracted_json?.items ?? []).some((it: any) => Array.isArray(it?.bbox) && it.bbox.length === 4);
+        const extracted = (data?.receipt_extractions?.[0]?.extracted_json?.items ?? []).some((it) => Array.isArray(it?.bbox) && it.bbox.length === 4);
         return persisted || extracted;
     }, [data]);
 
@@ -291,16 +465,12 @@ export default function ReceiptReviewPage() {
                 () => fetchReceiptData(),
             )
             .subscribe((status) => {
-                setIsLiveUpdating(status === 'SUBSCRIBED');
                 // Close race where OCR finishes between initial fetch and channel readiness.
-                if (status === 'SUBSCRIBED') {
-                    fetchReceiptData();
-                }
+                if (status === 'SUBSCRIBED') fetchReceiptData();
             });
 
         return () => {
             supabase.removeChannel(channel);
-            setIsLiveUpdating(false);
         };
     }, [receiptId, fetchReceiptData]);
 
@@ -351,6 +521,75 @@ export default function ReceiptReviewPage() {
         };
     }, [data?.image_original_path, hasAnyItemBbox]);
 
+    const openCropper = useCallback(async () => {
+        const sourceUrl = data?.image_original_path;
+        if (!sourceUrl) return;
+
+        setCropOpen(true);
+        setCropBusy(true);
+        setCropError(null);
+
+        try {
+            const res = await fetch(sourceUrl);
+            if (!res.ok) throw new Error(`Failed to load image (${res.status})`);
+            const blob = await res.blob();
+            if (!blob.type.startsWith('image/')) throw new Error('Source is not an image');
+
+            const file = new File([blob], 'receipt-source', { type: blob.type, lastModified: Date.now() });
+            setCropSourceFile(file);
+
+            const preview = URL.createObjectURL(file);
+            setCropPreviewUrl((prev) => {
+                if (prev) URL.revokeObjectURL(prev);
+                return preview;
+            });
+
+            const corners = await detectReceiptCorners(file);
+            const fallback: NormalizedQuad = [
+                { x: 0.06, y: 0.06 },
+                { x: 0.94, y: 0.06 },
+                { x: 0.94, y: 0.94 },
+                { x: 0.06, y: 0.94 },
+            ];
+            setCropQuad(corners ?? fallback);
+        } catch (e: unknown) {
+            setCropError(getErrorMessage(e, 'Could not open cropper'));
+        } finally {
+            setCropBusy(false);
+        }
+    }, [data?.image_original_path]);
+
+    const applyCrop = useCallback(async () => {
+        if (!cropSourceFile || !cropQuad) return;
+        setCropBusy(true);
+        setCropError(null);
+        try {
+            const flattened = await flattenReceiptFromCorners(cropSourceFile, cropQuad);
+            if (!flattened) throw new Error('Could not crop with selected corners');
+            const url = URL.createObjectURL(flattened);
+            setDisplayImagePath((prev) => {
+                // Avoid revoking server URLs; only revoke object URLs we created.
+                if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev);
+                return url;
+            });
+            if (hasAnyItemBbox) setDisableBboxOverlay(true);
+            setCropOpen(false);
+        } catch (e: unknown) {
+            setCropError(getErrorMessage(e, 'Crop failed'));
+        } finally {
+            setCropBusy(false);
+        }
+    }, [cropSourceFile, cropQuad, hasAnyItemBbox]);
+
+    useEffect(() => {
+        if (!cropOpen) return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setCropOpen(false);
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [cropOpen]);
+
     useEffect(() => {
         const img = receiptImgRef.current;
         if (!img) return;
@@ -386,10 +625,21 @@ export default function ReceiptReviewPage() {
 
         setSubmitting(true);
         try {
+            const correctedForSubmit = {
+                ...corrections,
+                // Ensure totals reflect any manual edits before persisting.
+                total: Number(finalTotalValue || 0),
+                subtotal: Number(lineSubtotal || 0),
+                tax: Number(lineTax || 0),
+            };
+
             const res = await fetch(`/api/receipts/${receiptId}/confirm`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ corrected_json: corrections }),
+                body: JSON.stringify({
+                    corrected_json: correctedForSubmit,
+                    items: editableItems,
+                }),
             });
 
             if (!res.ok) {
@@ -422,11 +672,12 @@ export default function ReceiptReviewPage() {
                 categoryTotals,
             });
             setShowConfirmSuccess(true);
+            void refreshGlobalFinancialData();
             setSubmitting(false);
 
             // Stay on the success popup until the user chooses an action.
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError(getErrorMessage(err, 'Failed to confirm receipt'));
             setSubmitting(false);
         }
     };
@@ -444,29 +695,53 @@ export default function ReceiptReviewPage() {
     const showFailureNotice = statusIsFailed && !extractionReady && !hasItems;
     const receiptDisplaySrc = displayImagePath || data?.image_original_path || '';
     const extractions = data?.receipt_extractions?.[0]?.extracted_json?.extractions;
-    const extractedItems = useMemo(() => {
+    const extractedItems = useMemo<ReceiptLineItem[]>(() => {
         if (!data) return [];
-        return data.receipt_items?.length
-            ? data.receipt_items.map((item) => ({
+
+        // If we have persisted receipt_items but missing bbox for some rows, try to fill it from
+        // the latest extraction payload (which often has better geometry).
+        const extractionItems = data.receipt_extractions?.[0]?.extracted_json?.items ?? [];
+        const bboxByLineIndex = new Map<number, [number, number, number, number] | null>();
+        for (let i = 0; i < extractionItems.length; i += 1) {
+            const it = extractionItems[i];
+            const idxRaw = (it as unknown as { line_index?: number; lineIndex?: number })?.line_index
+                ?? (it as unknown as { lineIndex?: number })?.lineIndex
+                ?? i;
+            const idx = Number(idxRaw);
+            if (!Number.isFinite(idx)) continue;
+            const bbox = (it as unknown as { bbox?: unknown })?.bbox ?? null;
+            if (Array.isArray(bbox) && bbox.length === 4) {
+                const [x0, y0, x1, y1] = bbox.map((n) => Number(n));
+                const normalized: [number, number, number, number] = [x0, y0, x1, y1];
+                bboxByLineIndex.set(idx, normalized.every((n) => Number.isFinite(n)) ? normalized : null);
+            } else {
+                bboxByLineIndex.set(idx, null);
+            }
+        }
+
+        if (data.receipt_items?.length) {
+            return data.receipt_items.map((item) => ({
                 lineIndex: item.line_index,
                 name: item.item_name,
                 price: Number(item.item_amount || 0),
                 quantity: item.quantity != null ? Number(item.quantity) : null,
                 unitPrice: item.unit_price != null ? Number(item.unit_price) : null,
                 category: item.item_category,
-                bbox: item.bbox ?? null,
-            }))
-            : (data.receipt_extractions?.[0]?.extracted_json?.items || []).map((item: any, index: number) => ({
-                lineIndex: index,
-                name: item.name,
-                price: Number(item.price || 0),
-                quantity: item.quantity != null ? Number(item.quantity) : null,
-                unitPrice: item.unit_price != null
-                    ? Number(item.unit_price)
-                    : (item.unitPrice != null ? Number(item.unitPrice) : null),
-                category: item.category_prediction ?? null,
-                bbox: item.bbox ?? null,
+                bbox: item.bbox ?? (bboxByLineIndex.get(item.line_index) ?? null),
             }));
+        }
+
+        return extractionItems.map((item, index) => ({
+            lineIndex: index,
+            name: item.name,
+            price: Number(item.price || 0),
+            quantity: item.quantity != null ? Number(item.quantity) : null,
+            unitPrice: item.unit_price != null
+                ? Number(item.unit_price)
+                : (item.unitPrice != null ? Number(item.unitPrice) : null),
+            category: item.category_prediction ?? null,
+            bbox: item.bbox ?? null,
+        }));
     }, [data]);
 
     useEffect(() => {
@@ -491,7 +766,7 @@ export default function ReceiptReviewPage() {
         if (!data) return;
         if (hasManualItemEdits) return;
 
-        const normalizedItems: EditableItem[] = extractedItems.map((item: any, index: number) => {
+        const normalizedItems: EditableItem[] = extractedItems.map((item, index) => {
             const derivedQuantity = Number(item.quantity ?? 1);
             const normalizedQuantity = Number.isFinite(derivedQuantity) && derivedQuantity > 0 ? derivedQuantity : 1;
             const lineTotal = Number(item.price ?? 0);
@@ -528,104 +803,115 @@ export default function ReceiptReviewPage() {
         });
     }, [showOcrLoading, receiptId]);
 
-    useEffect(() => {
-        if (!data) return;
-
-        const extractedBreakdown = data.receipt_extractions?.[0]?.extracted_json?.amount_breakdown || null;
-        const persistedBreakdown = data.receipt_amount_breakdowns?.[0] || null;
-        const tax = Number(persistedBreakdown?.tax ?? extractedBreakdown?.tax ?? extractions?.tax?.value ?? 0);
-        const discount = Number(persistedBreakdown?.discount ?? extractedBreakdown?.discount ?? 0);
-        const tip = Number(persistedBreakdown?.tip ?? extractedBreakdown?.tip ?? 0);
-        const fees = Number(persistedBreakdown?.fees ?? extractedBreakdown?.fees ?? 0);
-        const subtotal = editableItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.unitPrice || 0)), 0);
-        const computedFinal = subtotal + tax + tip + fees - discount;
-        const extractedTotal = Number(corrections?.total ?? extractions?.total?.value ?? data.total_amount ?? 0);
-        const hasExplicitFinalTotal =
-            corrections?.total !== undefined
-            || extractions?.total?.value !== undefined
-            || data.total_amount !== undefined;
-        const finalTotal = hasManualItemEdits ? computedFinal : (hasExplicitFinalTotal ? extractedTotal : computedFinal);
-
-        const snapshot = {
-            itemSubtotal: subtotal,
-            lineTax: tax,
-            lineDiscount: discount,
-            lineTip: tip,
-            lineFees: fees,
-            finalTotalValue: finalTotal,
-        };
-
-        if (!totalsSnapshotRef.current) {
-            totalsSnapshotRef.current = snapshot;
-            return;
-        }
-
-        const prev = totalsSnapshotRef.current;
-        const changed = (
-            prev.itemSubtotal !== snapshot.itemSubtotal
-            || prev.lineTax !== snapshot.lineTax
-            || prev.lineDiscount !== snapshot.lineDiscount
-            || prev.lineTip !== snapshot.lineTip
-            || prev.lineFees !== snapshot.lineFees
-            || prev.finalTotalValue !== snapshot.finalTotalValue
-        );
-
-        if (changed && hasManualItemEdits) {
-            setTotalsFlashKey((k) => k + 1);
-        }
-
-        totalsSnapshotRef.current = snapshot;
-    }, [data, editableItems, hasManualItemEdits, corrections, extractions]);
+    const loadingHeading = waitingForResult ? "Extracting your receipt…" : "Loading receipt…";
+    const loadingSubheading = waitingForResult
+        ? "Waiting for extraction updates. This page will update automatically."
+        : "Fetching receipt data and preparing the review screen.";
 
     const loadingScreen = (
         <div
-            className={`${styles.loadingLayer} ${showOcrLoading ? styles.loadingLayerActive : styles.loadingLayerExit}`}
+            className={cn(
+                "fixed inset-0 z-50 flex items-center justify-center p-6 transition-opacity duration-500",
+                "bg-background/70 backdrop-blur-sm",
+                showOcrLoading ? "opacity-100" : "opacity-0 pointer-events-none"
+            )}
             aria-hidden={!showLoadingLayer}
         >
-            <div className={styles.loading}>
-                <div className={styles.loadingShell}>
-                    <div className={styles.gridBackdrop} aria-hidden="true" />
-                    <div className={styles.receiptScanner}>
-                        <div className={styles.receiptPaper}>
-                            {data?.image_original_path ? (
-                                <img
-                                    src={receiptDisplaySrc}
-                                    alt="Receipt being scanned"
-                                    className={styles.scanReceiptImage}
-                                />
-                            ) : (
-                                <div className={styles.receiptPaperMock}>
-                                    <div className={styles.receiptMetaRow}>
-                                        <span />
-                                        <span />
-                                        <span />
-                                    </div>
-                                    <div className={styles.receiptLine} />
-                                    <div className={styles.receiptLine} />
-                                    <div className={styles.receiptLine} />
-                                    <div className={styles.receiptLine} />
-                                    <div className={styles.receiptLine} />
-                                    <div className={styles.receiptLineShort} />
-                                </div>
-                            )}
-                            <div className={styles.scanBeam} />
-                            <div className={styles.scanGlow} />
-                            <div className={styles.scanFrame} />
+            <div className="w-full max-w-xl">
+                <div className="card-elevated p-6 animate-slide-up">
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <h2 className="text-base font-semibold tracking-tight">{loadingHeading}</h2>
+                            <p className="text-sm text-foreground-muted mt-1">{loadingSubheading}</p>
+                        </div>
+                        <div className="text-[11px] text-foreground-muted whitespace-nowrap">
+                            {data?.status ? `Status: ${data.status}` : "Status: starting"}
                         </div>
                     </div>
-                    <div className={styles.loadingText}>
-                        <h2>Scanning receipt for OCR summary</h2>
-                        <p>Parsing lines, totals, and structured fields. This updates automatically when extraction is ready.</p>
+
+                    <Stepper active={waitingForResult || loading ? 2 : 3} />
+
+                    {receiptDisplaySrc ? (
+                        <div className="mt-4 rounded-lg border border-border bg-background-secondary p-2">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                                src={receiptDisplaySrc}
+                                alt="Receipt preview"
+                                className="w-full max-h-64 object-contain rounded-md bg-background"
+                            />
+                        </div>
+                    ) : null}
+
+                    <div className="mt-5">
+                        <DogLoadingAnimation size="md" showMessage={false} className="opacity-90" />
+                        <div className="mt-3 flex items-center justify-between text-[11px] text-foreground-muted">
+                            <span className="animate-pulse-soft">Working…</span>
+                            <span>Keep this tab open</span>
+                        </div>
+                    </div>
+
+                    <div className="mt-5 rounded-lg border border-border bg-background-secondary p-3">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted">
+                            Preparing items
+                        </div>
+                        <div className="mt-3 space-y-2">
+                            <SkeletonLine className="w-2/3" />
+                            <SkeletonLine className="w-5/6" />
+                            <SkeletonLine className="w-3/5" />
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     );
 
-    if (error) return <div className={styles.error}>Error: {error}</div>;
+    if (error) {
+        return (
+            <PageTransition>
+                <div className="space-y-4">
+                    <div>
+                        <h1 className="text-2xl font-semibold tracking-tight">Receipt Review</h1>
+                        <p className="text-foreground-muted text-sm mt-1">Something went wrong loading this receipt.</p>
+                    </div>
+                    <GlassCard className="p-5">
+                        <div className="flex items-start gap-3">
+                            <AlertTriangle className="w-4 h-4 text-destructive mt-0.5" />
+                            <div>
+                                <div className="text-sm font-semibold">Error</div>
+                                <div className="text-sm text-foreground-muted mt-1">{error}</div>
+                                <div className="mt-4 flex gap-2">
+                                    <GlassButton variant="secondary" onClick={() => router.back()}>
+                                        <ArrowLeft className="w-4 h-4" />
+                                        Back
+                                    </GlassButton>
+                                    <GlassButton variant="primary" onClick={() => window.location.reload()}>
+                                        Reload
+                                    </GlassButton>
+                                </div>
+                            </div>
+                        </div>
+                    </GlassCard>
+                </div>
+            </PageTransition>
+        );
+    }
+
     if (!data) {
         if (showLoadingLayer) return loadingScreen;
-        return <div>No data found.</div>;
+        return (
+            <PageTransition>
+                <div className="space-y-4">
+                    <div>
+                        <h1 className="text-2xl font-semibold tracking-tight">Receipt Review</h1>
+                        <p className="text-foreground-muted text-sm mt-1">No receipt data found.</p>
+                    </div>
+                    <GlassButton variant="secondary" onClick={() => router.push("/receipts")}>
+                        <ArrowLeft className="w-4 h-4" />
+                        Back to Receipts
+                    </GlassButton>
+                </div>
+            </PageTransition>
+        );
     }
 
     const extractedBreakdown = data.receipt_extractions?.[0]?.extracted_json?.amount_breakdown || null;
@@ -637,7 +923,6 @@ export default function ReceiptReviewPage() {
         tip: persistedBreakdown?.tip ?? extractedBreakdown?.tip ?? null,
         fees: persistedBreakdown?.fees ?? extractedBreakdown?.fees ?? null,
     };
-    const ocrSummary = data.receipt_extractions?.[0]?.extracted_json?.summary || '';
     const rawText = data.receipt_extractions?.[0]?.extracted_json?.raw_text || '';
 
     const extractedTotal = Number(corrections?.total ?? extractions?.total?.value ?? data.total_amount ?? 0);
@@ -729,15 +1014,43 @@ export default function ReceiptReviewPage() {
         setLineFlashKeys((prev) => ({ ...prev, [index]: (prev[index] ?? 0) + 1 }));
     };
 
+    const removeItem = (index: number) => {
+        setHasManualItemEdits(true);
+        setConfirmError(null);
+        setEditableItems((prev) => prev.filter((_, i) => i !== index));
+        setActiveItemEdit(null);
+        setHoveredItemIndex(null);
+    };
+
+    const addItem = () => {
+        setHasManualItemEdits(true);
+        setConfirmError(null);
+        setEditableItems((prev) => {
+            const newIndex = prev.length;
+            const nextLineIndex = (prev.reduce((m, it) => Math.max(m, Number(it?.lineIndex ?? -1)), -1) + 1) || 0;
+            const next: EditableItem = {
+                lineIndex: nextLineIndex,
+                name: "New item",
+                quantity: 1,
+                unitPrice: 0,
+                unitPriceInput: "0.00",
+                category: "Other",
+                bbox: null,
+            };
+            // Select the new row immediately.
+            setActiveItemEdit(newIndex);
+            return [...prev, next];
+        });
+        setHoveredItemIndex(null);
+    };
+
     const debugMode =
         typeof window !== 'undefined'
         && new URLSearchParams(window.location.search).has('debug');
 
     const bboxTransform = (() => {
-        type Mode = 'none' | 'flipY' | 'rotate180' | 'rotate90cw' | 'rotate90ccw';
-
         const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
-        const transformPoint = (x: number, y: number, mode: Mode) => {
+        const transformPoint = (x: number, y: number, mode: BboxTransformMode) => {
             switch (mode) {
                 case 'flipY':
                     return { x, y: 1 - y };
@@ -755,7 +1068,7 @@ export default function ReceiptReviewPage() {
             }
         };
 
-        const transformBbox = (bbox: [number, number, number, number], mode: Mode): [number, number, number, number] | null => {
+        const transformBbox = (bbox: [number, number, number, number], mode: BboxTransformMode): [number, number, number, number] | null => {
             const [x0, y0, x1, y1] = bbox;
             const corners = [
                 transformPoint(x0, y0, mode),
@@ -773,7 +1086,7 @@ export default function ReceiptReviewPage() {
             return [nx0, ny0, nx1, ny1];
         };
 
-        const corrForMode = (mode: Mode) => {
+        const corrForMode = (mode: BboxTransformMode) => {
             const pts: Array<{ idx: number; y: number }> = [];
             for (let i = 0; i < (editableItems?.length ?? 0); i += 1) {
                 const bboxAny = editableItems?.[i]?.bbox ?? null;
@@ -803,8 +1116,8 @@ export default function ReceiptReviewPage() {
             return num / denom;
         };
 
-        const modes: Mode[] = ['none', 'flipY', 'rotate180', 'rotate90cw', 'rotate90ccw'];
-        let best: Mode = 'none';
+        const modes: BboxTransformMode[] = ['none', 'flipY', 'rotate180', 'rotate90cw', 'rotate90ccw'];
+        let best: BboxTransformMode = 'none';
         let bestCorr = -Infinity;
         for (const m of modes) {
             const c = corrForMode(m);
@@ -826,8 +1139,8 @@ export default function ReceiptReviewPage() {
         if (![x0, y0, x1, y1].every((n) => Number.isFinite(n))) return null;
         if (x0 < 0 || y0 < 0 || x1 > 1 || y1 > 1) return null;
         if (x0 >= x1 || y0 >= y1) return null;
-        const modeUsed = bboxModeOverride === 'auto' ? bboxTransform.mode : bboxModeOverride;
-        const transformed = bboxTransform.transformBbox([x0, y0, x1, y1], modeUsed as any);
+        const modeUsed: BboxTransformMode = bboxModeOverride === 'auto' ? bboxTransform.mode : bboxModeOverride;
+        const transformed = bboxTransform.transformBbox([x0, y0, x1, y1], modeUsed);
         return transformed ?? [x0, y0, x1, y1];
     })();
 
@@ -843,475 +1156,789 @@ export default function ReceiptReviewPage() {
     })();
 
     return (
-        <div className={styles.transitionRoot}>
-            <div className={`${styles.summaryRoot} ${showOcrLoading ? styles.summaryRootEntering : styles.summaryRootVisible}`}>
-                <div className={styles.container}>
-                    <header className={styles.header}>
-                        <button onClick={() => router.back()} className={styles.backBtn}>Back</button>
-                        <h1>Receipt Review</h1>
-                        <div className={styles.statusBadge} data-status={data.status}>{data.status}</div>
-                    </header>
+        <PageTransition>
+            {/* Layout contract: keep everything within the viewport, no page-level scroll.
+               Scroll is allowed only inside the Items list. */}
+            <div className="flex flex-col min-h-0 h-[calc(100svh-170px)] md:h-[calc(100svh-120px)]">
+                <div className="shrink-0">
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <div className="flex items-center gap-2">
+                            <GlassButton variant="secondary" size="sm" onClick={() => router.back()}>
+                                <ArrowLeft className="w-4 h-4" />
+                                Back
+                            </GlassButton>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-                    <div className={styles.mainLayout}>
-                        <div className={styles.imageContainer}>
-                            <div className={styles.receiptStage}>
+                <div className="mt-4 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_520px] gap-4 items-stretch flex-1 min-h-0 overflow-hidden">
+                    <div className="flex flex-col min-h-0 gap-4">
+                        <GlassCard className="p-4 shrink-0" delay={0}>
+                            <div className="flex items-stretch justify-between gap-4">
+                                <div className="min-w-0">
+                                    <div className="text-[11px] text-foreground-muted uppercase tracking-wide">
+                                        Receipt Review
+                                    </div>
+                                    <div className="mt-1 text-base font-semibold leading-tight break-words">
+                                        {merchantName}
+                                    </div>
+                                    {addressLinesForDisplay.length > 0 ? (
+                                        <div className="mt-1 text-[12px] text-foreground-muted leading-snug break-words">
+                                            {addressLinesForDisplay.map((line, idx) => (
+                                                <div key={`${line}-${idx}`}>{line}</div>
+                                            ))}
+                                        </div>
+                                    ) : null}
+                                </div>
+
+                                <div className="flex items-stretch gap-2 shrink-0">
+                                    <div className="min-w-[110px] rounded-lg border border-border bg-background-secondary px-3 py-2 flex flex-col justify-between">
+                                        <div className="text-[10px] text-foreground-muted uppercase tracking-wide">Items</div>
+                                        <div className="text-xl font-semibold leading-tight tabular-nums">
+                                            <AnimatedNumber valueKey={items.length}>{items.length}</AnimatedNumber>
+                                        </div>
+                                    </div>
+                                    <div className="min-w-[140px] rounded-lg border border-border bg-background-secondary px-3 py-2 flex flex-col justify-between">
+                                        <div className="text-[10px] text-foreground-muted uppercase tracking-wide">Grand Total</div>
+                                        <div className="text-xl font-semibold leading-tight tabular-nums">
+                                            <AnimatedNumber valueKey={Math.round(Number(finalTotalValue || 0) * 100)}>
+                                                {money(finalTotalValue)}
+                                            </AnimatedNumber>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </GlassCard>
+
+                        {/* Fill remaining column height so the LHS bottom aligns with the RHS bottom. */}
+                        <GlassCard className="p-4 overflow-hidden flex flex-col min-h-0 flex-1" delay={80}>
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="text-sm font-semibold">Receipt</div>
+                                <div className="text-[11px] text-foreground-muted">
+                                    Zoom: {Math.round(zoom * 100)}%{isPanning ? " (panning)" : ""}
+                                </div>
+                            </div>
+
+                            <div
+                                ref={receiptStageRef}
+                                className={cn(
+                                    "relative mt-3 rounded-lg border border-border bg-background-secondary",
+                                    // Fill remaining column height; keeps LHS/RHS aligned vertically.
+                                    "flex-1 min-h-0 overflow-hidden flex items-center justify-center",
+                                    isPanning ? "cursor-grabbing" : "cursor-grab"
+                                )}
+                                onPointerDown={(e) => {
+                                    if (e.button !== 0) return;
+                                    const target = e.target as HTMLElement | null;
+                                    if (target?.closest?.("[data-zoom-controls]")) return;
+                                    const stage = receiptStageRef.current;
+                                    if (!stage) return;
+                                    e.preventDefault();
+                                    stage.setPointerCapture?.(e.pointerId);
+                                    setIsPanning(true);
+                                    panStartRef.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
+                                }}
+                                onPointerMove={(e) => {
+                                    if (!panStartRef.current) return;
+                                    const start = panStartRef.current;
+                                    e.preventDefault();
+                                    const next = {
+                                        x: start.panX + (e.clientX - start.x),
+                                        y: start.panY + (e.clientY - start.y),
+                                    };
+                                    setPan(clampPan(next, zoom));
+                                }}
+                                onPointerUp={(e) => {
+                                    if (!panStartRef.current) return;
+                                    const stage = receiptStageRef.current;
+                                    e.preventDefault();
+                                    stage?.releasePointerCapture?.(e.pointerId);
+                                    setIsPanning(false);
+                                    panStartRef.current = null;
+                                }}
+                                onPointerCancel={() => {
+                                    setIsPanning(false);
+                                    panStartRef.current = null;
+                                }}
+                            >
                                 <div
-                                    ref={receiptStageRef}
-                                    className={styles.receiptViewport}
-                                    onPointerDown={(e) => {
-                                        if (e.button !== 0) return;
-                                        const target = e.target as HTMLElement | null;
-                                        // Allow interactions with the zoom controls without starting a pan.
-                                        if (target?.closest?.(`.${styles.zoomControls}`)) return;
-                                        const stage = receiptStageRef.current;
-                                        if (!stage) return;
-                                        e.preventDefault();
-                                        stage.setPointerCapture?.(e.pointerId);
-                                        setIsPanning(true);
-                                        panStartRef.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
-                                    }}
-                                    onPointerMove={(e) => {
-                                        if (!panStartRef.current) return;
-                                        const start = panStartRef.current;
-                                        if (!start) return;
-                                        e.preventDefault();
-                                        const next = {
-                                            x: start.panX + (e.clientX - start.x),
-                                            y: start.panY + (e.clientY - start.y),
-                                        };
-                                        setPan(clampPan(next, zoom));
-                                    }}
-                                    onPointerUp={(e) => {
-                                        if (!panStartRef.current) return;
-                                        const stage = receiptStageRef.current;
-                                        e.preventDefault();
-                                        stage?.releasePointerCapture?.(e.pointerId);
-                                        setIsPanning(false);
-                                        panStartRef.current = null;
-                                    }}
-                                    onPointerCancel={() => {
-                                        setIsPanning(false);
-                                        panStartRef.current = null;
+                                    data-zoom-controls
+                                    className="absolute top-3 left-3 z-10 flex items-center gap-2 rounded-full border border-border bg-background/80 backdrop-blur px-2 py-1.5 shadow-sm"
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onPointerMove={(e) => e.stopPropagation()}
+                                    onPointerUp={(e) => e.stopPropagation()}
+                                    onWheel={(e) => e.stopPropagation()}
+                                >
+                                    <GlassButton
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={() => setZoomClamped(zoom - 0.2)}
+                                        aria-label="Zoom out"
+                                    >
+                                        <ZoomOut className="w-4 h-4" />
+                                    </GlassButton>
+                                    <GlassButton
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={() => setZoomClamped(zoom + 0.2)}
+                                        aria-label="Zoom in"
+                                    >
+                                        <ZoomIn className="w-4 h-4" />
+                                    </GlassButton>
+                                    <GlassButton
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                            setZoom(1);
+                                            setPan({ x: 0, y: 0 });
+                                        }}
+                                        aria-label="Reset zoom"
+                                    >
+                                        <RotateCcw className="w-4 h-4" />
+                                        Reset
+                                    </GlassButton>
+                                    <GlassButton
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={openCropper}
+                                        aria-label="Adjust crop"
+                                        title={hasAnyItemBbox ? "Cropping may disable highlights" : "Adjust crop"}
+                                    >
+                                        <Crop className="w-4 h-4" />
+                                        Crop
+                                    </GlassButton>
+                                </div>
+
+                                <div className="absolute inset-0 pointer-events-none">
+                                    <div
+                                        className="absolute inset-0"
+                                        style={{
+                                            background:
+                                                "radial-gradient(ellipse at 50% 35%, rgba(99,102,241,0.07), transparent 55%), radial-gradient(ellipse at 30% 80%, rgba(24,24,27,0.06), transparent 55%)",
+                                        }}
+                                    />
+                                    <div
+                                        className="absolute inset-0"
+                                        style={{
+                                            backgroundImage:
+                                                "linear-gradient(to right, rgba(0,0,0,0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.04) 1px, transparent 1px)",
+                                            backgroundSize: "36px 36px",
+                                            maskImage: "radial-gradient(circle at center, black 42%, transparent 78%)",
+                                            opacity: 0.35,
+                                        }}
+                                    />
+                                </div>
+
+                                <div
+                                    ref={receiptWrapRef}
+                                    className="relative"
+                                    style={{
+                                        transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
+                                        transformOrigin: "center center",
+                                        willChange: "transform",
                                     }}
                                 >
-                                    <div
-                                        className={styles.zoomControls}
-                                        onPointerDown={(e) => e.stopPropagation()}
-                                        onPointerMove={(e) => e.stopPropagation()}
-                                        onPointerUp={(e) => e.stopPropagation()}
-                                        onWheel={(e) => e.stopPropagation()}
-                                    >
-                                        <button type="button" onClick={() => setZoomClamped(zoom - 0.2)} aria-label="Zoom out">-</button>
-                                        <button type="button" onClick={() => setZoomClamped(zoom + 0.2)} aria-label="Zoom in">+</button>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setZoom(1);
-                                                setPan({ x: 0, y: 0 });
-                                            }}
-                                            aria-label="Reset zoom"
-                                        >
-                                            Reset
-                                        </button>
-                                        <span className={styles.zoomReadout}>{Math.round(zoom * 100)}%</span>
-                                    </div>
-
-                                    <div
-                                        ref={receiptWrapRef}
-                                        className={styles.receiptImageWrap}
-                                        style={{
-                                            transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                    ref={receiptImgRef}
+                                    src={receiptDisplaySrc}
+                                    alt="Receipt"
+                                    className="block max-w-[min(96%,980px)] max-h-full rounded-xl border border-border bg-card shadow-lg select-none"
+                                    draggable={false}
+                                    onLoad={() => {
+                                        const img = receiptImgRef.current;
+                                        if (!img) return;
+                                        const rect = img.getBoundingClientRect();
+                                            if (rect.width > 0 && rect.height > 0) {
+                                                baseReceiptSizeRef.current = { w: rect.width / zoom, h: rect.height / zoom };
+                                            }
                                         }}
-                                    >
-                                        <img
-                                            ref={receiptImgRef}
-                                            src={receiptDisplaySrc}
-                                            alt="Receipt"
-                                            className={styles.receiptImage}
-                                            draggable={false}
-                                            onLoad={() => {
-                                                const img = receiptImgRef.current;
-                                                if (!img) return;
-                                                const rect = img.getBoundingClientRect();
-                                                if (rect.width > 0 && rect.height > 0) {
-                                                    baseReceiptSizeRef.current = { w: rect.width / zoom, h: rect.height / zoom };
-                                                }
-                                            }}
-                                        />
-                                        {activeBboxPadded && (
-                                            <div
-                                                className={styles.itemBboxOverlay}
-                                                style={{
+                                    />
+                                    <AnimatePresence>
+                                        {activeBboxPadded && !disableBboxOverlay && (
+                                            <motion.div
+                                                key="bbox"
+                                                className="pointer-events-none absolute rounded-xl ring-2 ring-accent/70 bg-accent/10"
+                                                initial={{ opacity: 0 }}
+                                                animate={{
+                                                    opacity: 1,
                                                     left: `${activeBboxPadded[0] * 100}%`,
                                                     top: `${activeBboxPadded[1] * 100}%`,
                                                     width: `${(activeBboxPadded[2] - activeBboxPadded[0]) * 100}%`,
                                                     height: `${(activeBboxPadded[3] - activeBboxPadded[1]) * 100}%`,
                                                 }}
+                                                exit={{ opacity: 0 }}
+                                                transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
                                             />
                                         )}
-                                    </div>
+                                    </AnimatePresence>
                                 </div>
                             </div>
-                        </div>
+                        </GlassCard>
+                    </div>
 
-                        <aside className={styles.sidePanel}>
-                            {showFailureNotice && (
-                                <div className={styles.failureNotice}>
-                                    OCR failed for this upload. Please re-upload the receipt photo.
-                                </div>
-                            )}
-                            <section className={`${styles.section} ${styles.panelTop}`}>
-                                <div className={styles.purchaseHero}>
-                                    <div className={styles.purchaseTitleCard}>
-                                        <h4>{merchantName}</h4>
-                                        {addressLinesForDisplay.length > 0 && (
-                                            <p>
-                                                {addressLinesForDisplay.map((line, idx) => (
-                                                    <span key={`${line}-${idx}`}>
-                                                        {line}
-                                                        {idx < addressLinesForDisplay.length - 1 && <br />}
-                                                    </span>
-                                                ))}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className={styles.heroSplitStats}>
-                                        <div className={styles.heroStatBlock}>
-                                            <span>Items</span>
-                                            <strong>{items.length}</strong>
+                    <div className="flex flex-col min-h-0 gap-4">
+                        {showFailureNotice && (
+                            <GlassCard className="p-4 border border-destructive/30 bg-destructive-soft">
+                                <div className="flex items-start gap-3">
+                                    <AlertTriangle className="w-4 h-4 text-destructive mt-0.5" />
+                                    <div>
+                                        <div className="text-sm font-semibold text-destructive">Extraction failed</div>
+                                        <div className="text-sm text-foreground-muted mt-1">
+                                            OCR failed for this upload. Try re-uploading a clearer photo.
                                         </div>
-                                        <div className={styles.heroStatBlock}>
-                                            <span>Grand Total</span>
-                                            <strong
-                                                key={`hero-grand-total-${totalsFlashKey}`}
-                                                className={totalsFlashKey > 0 ? styles.valueFlash : ''}
-                                            >
-                                                {money(finalTotalValue)}
-                                            </strong>
+                                        <div className="mt-3">
+                                            <GlassButton variant="secondary" onClick={() => router.push("/receipts")}>
+                                                Back to Receipts
+                                            </GlassButton>
                                         </div>
                                     </div>
                                 </div>
-                            </section>
+                            </GlassCard>
+                        )}
 
-                            <section className={styles.section}>
-                                <h3>Items</h3>
-                                <div className={styles.fieldList}>
+                        {/* Fixed-height scroll region for items so the page doesn't grow indefinitely */}
+                        {/* Fill remaining column height; list inside scrolls. */}
+                        <GlassCard className="p-5 flex flex-col min-h-0 flex-1" delay={80}>
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="text-sm font-semibold">Items</div>
+                                    <div className="flex items-center gap-2">
+                                        <GlassButton variant="secondary" size="sm" onClick={addItem}>
+                                            <Plus className="w-4 h-4" />
+                                            Add Item
+                                        </GlassButton>
+                                    </div>
+                                </div>
+
+                            <div className="mt-3 flex-1 min-h-0 overflow-y-auto px-1 pb-2">
+                                <div className="space-y-2">
                                     {items.length ? (
-                                        items.map((item: EditableItem, index: number) => {
+                                        items.map((item, index) => {
                                             const lineSubtotal = Number(item.quantity || 0) * Number(item.unitPrice || 0);
                                             const isEditing = activeItemEdit === index;
                                             const lineFlashKey = lineFlashKeys[index] ?? 0;
+
                                             return (
-                                                <div
+                                                <motion.div
                                                     key={`item-${item.lineIndex}-${index}`}
-                                                    className={`${styles.fieldItem} ${isEditing ? styles.fieldItemActive : ''}`}
-                                                    onClick={() => setActiveItemEdit(index)}
+                                                    className={cn(
+                                                        "rounded-lg border border-border bg-card p-3 cursor-pointer",
+                                                        "transition-colors hover:bg-secondary/40",
+                                                        // Use inset ring so it doesn't get clipped by the scroll container overflow.
+                                                        isEditing && "ring-1 ring-inset ring-accent border-accent/40",
+                                                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/60"
+                                                    )}
+                                                    onClick={() => setActiveItemEdit((prev) => (prev === index ? null : index))}
                                                     onMouseEnter={() => setHoveredItemIndex(index)}
                                                     onMouseLeave={() => setHoveredItemIndex(null)}
                                                     onFocus={() => setHoveredItemIndex(index)}
                                                     onBlur={(e) => {
-                                                        // Don't clear hover highlight when focus moves between inputs inside the row.
                                                         const next = e.relatedTarget as Node | null;
                                                         if (next && e.currentTarget.contains(next)) return;
                                                         setHoveredItemIndex(null);
                                                     }}
+                                                    tabIndex={0}
+                                                    role="button"
+                                                    // Avoid translate-on-hover here; the list lives in an overflow container
+                                                    // and subtle lifts can get clipped at the edges.
+                                                    whileHover={{}}
+                                                    whileTap={{ scale: 0.99 }}
+                                                    transition={{ duration: 0.15 }}
                                                 >
-                                                    <div className={styles.fieldLabel}>
-                                                        <label>{item.name || `Item ${index + 1}`}</label>
-                                                        <span
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="min-w-0">
+                                                            <div className="flex items-center gap-2 min-w-0">
+                                                                <div className="text-sm font-semibold truncate">
+                                                                    {item.name || `Item ${index + 1}`}
+                                                                </div>
+                                                                <ChevronDown
+                                                                    className={cn(
+                                                                        "h-4 w-4 shrink-0 text-foreground-muted transition-transform duration-200",
+                                                                        isEditing && "rotate-180"
+                                                                    )}
+                                                                />
+                                                            </div>
+                                                            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-foreground-muted">
+                                                                <span>Qty {item.quantity}</span>
+                                                                <span>Unit {money(item.unitPrice)}</span>
+                                                                <span>{item.category || "Other"}</span>
+                                                            </div>
+                                                        </div>
+                                                        <div
                                                             key={`line-subtotal-${index}-${lineFlashKey}`}
-                                                            className={`${styles.confidence} ${lineFlashKey > 0 ? styles.valueFlash : ''}`}
+                                                            className={cn(
+                                                                "text-sm font-semibold whitespace-nowrap",
+                                                                lineFlashKey > 0 && "animate-pulse-soft"
+                                                            )}
                                                         >
                                                             {money(lineSubtotal)}
-                                                        </span>
-                                                    </div>
-                                                    <div className={styles.itemInlineMeta}>
-                                                        <span>{`Qty ${item.quantity}`}</span>
-                                                        <span>{`Unit ${money(item.unitPrice)}`}</span>
-                                                        <span>{item.category || 'Other'}</span>
+                                                        </div>
                                                     </div>
 
-                                                    <div
-                                                        className={`${styles.itemEditorPanel} ${isEditing ? styles.itemEditorPanelOpen : ''}`}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                    >
-                                                        <div className={styles.itemEditorGrid}>
-                                                            <label className={styles.editorField}>
-                                                                <span>Name</span>
-                                                                <input
-                                                                    type="text"
-                                                                    value={item.name}
-                                                                    onChange={(e) => updateItem(index, { name: e.target.value })}
-                                                                />
-                                                            </label>
-                                                            <label className={styles.editorField}>
-                                                                <span>Qty</span>
-                                                                <input
-                                                                    type="number"
-                                                                    min="0"
-                                                                    step="1"
-                                                                    value={item.quantity}
-                                                                    onChange={(e) => updateItem(index, { quantity: Number(e.target.value || 0) })}
-                                                                />
-                                                            </label>
-                                                            <label className={styles.editorField}>
-                                                                <span>Unit Price</span>
-                                                                <div className={styles.moneyInputWrap}>
-                                                                    <span className={styles.moneyPrefix} aria-hidden="true">$</span>
-                                                                    <input
-                                                                        className={styles.moneyInput}
-                                                                        type="text"
-                                                                        inputMode="decimal"
-                                                                        placeholder="0.00"
-                                                                        value={item.unitPriceInput}
-                                                                        onChange={(e) => {
-                                                                            const next = sanitizeMoneyInput(e.target.value);
-                                                                            updateItem(index, {
-                                                                                unitPriceInput: next,
-                                                                                unitPrice: parseMoneyInputOrZero(next),
-                                                                            });
-                                                                        }}
-                                                                    />
+                                                    <AnimatePresence initial={false}>
+                                                        {isEditing && (
+                                                            <motion.div
+                                                                initial={{ height: 0, opacity: 0 }}
+                                                                animate={{ height: "auto", opacity: 1 }}
+                                                                exit={{ height: 0, opacity: 0 }}
+                                                                transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+                                                                // Height animation needs overflow clipping; add a small padding
+                                                                // so focus outlines/rings don't get cut off at the edges.
+                                                                className="overflow-hidden px-1 pb-1"
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            >
+                                                                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                                    <label className="grid gap-1">
+                                                                        <span className="text-[11px] text-foreground-muted">Name</span>
+                                                                        <input
+                                                                            className="input-elegant px-3 py-2 text-sm outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-offset-0"
+                                                                            type="text"
+                                                                            value={item.name}
+                                                                            onChange={(e) => updateItem(index, { name: e.target.value })}
+                                                                        />
+                                                                    </label>
+                                                                    <label className="grid gap-1">
+                                                                        <span className="text-[11px] text-foreground-muted">Qty</span>
+                                                                        <input
+                                                                            className="input-elegant px-3 py-2 text-sm outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-offset-0"
+                                                                            type="number"
+                                                                            min="0"
+                                                                            step="1"
+                                                                            value={item.quantity}
+                                                                            onChange={(e) => updateItem(index, { quantity: Number(e.target.value || 0) })}
+                                                                        />
+                                                                    </label>
+                                                                    <label className="grid gap-1">
+                                                                        <span className="text-[11px] text-foreground-muted">Unit Price</span>
+                                                                        <div className="relative">
+                                                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-foreground-muted">
+                                                                                $
+                                                                            </span>
+                                                                            <input
+                                                                                className="input-elegant w-full pl-7 pr-3 py-2 text-sm outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-offset-0"
+                                                                                type="text"
+                                                                                inputMode="decimal"
+                                                                                placeholder="0.00"
+                                                                                value={item.unitPriceInput}
+                                                                                onChange={(e) => {
+                                                                                    const next = sanitizeMoneyInput(e.target.value);
+                                                                                    updateItem(index, {
+                                                                                        unitPriceInput: next,
+                                                                                        unitPrice: parseMoneyInputOrZero(next),
+                                                                                    });
+                                                                                }}
+                                                                            />
+                                                                        </div>
+                                                                    </label>
+                                                                    <label className="grid gap-1">
+                                                                        <span className="text-[11px] text-foreground-muted">Category</span>
+                                                                        <select
+                                                                            className="input-elegant px-3 py-2 text-sm outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-offset-0"
+                                                                            value={item.category}
+                                                                            onChange={(e) => updateItem(index, { category: e.target.value })}
+                                                                        >
+                                                                            {CATEGORY_OPTIONS.map((option) => (
+                                                                                <option key={option} value={option}>
+                                                                                    {option}
+                                                                                </option>
+                                                                            ))}
+                                                                        </select>
+                                                                    </label>
+                                                                    <div className="sm:col-span-2 flex items-center justify-end gap-2 pt-1">
+                                                                        <GlassButton
+                                                                            variant="danger"
+                                                                            size="sm"
+                                                                            onClick={() => removeItem(index)}
+                                                                        >
+                                                                            <Trash2 className="w-4 h-4" />
+                                                                            Remove Item
+                                                                        </GlassButton>
+                                                                    </div>
                                                                 </div>
-                                                            </label>
-                                                            <label className={styles.editorField}>
-                                                                <span>Category</span>
-                                                                <select
-                                                                    value={item.category}
-                                                                    onChange={(e) => updateItem(index, { category: e.target.value })}
-                                                                >
-                                                                    {CATEGORY_OPTIONS.map((option) => (
-                                                                        <option key={option} value={option}>{option}</option>
-                                                                    ))}
-                                                                </select>
-                                                            </label>
-                                                        </div>
-                                                        <button
-                                                            type="button"
-                                                            className={styles.doneEditBtn}
-                                                            onClick={() => setActiveItemEdit(null)}
-                                                        >
-                                                            Done
-                                                        </button>
-                                                    </div>
-                                                </div>
+                                                            </motion.div>
+                                                        )}
+                                                    </AnimatePresence>
+                                                </motion.div>
                                             );
                                         })
                                     ) : (
-                                        <div className={styles.fieldItem}>
-                                            <div className={styles.fieldLabel}>
-                                                <label>NO ITEMS FOUND</label>
-                                            </div>
+                                        <div className="rounded-lg border border-border bg-card p-4 text-sm text-foreground-muted">
+                                            No items found.
                                         </div>
                                     )}
                                 </div>
-                            </section>
+                            </div>
+                        </GlassCard>
 
-                            <section className={styles.section}>
-                                <h3>Total Calculation</h3>
-                                <div className={styles.metricList}>
-                                    <div className={styles.metricRow}><span>Subtotal</span><strong key={`calc-subtotal-${totalsFlashKey}`} className={totalsFlashKey > 0 ? styles.valueFlash : ''}>{money(lineSubtotal)}</strong></div>
-                                    <div className={styles.metricRow}><span>Tax</span><strong key={`calc-tax-${totalsFlashKey}`} className={totalsFlashKey > 0 ? styles.valueFlash : ''}>+ {money(lineTax)}</strong></div>
-                                    <div className={styles.metricRow}><span>Tip</span><strong key={`calc-tip-${totalsFlashKey}`} className={totalsFlashKey > 0 ? styles.valueFlash : ''}>+ {money(lineTip)}</strong></div>
-                                    <div className={styles.metricRow}><span>Fees</span><strong key={`calc-fees-${totalsFlashKey}`} className={totalsFlashKey > 0 ? styles.valueFlash : ''}>+ {money(lineFees)}</strong></div>
-                                    <div className={styles.metricRow}><span>Discount</span><strong key={`calc-discount-${totalsFlashKey}`} className={totalsFlashKey > 0 ? styles.valueFlash : ''}>- {money(lineDiscount)}</strong></div>
-                                    <div className={styles.metricDivider} />
-                                    <div className={`${styles.metricRow} ${styles.metricRowFinal}`}>
-                                        <span>Grand Total</span>
-                                        <strong key={`calc-grand-${totalsFlashKey}`} className={totalsFlashKey > 0 ? styles.valueFlash : ''}>{money(finalTotalValue)}</strong>
-                                    </div>
+                        <GlassCard className="p-5 shrink-0" delay={140}>
+                            <div className="text-sm font-semibold">Total</div>
+                            <div className="mt-3 space-y-2 text-sm">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-foreground-muted">Subtotal</span>
+                                    <span className="font-semibold tabular-nums">
+                                        <AnimatedNumber valueKey={Math.round(Number(lineSubtotal || 0) * 100)}>
+                                            {money(lineSubtotal)}
+                                        </AnimatedNumber>
+                                    </span>
                                 </div>
-                            </section>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-foreground-muted">Tax</span>
+                                    <span className="font-semibold tabular-nums">
+                                        <AnimatedNumber valueKey={`tax-${Math.round(Number(lineTax || 0) * 100)}`}>
+                                            + {money(lineTax)}
+                                        </AnimatedNumber>
+                                    </span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-foreground-muted">Tip</span>
+                                    <span className="font-semibold tabular-nums">
+                                        <AnimatedNumber valueKey={`tip-${Math.round(Number(lineTip || 0) * 100)}`}>
+                                            + {money(lineTip)}
+                                        </AnimatedNumber>
+                                    </span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-foreground-muted">Fees</span>
+                                    <span className="font-semibold tabular-nums">
+                                        <AnimatedNumber valueKey={`fees-${Math.round(Number(lineFees || 0) * 100)}`}>
+                                            + {money(lineFees)}
+                                        </AnimatedNumber>
+                                    </span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-foreground-muted">Discount</span>
+                                    <span className="font-semibold tabular-nums">
+                                        <AnimatedNumber valueKey={`disc-${Math.round(Number(lineDiscount || 0) * 100)}`}>
+                                            - {money(lineDiscount)}
+                                        </AnimatedNumber>
+                                    </span>
+                                </div>
+                                <div className="h-px bg-border my-2" />
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm font-semibold">Grand Total</span>
+                                    <span className="text-sm font-semibold tabular-nums">
+                                        <AnimatedNumber valueKey={`grand-${Math.round(Number(finalTotalValue || 0) * 100)}`}>
+                                            {money(finalTotalValue)}
+                                        </AnimatedNumber>
+                                    </span>
+                                </div>
+                            </div>
+                        </GlassCard>
 
-                            <footer className={styles.footer}>
-                                {confirmError && (
-                                    <div className={styles.saveError} role="alert">
-                                        {confirmError}
-                                    </div>
+                        <GlassCard className="p-5 shrink-0" delay={200}>
+                            {confirmError ? (
+                                <div className="mb-3 rounded-lg border border-destructive/30 bg-destructive-soft px-3 py-2 text-sm text-destructive">
+                                    {confirmError}
+                                </div>
+                            ) : null}
+
+                            <GlassButton
+                                variant="primary"
+                                size="lg"
+                                className="w-full"
+                                onClick={handleConfirm}
+                                disabled={submitting}
+                            >
+                                {submitting ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        Saving…
+                                    </>
+                                ) : (
+                                    <>
+                                        <CheckCircle2 className="w-4 h-4" />
+                                        Confirm
+                                    </>
                                 )}
-                                <button className={styles.confirmBtn} onClick={handleConfirm} disabled={submitting}>
-                                    Confirm & Update Graph
-                                </button>
-                            </footer>
+                            </GlassButton>
 
-                            {debugMode && (
-                                <section className={styles.section}>
-                                    <h3>Debug</h3>
-                                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
-                                        <button
-                                            type="button"
-                                            onClick={async () => {
-                                                if (!receiptId) return;
-                                                const imageUrl = data?.image_original_path;
-                                                if (!imageUrl) {
-                                                    setDebugRerunStatus('Missing image_original_path on receipt');
-                                                    return;
-                                                }
-                                                setDebugRerunStatus('Re-running extraction...');
-                                                try {
-                                                    const res = await fetch('/api/receipts/extract', {
-                                                        method: 'POST',
-                                                        headers: { 'Content-Type': 'application/json' },
-                                                        body: JSON.stringify({ receipt_id: receiptId, image_url: imageUrl }),
-                                                    });
-                                                    const json = await res.json().catch(() => ({}));
-                                                    if (!res.ok) throw new Error(json?.error || `extract failed (${res.status})`);
-                                                    setDebugRerunStatus('Extraction finished. Waiting for live updates...');
-                                                } catch (e: any) {
-                                                    setDebugRerunStatus(`Extraction failed: ${e?.message || String(e)}`);
-                                                }
-                                            }}
-                                            style={{
-                                                padding: '0.45rem 0.7rem',
-                                                borderRadius: 10,
-                                                border: '1px solid #cfddce',
-                                                background: '#f8fbf6',
-                                                fontWeight: 800,
-                                                cursor: 'pointer',
-                                            }}
-                                        >
-                                            Re-run Extraction
-                                        </button>
-                                        {debugRerunStatus && (
-                                            <span style={{ fontSize: 12, color: '#556759' }}>{debugRerunStatus}</span>
-                                        )}
+                            <div className="mt-2 text-[11px] text-foreground-muted">
+                                This will save the receipt and create transactions based on your item categories.
+                            </div>
+                        </GlassCard>
+
+                        {debugMode && (
+                            <GlassCard className="p-5">
+                                <div className="text-sm font-semibold">Debug</div>
+                                <div className="mt-3 flex items-center gap-2">
+                                    <GlassButton
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={async () => {
+                                            if (!receiptId) return;
+                                            const imageUrl = data?.image_original_path;
+                                            if (!imageUrl) {
+                                                setDebugRerunStatus("Missing image_original_path on receipt");
+                                                return;
+                                            }
+                                            setDebugRerunStatus("Re-running extraction...");
+                                            try {
+                                                const res = await fetch("/api/receipts/extract", {
+                                                    method: "POST",
+                                                    headers: { "Content-Type": "application/json" },
+                                                    body: JSON.stringify({ receipt_id: receiptId, image_url: imageUrl }),
+                                                });
+                                                const json = await res.json().catch(() => ({}));
+                                                if (!res.ok) throw new Error(json?.error || `extract failed (${res.status})`);
+                                                setDebugRerunStatus("Extraction finished. Waiting for live updates...");
+                                            } catch (e: unknown) {
+                                                setDebugRerunStatus(`Extraction failed: ${getErrorMessage(e, "unknown error")}`);
+                                            }
+                                        }}
+                                    >
+                                        Re-run Extraction
+                                    </GlassButton>
+                                    {debugRerunStatus ? (
+                                        <span className="text-[11px] text-foreground-muted">{debugRerunStatus}</span>
+                                    ) : null}
+                                </div>
+
+                                <details className="mt-3">
+                                    <summary className="text-sm cursor-pointer">Show raw extraction + items</summary>
+                                    <div className="mt-3 grid gap-2">
+                                        <label className="grid gap-1">
+                                            <span className="text-[11px] text-foreground-muted">
+                                                BBox Transform (auto={bboxTransform.mode})
+                                            </span>
+                                            <select
+                                                className="input-elegant px-3 py-2 text-sm"
+                                                value={bboxModeOverride}
+                                                onChange={(e) => setBboxModeOverride(parseBboxModeOverride(e.target.value))}
+                                            >
+                                                <option value="auto">auto</option>
+                                                <option value="none">none</option>
+                                                <option value="flipY">flipY</option>
+                                                <option value="rotate180">rotate180</option>
+                                                <option value="rotate90cw">rotate90cw</option>
+                                                <option value="rotate90ccw">rotate90ccw</option>
+                                            </select>
+                                        </label>
+                                        <div className="text-[11px] text-foreground-muted">Active bbox: {JSON.stringify(activeBbox)}</div>
                                     </div>
-                                    <details>
-                                        <summary>Show raw extraction + items</summary>
-                                        <div style={{ margin: '0.6rem 0 0.8rem', display: 'grid', gap: 8 }}>
-                                            <label style={{ display: 'grid', gap: 4 }}>
-                                                <span style={{ fontSize: 12, fontWeight: 700, color: '#556759' }}>
-                                                    BBox Transform (auto={bboxTransform.mode})
-                                                </span>
-                                                <select
-                                                    value={bboxModeOverride}
-                                                    onChange={(e) => setBboxModeOverride(e.target.value as any)}
-                                                    style={{ padding: '0.4rem 0.5rem', borderRadius: 8, border: '1px solid #cfddce' }}
-                                                >
-                                                    <option value="auto">auto</option>
-                                                    <option value="none">none</option>
-                                                    <option value="flipY">flipY</option>
-                                                    <option value="rotate180">rotate180</option>
-                                                    <option value="rotate90cw">rotate90cw</option>
-                                                    <option value="rotate90ccw">rotate90ccw</option>
-                                                </select>
-                                            </label>
-                                            <div style={{ fontSize: 12, color: '#556759' }}>
-                                                Active bbox: {JSON.stringify(activeBbox)}
-                                            </div>
-                                        </div>
-                                        <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12, lineHeight: 1.35 }}>
-                                            {JSON.stringify({
+                                    <pre className="mt-3 whitespace-pre-wrap text-[12px] leading-[1.35] text-foreground-muted">
+                                        {JSON.stringify(
+                                            {
                                                 receipt_id: data.id,
                                                 status: data.status,
                                                 merchant: extractions?.merchant?.value ?? null,
                                                 extracted_items: extraction?.items ?? null,
                                                 persisted_items: data.receipt_items ?? null,
                                                 raw_text: rawText,
-                                            }, null, 2)}
-                                        </pre>
-                                    </details>
-                                </section>
-                            )}
-                        </aside>
-                    </div>
-                </div>
-            </div>
-            {showLoadingLayer && loadingScreen}
-
-            {showConfirmSuccess && confirmSuccessSummary && (
-                <div
-                    className={styles.successBackdrop}
-                    role="dialog"
-                    aria-modal="true"
-                    aria-label="Receipt confirmed"
-                    onClick={() => {
-                        setShowConfirmSuccess(false);
-                        router.push('/receipts');
-                    }}
-                >
-                    <div
-                        className={styles.successCard}
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                            <div className={styles.successHeader}>
-                                <div className={styles.successIcon} aria-hidden="true">
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                                    <path
-                                        d="M20 7L10.5 16.5L4 10"
-                                        stroke="currentColor"
-                                        strokeWidth="2.6"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                    />
-                                </svg>
-                            </div>
-                            <div>
-                                <div className={styles.successTitle}>Receipt Saved</div>
-                                <div className={styles.successSubtitle}>Added to your graph. Returning to imports.</div>
-                            </div>
-                        </div>
-
-                        <div className={styles.successGrid}>
-                            <div className={styles.successStat}>
-                                <span>Merchant</span>
-                                <strong>{confirmSuccessSummary.merchant}</strong>
-                            </div>
-                            <div className={styles.successStat}>
-                                <span>Items</span>
-                                <strong>{confirmSuccessSummary.items}</strong>
-                            </div>
-                            <div className={styles.successStat}>
-                                <span>Total</span>
-                                <strong>{money(confirmSuccessSummary.total)}</strong>
-                            </div>
-                            <div className={styles.successStat}>
-                                <span>Date</span>
-                                <strong>{confirmSuccessSummary.date || 'Unknown'}</strong>
-                            </div>
-                        </div>
-
-                        {confirmSuccessSummary.categoryTotals.length > 0 && (
-                            <div className={styles.successCategoryBlock}>
-                                <div className={styles.successCategoryHeader}>
-                                    <span>Category totals</span>
-                                    <span className={styles.successCategoryHint}>Added to your graph</span>
-                                </div>
-                                <div className={styles.successCategoryList}>
-                                    {confirmSuccessSummary.categoryTotals.slice(0, 6).map((row) => (
-                                        <div key={row.category} className={styles.successCategoryRow}>
-                                            <span className={styles.successCategoryName}>{row.category}</span>
-                                            <strong className={styles.successCategoryTotal}>{money(row.total)}</strong>
-                                        </div>
-                                    ))}
-                                    {confirmSuccessSummary.categoryTotals.length > 6 && (
-                                        <div className={styles.successCategoryMore}>
-                                            + {confirmSuccessSummary.categoryTotals.length - 6} more
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
+                                            },
+                                            null,
+                                            2
+                                        )}
+                                    </pre>
+                                </details>
+                            </GlassCard>
                         )}
-
-                        <div className={styles.successActions}>
-                            <button
-                                type="button"
-                                className={styles.successPrimary}
-                                onClick={() => router.push('/receipts')}
-                            >
-                                Back to Receipts
-                            </button>
-                            <button
-                                type="button"
-                                className={styles.successSecondary}
-                                onClick={() => setShowConfirmSuccess(false)}
-                            >
-                                Keep Reviewing
-                            </button>
-                        </div>
                     </div>
                 </div>
-            )}
-        </div>
+
+                {showLoadingLayer && loadingScreen}
+
+                {/* Manual crop modal */}
+                <AnimatePresence>
+                    {cropOpen && cropPreviewUrl && cropQuad && (
+                        <motion.div
+                            className="fixed inset-0 z-[60] bg-background/70 backdrop-blur-sm flex items-center justify-center p-6"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setCropOpen(false)}
+                        >
+                            <motion.div
+                                className="w-full max-w-4xl"
+                                initial={{ opacity: 0, y: 10, scale: 0.99 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: 10, scale: 0.99 }}
+                                transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <div className="card-elevated p-5">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div>
+                                            <div className="text-base font-semibold tracking-tight">Adjust Crop</div>
+                                            <div className="text-sm text-foreground-muted mt-1">
+                                                Drag the corners to fit the receipt. Press Escape to close.
+                                                {hasAnyItemBbox ? " Cropping will disable item highlights." : ""}
+                                            </div>
+                                        </div>
+                                        <GlassButton variant="ghost" size="sm" onClick={() => setCropOpen(false)}>
+                                            <X className="w-4 h-4" />
+                                            Close
+                                        </GlassButton>
+                                    </div>
+
+                                    {cropError ? (
+                                        <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive-soft px-3 py-2 text-sm text-destructive">
+                                            {cropError}
+                                        </div>
+                                    ) : null}
+
+                                    <div
+                                        ref={cropViewportRef}
+                                        className={cn(
+                                            "relative mt-4 rounded-lg border border-border bg-background-secondary overflow-hidden",
+                                            "h-[min(62vh,640px)]"
+                                        )}
+                                        onPointerMove={(e) => {
+                                            if (cropDragIndex == null) return;
+                                            const el = cropViewportRef.current;
+                                            if (!el) return;
+                                            const rect = el.getBoundingClientRect();
+                                            const nx = clamp01((e.clientX - rect.left) / rect.width);
+                                            const ny = clamp01((e.clientY - rect.top) / rect.height);
+                                            setCropQuad((prev) => {
+                                                if (!prev) return prev;
+                                                const pts = prev.map((p, idx) => (idx === cropDragIndex ? { x: nx, y: ny } : p));
+                                                return orderNormalizedQuad(pts);
+                                            });
+                                        }}
+                                        onPointerUp={() => setCropDragIndex(null)}
+                                        onPointerCancel={() => setCropDragIndex(null)}
+                                    >
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img
+                                            src={cropPreviewUrl}
+                                            alt="Crop preview"
+                                            className="absolute inset-0 w-full h-full object-contain select-none"
+                                            draggable={false}
+                                        />
+
+                                        {/* Overlay quad */}
+                                        <svg className="absolute inset-0 w-full h-full pointer-events-none">
+                                            <polygon
+                                                points={cropQuad.map((p) => `${p.x * 100},${p.y * 100}`).join(" ")}
+                                                fill="rgba(99,102,241,0.10)"
+                                                stroke="rgba(99,102,241,0.9)"
+                                                strokeWidth="0.4"
+                                                vectorEffect="non-scaling-stroke"
+                                            />
+                                        </svg>
+
+                                        {cropQuad.map((p, idx) => (
+                                            <button
+                                                key={idx}
+                                                type="button"
+                                                className={cn(
+                                                    "absolute -translate-x-1/2 -translate-y-1/2",
+                                                    "h-4 w-4 rounded-full bg-background border border-border shadow-sm",
+                                                    "ring-2 ring-accent/60"
+                                                )}
+                                                style={{ left: `${p.x * 100}%`, top: `${p.y * 100}%` }}
+                                                onPointerDown={(e) => {
+                                                    e.preventDefault();
+                                                    (e.currentTarget as HTMLButtonElement).setPointerCapture?.(e.pointerId);
+                                                    setCropDragIndex(idx);
+                                                }}
+                                                aria-label={`Corner ${idx + 1}`}
+                                            />
+                                        ))}
+                                    </div>
+
+                                    <div className="mt-4 flex items-center justify-end gap-2">
+                                        <GlassButton variant="secondary" onClick={() => setCropOpen(false)} disabled={cropBusy}>
+                                            Cancel
+                                        </GlassButton>
+                                        <GlassButton variant="primary" onClick={applyCrop} disabled={cropBusy}>
+                                            {cropBusy ? (
+                                                <>
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                    Applying…
+                                                </>
+                                            ) : (
+                                                "Apply Crop"
+                                            )}
+                                        </GlassButton>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {showConfirmSuccess && confirmSuccessSummary && (
+                    <div
+                        className="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm flex items-center justify-center p-6"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Receipt confirmed"
+                        onClick={() => {
+                            setShowConfirmSuccess(false);
+                            router.push("/receipts");
+                        }}
+                    >
+                        <div onClick={(e) => e.stopPropagation()} className="w-full max-w-xl">
+                            <div className="card-elevated p-6 animate-slide-up">
+                                <div className="flex items-start gap-3">
+                                    <div className="w-10 h-10 rounded-lg bg-success-soft border border-success/30 flex items-center justify-center">
+                                        <CheckCircle2 className="w-5 h-5 text-success" />
+                                    </div>
+                                    <div>
+                                        <div className="text-base font-semibold tracking-tight">Receipt Saved</div>
+                                        <div className="text-sm text-foreground-muted mt-1">
+                                            Added to your graph.
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="mt-5 grid grid-cols-2 gap-3">
+                                    <div className="rounded-lg border border-border bg-background-secondary p-3">
+                                        <div className="text-[11px] text-foreground-muted uppercase tracking-wide">Merchant</div>
+                                        <div className="text-sm font-semibold mt-1 truncate">{confirmSuccessSummary.merchant}</div>
+                                    </div>
+                                    <div className="rounded-lg border border-border bg-background-secondary p-3">
+                                        <div className="text-[11px] text-foreground-muted uppercase tracking-wide">Items</div>
+                                        <div className="text-sm font-semibold mt-1">{confirmSuccessSummary.items}</div>
+                                    </div>
+                                    <div className="rounded-lg border border-border bg-background-secondary p-3">
+                                        <div className="text-[11px] text-foreground-muted uppercase tracking-wide">Total</div>
+                                        <div className="text-sm font-semibold mt-1">{money(confirmSuccessSummary.total)}</div>
+                                    </div>
+                                    <div className="rounded-lg border border-border bg-background-secondary p-3">
+                                        <div className="text-[11px] text-foreground-muted uppercase tracking-wide">Date</div>
+                                        <div className="text-sm font-semibold mt-1">{confirmSuccessSummary.date || "Unknown"}</div>
+                                    </div>
+                                </div>
+
+                                {confirmSuccessSummary.categoryTotals.length > 0 && (
+                                    <div className="mt-5">
+                                        <div className="flex items-center justify-between text-[11px] text-foreground-muted uppercase tracking-wide">
+                                            <span>Category totals</span>
+                                            <span className="normal-case tracking-normal">Added to your graph</span>
+                                        </div>
+                                        <div className="mt-2 rounded-lg border border-border bg-background-secondary divide-y divide-border overflow-hidden">
+                                            {confirmSuccessSummary.categoryTotals.slice(0, 6).map((row) => (
+                                                <div key={row.category} className="flex items-center justify-between px-3 py-2 text-sm">
+                                                    <span className="text-foreground-muted">{row.category}</span>
+                                                    <span className="font-semibold">{money(row.total)}</span>
+                                                </div>
+                                            ))}
+                                            {confirmSuccessSummary.categoryTotals.length > 6 && (
+                                                <div className="px-3 py-2 text-[12px] text-foreground-muted">
+                                                    + {confirmSuccessSummary.categoryTotals.length - 6} more
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    <GlassButton variant="primary" size="lg" onClick={() => router.push("/receipts")}>
+                                        Back to Receipts
+                                    </GlassButton>
+                                    <GlassButton variant="secondary" size="lg" onClick={() => setShowConfirmSuccess(false)}>
+                                        Keep Reviewing
+                                    </GlassButton>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </PageTransition>
     );
 }

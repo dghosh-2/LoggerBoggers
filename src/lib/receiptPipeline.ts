@@ -1,10 +1,11 @@
 import { supabase } from '@repo/core';
 
-export async function createReceiptAndTriggerOcr(imageUrl: string) {
+export async function createReceiptAndTriggerOcr(imageUrl: string, userId: string) {
     const dbStart = Date.now();
     const { data: receipt, error: dbError } = await supabase
         .from('receipts')
         .insert({
+            user_id: userId,
             image_original_path: imageUrl,
             status: 'pending',
             source: 'upload',
