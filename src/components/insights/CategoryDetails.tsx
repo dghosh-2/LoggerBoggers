@@ -10,12 +10,76 @@ export function CategoryDetails() {
     const { selectedCategory, setSelectedCategory, selectedRange } = useInsightsStore();
     const { transactions: allTransactions, isConnected } = useFinancialData();
 
+    // Calculate which categories are included in "Other"
+    const otherCategories = useMemo(() => {
+        if (selectedCategory !== 'Other' || !isConnected || allTransactions.length === 0) return [];
+
+        const now = new Date();
+        const rangeTransactions = allTransactions.filter(t => {
+            const date = new Date(t.date);
+            if (selectedRange === 'MTD') {
+                return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+            } else if (selectedRange === '3M') {
+                const threeMonthsAgo = new Date(now);
+                threeMonthsAgo.setMonth(now.getMonth() - 3);
+                return date >= threeMonthsAgo;
+            } else if (selectedRange === 'YR') {
+                const twelveMonthsAgo = new Date(now);
+                twelveMonthsAgo.setFullYear(now.getFullYear() - 1);
+                return date >= twelveMonthsAgo;
+            }
+            return true;
+        });
+
+        const categoryTotals: Record<string, number> = {};
+        rangeTransactions.forEach(t => {
+            categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount;
+        });
+
+        // Sort by value and get top 5
+        const sortedCategories = Object.entries(categoryTotals)
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value);
+
+        const MAX_CATEGORIES = 5;
+        const topCategories = sortedCategories.slice(0, MAX_CATEGORIES).map(c => c.name);
+        const otherCategoryNames = sortedCategories.slice(MAX_CATEGORIES).map(c => c.name);
+
+        return otherCategoryNames;
+    }, [selectedCategory, allTransactions, isConnected, selectedRange]);
+
     const transactions = useMemo(() => {
         if (!isConnected || allTransactions.length === 0) return [];
-        return allTransactions.filter(
-            (t) => t.category === selectedCategory
-        );
-    }, [selectedCategory, allTransactions, isConnected]);
+
+        // Get date range based on selectedRange
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth();
+
+        let startDate: Date;
+
+        if (selectedRange === 'MTD') {
+            startDate = new Date(currentYear, currentMonth, 1);
+        } else if (selectedRange === '3M') {
+            startDate = new Date(currentYear, currentMonth - 3, 1);
+        } else if (selectedRange === 'YR') {
+            startDate = new Date(currentYear, 0, 1);
+        } else {
+            // 'All'
+            startDate = new Date(0); // epoch
+        }
+
+        return allTransactions.filter((t) => {
+            const txDate = new Date(t.date);
+
+            // If "Other" is selected, show transactions from categories not in top 5
+            if (selectedCategory === 'Other') {
+                return otherCategories.includes(t.category) && txDate >= startDate;
+            }
+
+            return t.category === selectedCategory && txDate >= startDate;
+        });
+    }, [selectedCategory, allTransactions, isConnected, selectedRange, otherCategories]);
 
     const totalAmount = useMemo(() => {
         return transactions.reduce((sum, t) => sum + t.amount, 0);
@@ -57,8 +121,8 @@ export function CategoryDetails() {
                     </div>
                 ) : (
                     transactions.map((t, i) => (
-                        <motion.div 
-                            key={i} 
+                        <motion.div
+                            key={i}
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: i * 0.03 }}
@@ -70,7 +134,7 @@ export function CategoryDetails() {
                                 </div>
                                 <div>
                                     <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
-                                        {t.merchant}
+                                        {t.merchant_name || t.name}
                                     </p>
                                     <p className="text-xs text-foreground-muted">{t.date}</p>
                                 </div>
