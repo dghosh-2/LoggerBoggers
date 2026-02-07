@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { usePathname, useRouter } from "next/navigation";
 import { 
   LayoutDashboard, 
@@ -12,6 +12,7 @@ import {
   User
 } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
+import { useUIStore } from "@/stores/ui-store";
 
 const navItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -24,18 +25,22 @@ const navItems = [
 export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
+  const { navbarHidden } = useUIStore();
 
   const handleNavClick = (href: string) => {
     router.push(href);
   };
 
   return (
-    <motion.header
-      initial={{ y: -20, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-      className="fixed top-0 left-0 right-0 z-50"
-    >
+    <AnimatePresence>
+      {!navbarHidden && (
+        <motion.header
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: -20, opacity: 0 }}
+          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+          className="fixed top-0 left-0 right-0 z-50"
+        >
       <div className="mx-auto max-w-7xl px-6 py-4">
         <nav className="card-elevated flex items-center justify-between px-4 py-3">
           {/* Logo */}
@@ -89,5 +94,7 @@ export function Navbar() {
         </nav>
       </div>
     </motion.header>
+      )}
+    </AnimatePresence>
   );
 }

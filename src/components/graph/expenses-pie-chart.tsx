@@ -190,16 +190,12 @@ export function ExpensesPieChart() {
                 </PieChart>
             </ResponsiveContainer>
 
-            {/* Center Label */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ marginTop: '-12%' }}>
-                <div className="text-center">
-                    {selectedCategory ? (
-                        <div className="font-medium text-primary text-sm">{selectedCategory}</div>
-                    ) : (
-                        <div className="text-foreground-muted text-xs">Click to explore</div>
-                    )}
+            {/* Center Label - shows selected category */}
+            {selectedCategory && (
+                <div className="absolute left-1/2 top-[45%] -translate-x-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none">
+                    <div className="font-medium text-primary text-sm">{selectedCategory}</div>
                 </div>
-            </div>
+            )}
         </div>
     );
 }

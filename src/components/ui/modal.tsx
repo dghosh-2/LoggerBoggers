@@ -3,6 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 import { useEffect } from "react";
+import { useUIStore } from "@/stores/ui-store";
 
 interface ModalProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ interface ModalProps {
   subtitle?: string;
   children: React.ReactNode;
   size?: "sm" | "md" | "lg" | "xl" | "full";
+  hideNavbar?: boolean;
 }
 
 const sizeClasses = {
@@ -27,9 +29,12 @@ export function Modal({
   title, 
   subtitle,
   children, 
-  size = "md" 
+  size = "md",
+  hideNavbar = true
 }: ModalProps) {
-  // Close on escape key
+  const { setNavbarHidden } = useUIStore();
+
+  // Close on escape key and manage navbar visibility
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -38,13 +43,19 @@ export function Modal({
     if (isOpen) {
       document.addEventListener("keydown", handleEscape);
       document.body.style.overflow = "hidden";
+      if (hideNavbar) {
+        setNavbarHidden(true);
+      }
     }
     
     return () => {
       document.removeEventListener("keydown", handleEscape);
       document.body.style.overflow = "";
+      if (hideNavbar) {
+        setNavbarHidden(false);
+      }
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, hideNavbar, setNavbarHidden]);
 
   return (
     <AnimatePresence>

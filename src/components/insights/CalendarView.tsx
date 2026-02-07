@@ -12,11 +12,11 @@ const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 // Recurring subscriptions/bills for calendar display
 const SUBSCRIPTIONS = [
-    { date: 1, name: 'Rent', amount: 2450, icon: '🏠' },
-    { date: 15, name: 'Netflix', amount: 15.99, icon: '📺' },
-    { date: 20, name: 'Internet', amount: 79.99, icon: '📡' },
-    { date: 25, name: 'Phone', amount: 45, icon: '📱' },
-    { date: 28, name: 'Spotify', amount: 12, icon: '🎵' },
+    { date: 1, name: 'Rent', amount: 2450 },
+    { date: 15, name: 'Netflix', amount: 15.99 },
+    { date: 20, name: 'Internet', amount: 79.99 },
+    { date: 25, name: 'Phone', amount: 45 },
+    { date: 28, name: 'Spotify', amount: 12 },
 ];
 
 export function CalendarView() {
@@ -220,11 +220,10 @@ export function CalendarView() {
                                         {date.subs.map((sub: any, i: number) => (
                                             <div 
                                                 key={i}
-                                                className="flex items-center gap-1 px-1 py-0.5 rounded text-[9px] font-medium truncate bg-secondary/80 text-foreground-muted border border-border"
+                                                className="px-1.5 py-0.5 rounded text-[9px] font-medium truncate bg-secondary/80 text-foreground-muted border border-border"
                                                 title={`${sub.name}: $${sub.amount}`}
                                             >
-                                                <span className="text-[10px] flex-shrink-0">{sub.icon}</span>
-                                                <span className="truncate hidden sm:inline">{sub.name}</span>
+                                                {sub.name}
                                             </div>
                                         ))}
                                     </div>
@@ -298,13 +297,10 @@ export function CalendarView() {
                                     {selectedDayData.subs.map((sub: any, i: number) => (
                                         <div 
                                             key={i}
-                                            className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-secondary/50 border-border text-foreground"
+                                            className="flex items-center justify-between px-3 py-2 rounded-lg border bg-secondary/50 border-border text-foreground"
                                         >
-                                            <span className="text-lg">{sub.icon}</span>
-                                            <div>
-                                                <p className="text-sm font-medium">{sub.name}</p>
-                                                <p className="text-xs text-foreground-muted">${sub.amount}</p>
-                                            </div>
+                                            <p className="text-sm font-medium">{sub.name}</p>
+                                            <p className="text-sm text-foreground-muted">${sub.amount}</p>
                                         </div>
                                     ))}
                                 </div>

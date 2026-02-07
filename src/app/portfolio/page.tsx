@@ -202,33 +202,164 @@ export default function PortfolioPage() {
           </GlassCard>
         </div>
 
-        {/* Holdings */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Your Holdings</h2>
-            <span className="text-sm text-foreground-muted">
-              {portfolio.length} assets
-            </span>
+        {/* Holdings or Allocation View */}
+        {selectedView === "holdings" ? (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Your Holdings</h2>
+              <span className="text-sm text-foreground-muted">
+                {portfolio.length} assets
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {portfolio.map((holding) => (
+                <div 
+                  key={holding.id} 
+                  onClick={() => setSelectedHolding(holding)}
+                  className="cursor-pointer"
+                >
+                  <HoldingCard
+                    symbol={holding.symbol}
+                    name={holding.name}
+                    value={holding.value}
+                    change={holding.change}
+                    percentage={Math.round((holding.value / totalValue) * 100)}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {portfolio.map((holding) => (
-              <div 
-                key={holding.id} 
-                onClick={() => setSelectedHolding(holding)}
-                className="cursor-pointer"
-              >
-                <HoldingCard
-                  symbol={holding.symbol}
-                  name={holding.name}
-                  value={holding.value}
-                  change={holding.change}
-                  percentage={Math.round((holding.value / totalValue) * 100)}
-                />
+        ) : (
+          <GlassCard>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-semibold">Portfolio Allocation</h2>
+              <span className="text-sm text-foreground-muted">
+                By asset value
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Allocation Pie Chart */}
+              <div className="h-[300px] flex items-center justify-center">
+                <div className="relative w-[260px] h-[260px]">
+                  {/* SVG Pie Chart */}
+                  <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                    {portfolio.reduce((acc, holding, index) => {
+                      const percentage = (holding.value / totalValue) * 100;
+                      const previousPercentages = portfolio
+                        .slice(0, index)
+                        .reduce((sum, h) => sum + (h.value / totalValue) * 100, 0);
+                      
+                      const colors = [
+                        'var(--primary)',
+                        'hsl(var(--success))',
+                        'hsl(var(--warning))',
+                        'hsl(var(--destructive))',
+                        'hsl(var(--accent))',
+                        '#8b5cf6',
+                        '#ec4899',
+                        '#14b8a6',
+                      ];
+                      
+                      const circumference = 2 * Math.PI * 40;
+                      const strokeDasharray = `${(percentage / 100) * circumference} ${circumference}`;
+                      const strokeDashoffset = -((previousPercentages / 100) * circumference);
+                      
+                      acc.push(
+                        <circle
+                          key={holding.id}
+                          cx="50"
+                          cy="50"
+                          r="40"
+                          fill="none"
+                          stroke={colors[index % colors.length]}
+                          strokeWidth="20"
+                          strokeDasharray={strokeDasharray}
+                          strokeDashoffset={strokeDashoffset}
+                          className="transition-all duration-500 cursor-pointer hover:opacity-80"
+                          onClick={() => setSelectedHolding(holding)}
+                        />
+                      );
+                      return acc;
+                    }, [] as JSX.Element[])}
+                  </svg>
+                  {/* Center Text */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <p className="text-2xl font-semibold">${(totalValue / 1000).toFixed(1)}k</p>
+                    <p className="text-xs text-foreground-muted">Total Value</p>
+                  </div>
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
+
+              {/* Legend */}
+              <div className="space-y-3">
+                {portfolio.map((holding, index) => {
+                  const percentage = (holding.value / totalValue) * 100;
+                  const colors = [
+                    'bg-primary',
+                    'bg-success',
+                    'bg-warning',
+                    'bg-destructive',
+                    'bg-accent',
+                    'bg-violet-500',
+                    'bg-pink-500',
+                    'bg-teal-500',
+                  ];
+                  
+                  return (
+                    <motion.div
+                      key={holding.id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className="flex items-center justify-between p-3 rounded-xl bg-secondary/50 hover:bg-secondary cursor-pointer transition-colors"
+                      onClick={() => setSelectedHolding(holding)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-3 h-3 rounded-full ${colors[index % colors.length]}`} />
+                        <div>
+                          <p className="font-medium text-sm">{holding.symbol}</p>
+                          <p className="text-xs text-foreground-muted">{holding.name}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium text-sm">{percentage.toFixed(1)}%</p>
+                        <p className="text-xs text-foreground-muted">
+                          ${holding.value.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                        </p>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Allocation Breakdown */}
+            <div className="mt-8 pt-6 border-t border-border">
+              <h3 className="text-sm font-medium mb-4">Asset Type Breakdown</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                  { type: 'Tech', percentage: 45, color: 'bg-primary' },
+                  { type: 'Finance', percentage: 25, color: 'bg-success' },
+                  { type: 'Healthcare', percentage: 15, color: 'bg-warning' },
+                  { type: 'Other', percentage: 15, color: 'bg-secondary' },
+                ].map((sector) => (
+                  <div key={sector.type} className="text-center">
+                    <div className="h-2 rounded-full bg-secondary mb-2 overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full ${sector.color}`} 
+                        style={{ width: `${sector.percentage}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-foreground-muted">{sector.type}</p>
+                    <p className="text-sm font-medium">{sector.percentage}%</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </GlassCard>
+        )}
 
         {/* Performance Prediction */}
         <GlassCard>
