@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { ArrowRight, ChevronLeft, ChevronRight, X, TrendingUp, Wallet, PiggyBank, CreditCard } from 'lucide-react';
 import Image from 'next/image';
 import { useUIStore } from '@/stores/ui-store';
+import { useAuthStore } from '@/stores/auth-store';
+import { AuthModal } from '@/components/auth/AuthModal';
 
 const STEPS = [
   { id: 'age', label: 'How old are you?', type: 'number', placeholder: '25' },
@@ -77,7 +79,9 @@ function FloatingCard({
 export default function Home() {
   const router = useRouter();
   const { setNavbarHidden, setChatHidden } = useUIStore();
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const { user, checkSession, isInitialized } = useAuthStore();
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<Record<string, string>>({
     age: '',
@@ -89,6 +93,11 @@ export default function Home() {
   });
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Check session on mount
+  useEffect(() => {
+    checkSession();
+  }, [checkSession]);
 
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
@@ -146,6 +155,23 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Handle Get Started click - show auth modal if not logged in
+  const handleGetStarted = () => {
+    if (user) {
+      // User is already logged in, go directly to onboarding
+      setIsOnboardingModalOpen(true);
+    } else {
+      // Show auth modal first
+      setIsAuthModalOpen(true);
+    }
+  };
+
+  // Handle successful auth - proceed to onboarding
+  const handleAuthSuccess = () => {
+    setIsAuthModalOpen(false);
+    setIsOnboardingModalOpen(true);
   };
 
   const step = STEPS[currentStep];
@@ -335,12 +361,12 @@ export default function Home() {
         className="absolute bottom-8 md:bottom-12 left-1/2 -translate-x-1/2 z-30"
       >
         <motion.button
-          onClick={() => setIsModalOpen(true)}
+          onClick={handleGetStarted}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           className="group relative inline-flex items-center gap-3 px-10 py-4 bg-foreground text-background rounded-lg font-mono text-sm uppercase tracking-widest font-medium transition-all duration-300 hover:shadow-2xl hover:shadow-foreground/25 overflow-hidden"
         >
-          <span className="relative z-10">Get Started</span>
+          <span className="relative z-10">{user ? 'Continue' : 'Get Started'}</span>
           <ArrowRight className="w-4 h-4 relative z-10 transition-transform duration-300 group-hover:translate-x-1" />
           <motion.div
             className="absolute inset-0 bg-gradient-to-r from-foreground via-foreground-secondary to-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-300"
@@ -348,9 +374,16 @@ export default function Home() {
         </motion.button>
       </motion.div>
 
+      {/* Auth Modal */}
+      <AuthModal 
+        isOpen={isAuthModalOpen} 
+        onClose={() => setIsAuthModalOpen(false)} 
+        onSuccess={handleAuthSuccess}
+      />
+
       {/* Onboarding Modal */}
       <AnimatePresence>
-        {isModalOpen && (
+        {isOnboardingModalOpen && (
           <>
             <motion.div
               initial={{ opacity: 0 }}
@@ -358,7 +391,7 @@ export default function Home() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
               className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm"
-              onClick={() => setIsModalOpen(false)}
+              onClick={() => setIsOnboardingModalOpen(false)}
             />
 
             <motion.div
@@ -380,7 +413,7 @@ export default function Home() {
                         <p className="text-xs text-foreground-muted">Step {currentStep + 1} of {STEPS.length}</p>
                       </div>
                     </div>
-                    <button onClick={() => setIsModalOpen(false)} className="p-1.5 rounded-md hover:bg-secondary transition-colors">
+                    <button onClick={() => setIsOnboardingModalOpen(false)} className="p-1.5 rounded-md hover:bg-secondary transition-colors">
                       <X className="w-4 h-4 text-foreground-muted" />
                     </button>
                   </div>

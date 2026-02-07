@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { getUserIdFromRequest } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
     try {
+        // Get authenticated user ID
+        const userId = await getUserIdFromRequest(request);
+        
+        if (!userId) {
+            return NextResponse.json({ transactions: [] });
+        }
+
         const { searchParams } = new URL(request.url);
         const startDate = searchParams.get('start_date');
         const endDate = searchParams.get('end_date');
@@ -12,7 +20,7 @@ export async function GET(request: NextRequest) {
         let query = supabase
             .from('transactions')
             .select('*')
-            .eq('user_id', 'default_user')
+            .eq('uuid_user_id', userId)
             .order('date', { ascending: false })
             .limit(limit);
         

@@ -1,13 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { getUserIdFromRequest } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
     try {
+        // Get authenticated user ID
+        const userId = await getUserIdFromRequest(request);
+        
+        if (!userId) {
+            // Return zeros if not authenticated
+            return NextResponse.json({
+                is_connected: false,
+                total_spending: 0,
+                total_income: 0,
+                net_worth: 0,
+                monthly_spending: 0,
+                monthly_income: 0,
+                spending_by_category: {},
+                recent_transactions: [],
+                monthly_trend: [],
+            });
+        }
+
         // Check if user is connected to Plaid
         const { data: connectionData } = await supabase
             .from('user_plaid_connections')
             .select('is_connected')
-            .eq('user_id', 'default_user')
+            .eq('uuid_user_id', userId)
             .single();
         
         const isConnected = connectionData?.is_connected || false;
@@ -41,7 +60,7 @@ export async function GET(request: NextRequest) {
         const { data: allTransactions } = await supabase
             .from('transactions')
             .select('amount, category, date, name')
-            .eq('user_id', 'default_user')
+            .eq('uuid_user_id', userId)
             .gte('date', twelveMonthsAgoStr)
             .order('date', { ascending: false });
         
@@ -49,7 +68,7 @@ export async function GET(request: NextRequest) {
         const { data: allIncome } = await supabase
             .from('income')
             .select('amount, date')
-            .eq('user_id', 'default_user')
+            .eq('uuid_user_id', userId)
             .gte('date', twelveMonthsAgoStr);
         
         // Calculate totals

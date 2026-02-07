@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { plaidClient } from '@/lib/plaid-client';
 import { supabase } from '@/lib/supabase';
+import { getUserIdFromRequest } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
     try {
+        // Get authenticated user ID
+        const userId = await getUserIdFromRequest(request);
+        
+        if (!userId) {
+            return NextResponse.json(
+                { error: 'Authentication required' },
+                { status: 401 }
+            );
+        }
+
         const { public_token, institution } = await request.json();
 
         if (!public_token) {
@@ -23,7 +34,8 @@ export async function POST(request: NextRequest) {
 
         // Store the access token in Supabase (in production, encrypt this!)
         const { error: insertError } = await supabase.from('plaid_items').upsert({
-            user_id: 'default_user',
+            user_id: userId,
+            uuid_user_id: userId,
             item_id: itemId,
             access_token: accessToken,
             institution_id: institution?.institution_id || null,
@@ -54,7 +66,8 @@ export async function POST(request: NextRequest) {
             // Store accounts in Supabase
             for (const account of plaidAccounts) {
                 await supabase.from('accounts').upsert({
-                    user_id: 'default_user',
+                    user_id: userId,
+                    uuid_user_id: userId,
                     plaid_account_id: account.account_id,
                     plaid_item_id: itemId,
                     name: account.name,
@@ -110,7 +123,8 @@ export async function POST(request: NextRequest) {
                 const category = mapPlaidCategory(tx.category);
                 const isFoodRelated = category === 'Food & Drink';
                 return {
-                    user_id: 'default_user',
+                    user_id: userId,
+                    uuid_user_id: userId,
                     plaid_transaction_id: tx.transaction_id,
                     amount: Math.abs(tx.amount),
                     category,
@@ -137,31 +151,45 @@ export async function POST(request: NextRequest) {
             const allTransactions = [...filteredFakeTransactions, ...formattedPlaidTransactions];
 
             // Clear existing data and insert new
-            await supabase.from('transactions').delete().eq('user_id', 'default_user');
-            await supabase.from('income').delete().eq('user_id', 'default_user');
+            await supabase.from('transactions').delete().eq('uuid_user_id', userId);
+            await supabase.from('income').delete().eq('uuid_user_id', userId);
+
+            // Add user_id to fake transactions and income
+            const allTransactionsWithUser = allTransactions.map(tx => ({
+                ...tx,
+                user_id: userId,
+                uuid_user_id: userId,
+            }));
+
+            const fakeIncomeWithUser = fakeIncome.map(inc => ({
+                ...inc,
+                user_id: userId,
+                uuid_user_id: userId,
+            }));
 
             // Insert transactions in batches
             const BATCH_SIZE = 500;
-            for (let i = 0; i < allTransactions.length; i += BATCH_SIZE) {
-                const batch = allTransactions.slice(i, i + BATCH_SIZE);
+            for (let i = 0; i < allTransactionsWithUser.length; i += BATCH_SIZE) {
+                const batch = allTransactionsWithUser.slice(i, i + BATCH_SIZE);
                 await supabase.from('transactions').insert(batch);
             }
 
             // Insert income
-            for (let i = 0; i < fakeIncome.length; i += BATCH_SIZE) {
-                const batch = fakeIncome.slice(i, i + BATCH_SIZE);
+            for (let i = 0; i < fakeIncomeWithUser.length; i += BATCH_SIZE) {
+                const batch = fakeIncomeWithUser.slice(i, i + BATCH_SIZE);
                 await supabase.from('income').insert(batch);
             }
 
             // Update user connection status
             await supabase.from('user_plaid_connections').upsert({
-                user_id: 'default_user',
+                user_id: userId,
+                uuid_user_id: userId,
                 is_connected: true,
                 plaid_item_id: itemId,
                 connected_at: new Date().toISOString(),
                 last_sync_at: new Date().toISOString(),
             }, {
-                onConflict: 'user_id',
+                onConflict: 'uuid_user_id',
             });
 
         } catch (syncError: any) {

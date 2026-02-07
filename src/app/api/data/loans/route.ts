@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { getUserIdFromRequest } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
     try {
+        // Get authenticated user ID
+        const userId = await getUserIdFromRequest(request);
+        
+        if (!userId) {
+            return NextResponse.json({ loans: [] });
+        }
+
         // Check if user is connected
         const { data: connectionData } = await supabase
             .from('user_plaid_connections')
             .select('is_connected')
-            .eq('user_id', 'default_user')
+            .eq('uuid_user_id', userId)
             .single();
 
         if (!connectionData?.is_connected) {
@@ -18,7 +26,7 @@ export async function GET(request: NextRequest) {
         const { data: loanAccounts, error } = await supabase
             .from('accounts')
             .select('*')
-            .eq('user_id', 'default_user')
+            .eq('uuid_user_id', userId)
             .eq('type', 'loan');
 
         if (error) {

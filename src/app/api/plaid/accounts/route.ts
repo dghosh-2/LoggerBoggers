@@ -1,14 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { plaidClient } from '@/lib/plaid-client';
 import { supabase } from '@/lib/supabase';
+import { getUserIdFromRequest } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
     try {
+        // Get authenticated user ID
+        const userId = await getUserIdFromRequest(request);
+        
+        if (!userId) {
+            return NextResponse.json({ 
+                accounts: [],
+                institutions: [],
+                message: 'Authentication required' 
+            });
+        }
+
         // Check if user is connected
         const { data: connectionData } = await supabase
             .from('user_plaid_connections')
             .select('is_connected')
-            .eq('user_id', 'default_user')
+            .eq('uuid_user_id', userId)
             .single();
 
         if (!connectionData?.is_connected) {
@@ -23,7 +35,7 @@ export async function GET(request: NextRequest) {
         const { data: plaidItems, error: itemsError } = await supabase
             .from('plaid_items')
             .select('*')
-            .eq('user_id', 'default_user')
+            .eq('uuid_user_id', userId)
             .eq('status', 'active');
 
         if (itemsError || !plaidItems || plaidItems.length === 0) {
@@ -64,7 +76,8 @@ export async function GET(request: NextRequest) {
                 // Update accounts in Supabase with fresh balances
                 for (const account of accountsResponse.data.accounts) {
                     await supabase.from('accounts').upsert({
-                        user_id: 'default_user',
+                        user_id: userId,
+                        uuid_user_id: userId,
                         plaid_account_id: account.account_id,
                         plaid_item_id: item.item_id,
                         name: account.name,
@@ -143,7 +156,7 @@ export async function GET(request: NextRequest) {
         await supabase
             .from('user_plaid_connections')
             .update({ last_sync_at: new Date().toISOString() })
-            .eq('user_id', 'default_user');
+            .eq('uuid_user_id', userId);
 
         return NextResponse.json({ 
             accounts: allAccounts,
