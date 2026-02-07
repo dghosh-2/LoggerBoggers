@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
         const category = searchParams.get('category');
         const limit = parseInt(searchParams.get('limit') || '1000');
         
-        // Actual schema: id, user_id, plaid_transaction_id, amount, category, name, date, account_id, source, merchant_name, pending, uuid_user_id, location
+        // Schema: id, user_id, uuid_user_id, date, category, name, merchant_name, amount, tip, tax, location, source, pending
         let query = supabaseAdmin
             .from('transactions')
             .select('*')
@@ -32,7 +32,6 @@ export async function GET(request: NextRequest) {
             query = query.lte('date', endDate);
         }
         if (category) {
-            // Category is a text field, filter directly
             query = query.eq('category', category);
         }
         
@@ -51,14 +50,11 @@ export async function GET(request: NextRequest) {
             merchant_name: tx.merchant_name,
             date: tx.date,
             location: tx.location,
+            tip: tx.tip,
+            tax: tx.tax,
+            source: tx.source,
             created_at: tx.created_at,
         }));
-        
-        // #region agent log
-        const categoryCounts: Record<string, number> = {};
-        normalizedTransactions.forEach((tx: any) => { categoryCounts[tx.category] = (categoryCounts[tx.category] || 0) + 1; });
-        fetch('http://127.0.0.1:7245/ingest/2d405ccf-cb3f-4611-bc27-f95a616c15c9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'transactions/route.ts:55',message:'Transactions fetched',data:{count:normalizedTransactions.length,categoryCounts,sampleTx:normalizedTransactions.slice(0,3)},timestamp:Date.now(),hypothesisId:'A,E'})}).catch(()=>{});
-        // #endregion
         
         return NextResponse.json({ transactions: normalizedTransactions });
     } catch (error: any) {

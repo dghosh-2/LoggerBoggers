@@ -66,10 +66,6 @@ export function FinancialGraph() {
     rangeTransactions.forEach(t => {
       categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount;
     });
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7245/ingest/2d405ccf-cb3f-4611-bc27-f95a616c15c9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'financial-graph.tsx:68',message:'Graph data computed',data:{selectedRange,totalTx:transactions.length,filteredTx:rangeTransactions.length,categoryTotals,now:now.toISOString()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D,E'})}).catch(()=>{});
-    // #endregion
 
     const totalExp = Object.values(categoryTotals).reduce((a, b) => a + b, 0);
     // Use real income from summary if available
