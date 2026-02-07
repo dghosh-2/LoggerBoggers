@@ -1,0 +1,14 @@
+{
+  "name": "loggerboggers-monorepo",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dedalus": "node --env-file=${DEDALUS_ENV_FILE:-.env} scripts/dedalus.mjs",
+    "dedalus:chat": "node --env-file=${DEDALUS_ENV_FILE:-.env} scripts/dedalus-chat.mjs",
+    "dedalus:ocr": "node --env-file=${DEDALUS_ENV_FILE:-.env} scripts/dedalus-ocr.mjs",
+    "web": "npm run dev --workspace=@repo/web"
+  }
+}

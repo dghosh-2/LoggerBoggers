@@ -1,0 +1,9 @@
+{
+    "name": "@repo/core",
+    "version": "0.0.0",
+    "private": true,
+    "main": "./index.ts",
+    "dependencies": {
+        "@supabase/supabase-js": "^2.95.2"
+    }
+}
