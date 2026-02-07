@@ -69,32 +69,74 @@ export function ChatAssistant() {
     return msg;
   };
 
-  const simulateResponse = (userMessage: string) => {
+  const fetchResponse = async (userMessage: string) => {
     setIsThinking(true);
-    // Simulated delay for frontend demo
-    setTimeout(() => {
-      const responses: Record<string, string> = {
-        spending:
-          "Based on your recent transactions, you've spent $3,240 this month — about 8% less than last month. Your biggest categories are dining ($680) and subscriptions ($320). Want me to break it down further?",
-        "net worth":
-          "Your net worth has grown 4.2% over the last 3 months, currently sitting at $47,850. Your investment portfolio is the main driver, up 6.1%. Keep it up!",
-        expenses:
-          "Here are 3 quick wins: 1) You have 4 overlapping streaming subscriptions — consolidating could save ~$45/mo. 2) Switching your coffee spend to bi-weekly could save $60/mo. 3) Your insurance premiums are due for renegotiation.",
-        portfolio:
-          "Your portfolio has a moderate risk profile with a Sharpe ratio of 1.2. You're 70% equities, 20% bonds, 10% alternatives. Consider rebalancing — tech is slightly overweight at 35% of equities.",
-      };
 
-      const key = Object.keys(responses).find((k) =>
-        userMessage.toLowerCase().includes(k)
-      );
-      const reply =
-        key
-          ? responses[key]
-          : "That's a great question. I'd analyze your transaction history and portfolio data to give you a detailed answer. This feature will be fully connected to your financial data soon!";
+    try {
+      // Get all messages for context
+      const conversationMessages = messages
+        .filter(msg => msg.id !== 'welcome') // Exclude welcome message
+        .map(msg => ({
+          role: msg.role,
+          content: msg.content
+        }));
 
-      addMessage("assistant", reply);
+      // Add the current user message
+      conversationMessages.push({
+        role: 'user',
+        content: userMessage
+      });
+
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: conversationMessages,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get response');
+      }
+
+      // Stream the response
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let assistantMessage = '';
+
+      if (reader) {
+        // Add empty assistant message that we'll update
+        const msgId = Date.now().toString();
+        setMessages(prev => [...prev, {
+          id: msgId,
+          role: 'assistant',
+          content: '',
+          timestamp: new Date(),
+        }]);
+        setIsThinking(false);
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          assistantMessage += chunk;
+
+          // Update the message in real-time
+          setMessages(prev => prev.map(msg =>
+            msg.id === msgId
+              ? { ...msg, content: assistantMessage }
+              : msg
+          ));
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching response:', error);
+      addMessage('assistant', 'Sorry, I encountered an error. Please try again.');
       setIsThinking(false);
-    }, 1200 + Math.random() * 800);
+    }
   };
 
   const handleSend = () => {
@@ -102,7 +144,7 @@ export function ChatAssistant() {
     if (!text) return;
     addMessage("user", text);
     setInput("");
-    simulateResponse(text);
+    fetchResponse(text);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -121,14 +163,14 @@ export function ChatAssistant() {
         const voiceInput = "How's my spending this month?";
         setInput(voiceInput);
         addMessage("user", voiceInput);
-        simulateResponse(voiceInput);
+        fetchResponse(voiceInput);
       }, 2500);
     }
   };
 
   const handleSuggestedPrompt = (prompt: string) => {
     addMessage("user", prompt);
-    simulateResponse(prompt);
+    fetchResponse(prompt);
   };
 
   return (
