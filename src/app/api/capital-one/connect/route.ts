@@ -255,57 +255,34 @@ export async function POST(request: NextRequest) {
         const savingsAccountId = accountsToStore[1].plaid_account_id;
         const creditAccountId = accountsToStore[2].plaid_account_id;
         
-        // First, ensure all categories exist in the database
-        const categoryNames = ['Food & Drink', 'Transportation', 'Shopping', 'Entertainment', 
-                              'Bills & Utilities', 'Health & Fitness', 'Travel', 'Personal Care', 
-                              'Education', 'Other'];
-        
-        // Get existing categories
-        const { data: existingCategories } = await supabaseAdmin
-            .from('categories')
-            .select('id, name');
-        
-        const categoryMap: Record<string, string> = {};
-        (existingCategories || []).forEach(cat => {
-            categoryMap[cat.name] = cat.id;
-        });
-        
-        // Create missing categories
-        for (const catName of categoryNames) {
-            if (!categoryMap[catName]) {
-                const { data: newCat, error: catError } = await supabaseAdmin
-                    .from('categories')
-                    .insert({ name: catName })
-                    .select('id, name')
-                    .single();
-                if (newCat) {
-                    categoryMap[newCat.name] = newCat.id;
-                    console.log(`Created category: ${catName}`);
-                }
-            }
-        }
-        
-        console.log('Category map:', categoryMap);
-        
         // Transform transactions to match actual database schema
-        // Actual schema: id, receipt_id, merchant_name, amount, transaction_date, category_id, notes, created_at, user_id
+        // Actual schema: id, user_id, plaid_transaction_id, amount, category, name, date, account_id, source, merchant_name, pending, uuid_user_id, location
         const allTransactionsWithUser = fakeTransactions.map((tx) => {
-            const categoryId = categoryMap[tx.category] || categoryMap['Other'];
-            
             return {
+                user_id: userId,
+                uuid_user_id: userId,
                 merchant_name: tx.merchant_name || tx.name,
+                name: tx.name || tx.merchant_name,
                 amount: tx.amount,
-                transaction_date: tx.date, // Schema uses transaction_date not date
-                category_id: categoryId,   // Schema uses category_id not category
-                user_id: userId,           // Schema uses user_id (no uuid_user_id)
-                notes: tx.location || null, // Store location in notes field
+                date: tx.date,           // Schema uses 'date' not 'transaction_date'
+                category: tx.category,   // Schema uses 'category' (text) not 'category_id'
+                source: 'capital_one',
+                location: tx.location || null,
+                pending: false,
             };
         });
 
+        // Transform income to match actual database schema
+        // Actual schema: id, user_id, amount, source, name, date, recurring, frequency, uuid_user_id, location
         const fakeIncomeWithUser = fakeIncome.map(inc => ({
-            ...inc,
             user_id: userId,
             uuid_user_id: userId,
+            amount: inc.amount,
+            source: inc.source || 'Salary',
+            name: inc.source || 'Salary',
+            date: inc.date,
+            recurring: true,
+            frequency: 'monthly',
         }));
 
         // Insert transactions in batches
