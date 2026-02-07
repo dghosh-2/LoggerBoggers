@@ -290,6 +290,10 @@ export default function PortfolioPage() {
   };
 
   const totalStockValue = getTotalValue();
+  const netWorthWithManual = (summary?.netWorth || 0) + (totalStockValue || 0);
+  const investmentsWithManual = (summary?.totalInvestments || 0) + (totalStockValue || 0);
+  const dbHoldingsTotalValue = (plaidHoldings || []).reduce((sum, h) => sum + Number(h.value || 0), 0);
+  const sortedDbHoldings = [...(plaidHoldings || [])].sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
 
   // Combine all accounts for the balance bar
   const allAccounts = [
@@ -453,10 +457,10 @@ export default function PortfolioPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[11px] text-foreground-muted uppercase tracking-wider">Net Worth (Excluding Manual Stocks)</p>
+                <p className="text-[11px] text-foreground-muted uppercase tracking-wider">Net Worth</p>
                 <div className="flex items-baseline gap-3">
                   <h1 className="text-3xl font-semibold tabular-nums">
-                    ${summary?.netWorth.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    ${netWorthWithManual.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </h1>
                 </div>
               </div>
@@ -470,7 +474,7 @@ export default function PortfolioPage() {
                 <div>
                   <p className="text-[10px] text-foreground-muted">Investments</p>
                   <p className="text-sm font-semibold text-primary tabular-nums">
-                    ${summary?.totalInvestments.toLocaleString()}
+                    ${investmentsWithManual.toLocaleString()}
                   </p>
                 </div>
                 <div>
@@ -485,7 +489,7 @@ export default function PortfolioPage() {
         </GlassCard>
 
         {/* Net Worth Chart */}
-        <PortfolioChart data={summary?.netWorth ? generatePortfolioHistory(summary.netWorth) : []} />
+        <PortfolioChart data={netWorthWithManual ? generatePortfolioHistory(netWorthWithManual) : []} />
 
         {/* ═══════════════════════════════════════════════════════════════════
             SECTION 4: ACCOUNTS SUMMARY
@@ -571,143 +575,37 @@ export default function PortfolioPage() {
         )}
 
         {/* ═══════════════════════════════════════════════════════════════════
-            SECTION 6: MANUAL STOCK HOLDINGS (Portfolio-only)
+            SECTION 6: STOCK HOLDINGS
+            - DB holdings (Supabase `holdings`) are part of Net Worth.
+            - Manual holdings are optional and not part of Net Worth.
         ═══════════════════════════════════════════════════════════════════ */}
         <GlassCard>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <LineChart className="w-4 h-4 text-primary" />
-              <h3 className="text-sm font-semibold">Manual Stock Holdings</h3>
+              <h3 className="text-sm font-semibold">Stock Holdings</h3>
             </div>
             <div className="flex items-center gap-3">
-              {totalStockValue > 0 && (
+              {dbHoldingsTotalValue > 0 && (
                 <span className="text-sm font-bold text-primary tabular-nums">
-                  ${totalStockValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  ${dbHoldingsTotalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </span>
               )}
-              <span className="text-[9px] text-foreground-muted bg-secondary px-2 py-0.5 rounded">
-                Not in net worth
-              </span>
             </div>
           </div>
 
-          {/* Add Stock Form - Cleaner layout */}
-          <div className="p-3 rounded-lg bg-secondary/30 border border-border/50 mb-3">
-            <div className="flex items-center gap-2">
-              {/* Stock Symbol Input with Search */}
-              <div className="flex-1 relative min-w-0">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-foreground-muted pointer-events-none" />
-                <input
-                  type="text"
-                  placeholder="Search symbol (AAPL, GOOGL...)"
-                  value={stockSymbol}
-                  onChange={(e) => {
-                    setStockSymbol(e.target.value.toUpperCase());
-                    setSelectedStock(null);
-                  }}
-                  className="w-full pl-8 pr-8 py-2 rounded-md bg-background border border-border text-xs focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
-                />
-                {stockSymbol && !selectedStock && (
-                  <button
-                    onClick={() => {
-                      setStockSymbol("");
-                      setSearchResults([]);
-                    }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground p-0.5"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
-
-                {/* Search Results Dropdown */}
-                {searchResults.length > 0 && !selectedStock && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-md shadow-lg z-50 max-h-[160px] overflow-y-auto">
-                    {searchResults.map((result) => (
-                      <button
-                        key={result.symbol}
-                        onClick={() => handleSelectStock(result)}
-                        className="w-full px-2.5 py-1.5 text-left hover:bg-secondary transition-colors flex items-center justify-between gap-2"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-semibold">{result.symbol}</p>
-                          <p className="text-[9px] text-foreground-muted truncate">{result.name}</p>
-                        </div>
-                        <span className="text-[9px] text-foreground-muted flex-shrink-0">{result.exchange}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Shares Input */}
-              <div className="w-24 flex-shrink-0">
-                <input
-                  type="number"
-                  placeholder="Shares"
-                  value={stockShares}
-                  onChange={(e) => setStockShares(e.target.value)}
-                  min="0"
-                  step="0.01"
-                  className="w-full px-2.5 py-2 rounded-md bg-background border border-border text-xs focus:outline-none focus:ring-1 focus:ring-primary/50 tabular-nums"
-                />
-              </div>
-
-              {/* Add Button */}
-              <GlassButton
-                variant="primary"
-                size="sm"
-                onClick={handleAddStock}
-                disabled={!selectedStock || !stockShares || isAddingStock}
-                className="flex-shrink-0 px-3"
-              >
-                {isAddingStock ? (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Plus className="w-3.5 h-3.5" />
-                )}
-              </GlassButton>
-            </div>
-
-            {/* Selected Stock Info - Inline */}
-            {selectedStock && (
-              <div className="mt-2 flex items-center justify-between gap-2 px-2 py-1.5 rounded bg-primary/10">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-xs font-semibold text-primary">{selectedStock.symbol}</span>
-                  <span className="text-[10px] text-foreground-muted truncate">{selectedStock.name}</span>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-xs font-mono">${selectedStock.price?.toFixed(2) || '...'}</span>
-                  {stockShares && parseFloat(stockShares) > 0 && (
-                    <span className="text-xs font-semibold text-success tabular-nums">
-                      = ${(parseFloat(stockShares) * (selectedStock.price || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </span>
-                  )}
-                  <button
-                    onClick={() => {
-                      setSelectedStock(null);
-                      setStockSymbol("");
-                    }}
-                    className="text-foreground-muted hover:text-foreground p-0.5"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Holdings List */}
-          {manualStockHoldings.length === 0 ? (
+          {/* DB Holdings (Supabase `holdings`) */}
+          {sortedDbHoldings.length === 0 ? (
             <div className="text-center py-6">
               <LineChart className="w-8 h-8 text-foreground-muted mx-auto mb-2 opacity-50" />
-              <p className="text-xs font-medium text-foreground-muted">No stocks added yet</p>
+              <p className="text-xs font-medium text-foreground-muted">No holdings found</p>
               <p className="text-[10px] text-foreground-muted/70">
-                Search and add stocks to track their value
+                Connect an institution and sync holdings to see them here.
               </p>
             </div>
           ) : (
             <div className="space-y-1.5">
-              {manualStockHoldings.map((holding) => (
+              {sortedDbHoldings.map((holding) => (
                 <motion.div
                   key={holding.id}
                   initial={{ opacity: 0, y: 5 }}
@@ -716,15 +614,15 @@ export default function PortfolioPage() {
                 >
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center font-bold text-xs text-primary">
-                      {holding.symbol.slice(0, 2)}
+                      {holding.symbol?.slice(0, 2) || '—'}
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <p className="text-xs font-semibold">{holding.symbol}</p>
-                        <p className="text-[9px] text-foreground-muted truncate max-w-[100px]">{holding.name}</p>
+                        <p className="text-xs font-semibold">{holding.symbol || 'Unknown'}</p>
+                        <p className="text-[9px] text-foreground-muted truncate max-w-[140px]">{holding.name}</p>
                       </div>
                       <p className="text-[10px] text-foreground-muted tabular-nums">
-                        {holding.shares} × ${holding.currentPrice.toFixed(2)}
+                        {Number(holding.quantity || 0).toLocaleString()} × ${Number(holding.price || 0).toFixed(2)}
                       </p>
                     </div>
                   </div>
@@ -732,18 +630,16 @@ export default function PortfolioPage() {
                   <div className="flex items-center gap-3">
                     <div className="text-right">
                       <p className="text-xs font-semibold tabular-nums">
-                        ${holding.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        ${Number(holding.value || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </p>
-                      <p className={`text-[9px] tabular-nums ${holding.changePercent >= 0 ? 'text-success' : 'text-destructive'}`}>
-                        {holding.changePercent >= 0 ? '+' : ''}{holding.changePercent.toFixed(2)}%
-                      </p>
+                      {typeof holding.gainLossPercent === 'number' ? (
+                        <p className={`text-[9px] tabular-nums ${holding.gainLossPercent >= 0 ? 'text-success' : 'text-destructive'}`}>
+                          {holding.gainLossPercent >= 0 ? '+' : ''}{Number(holding.gainLossPercent).toFixed(2)}%
+                        </p>
+                      ) : (
+                        <p className="text-[9px] tabular-nums text-foreground-muted">--</p>
+                      )}
                     </div>
-                    <button
-                      onClick={() => handleRemoveStock(holding.id, holding.symbol)}
-                      className="p-1 rounded hover:bg-destructive/10 text-foreground-muted hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
                   </div>
                 </motion.div>
               ))}
@@ -752,11 +648,182 @@ export default function PortfolioPage() {
               <div className="flex items-center justify-between pt-2 mt-1 border-t border-border">
                 <p className="text-xs text-foreground-muted">Total Value</p>
                 <p className="text-sm font-bold tabular-nums">
-                  ${totalStockValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  ${dbHoldingsTotalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </p>
               </div>
             </div>
           )}
+
+          {/* Optional: manual holdings (local only) */}
+          <details className="mt-4">
+            <summary className="cursor-pointer select-none text-xs font-medium text-foreground-muted hover:text-foreground transition-colors">
+              Add stocks manually
+            </summary>
+            <div className="mt-3">
+              {/* Add Stock Form - Cleaner layout */}
+              <div className="p-3 rounded-lg bg-secondary/30 border border-border/50 mb-3">
+                <div className="flex items-center gap-2">
+                  {/* Stock Symbol Input with Search */}
+                  <div className="flex-1 relative min-w-0">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-foreground-muted pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Search symbol (AAPL, GOOGL...)"
+                      value={stockSymbol}
+                      onChange={(e) => {
+                        setStockSymbol(e.target.value.toUpperCase());
+                        setSelectedStock(null);
+                      }}
+                      className="w-full pl-8 pr-8 py-2 rounded-md bg-background border border-border text-xs focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
+                    />
+                    {stockSymbol && !selectedStock && (
+                      <button
+                        onClick={() => {
+                          setStockSymbol("");
+                          setSearchResults([]);
+                        }}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground p-0.5"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+
+                    {/* Search Results Dropdown */}
+                    {searchResults.length > 0 && !selectedStock && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-md shadow-lg z-50 max-h-[160px] overflow-y-auto">
+                        {searchResults.map((result) => (
+                          <button
+                            key={result.symbol}
+                            onClick={() => handleSelectStock(result)}
+                            className="w-full px-2.5 py-1.5 text-left hover:bg-secondary transition-colors flex items-center justify-between gap-2"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-semibold">{result.symbol}</p>
+                              <p className="text-[9px] text-foreground-muted truncate">{result.name}</p>
+                            </div>
+                            <span className="text-[9px] text-foreground-muted flex-shrink-0">{result.exchange}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Shares Input */}
+                  <div className="w-24 flex-shrink-0">
+                    <input
+                      type="number"
+                      placeholder="Shares"
+                      value={stockShares}
+                      onChange={(e) => setStockShares(e.target.value)}
+                      min="0"
+                      step="0.01"
+                      className="w-full px-2.5 py-2 rounded-md bg-background border border-border text-xs focus:outline-none focus:ring-1 focus:ring-primary/50 tabular-nums"
+                    />
+                  </div>
+
+                  {/* Add Button */}
+                  <GlassButton
+                    variant="primary"
+                    size="sm"
+                    onClick={handleAddStock}
+                    disabled={!selectedStock || !stockShares || isAddingStock}
+                    className="flex-shrink-0 px-3"
+                  >
+                    {isAddingStock ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Plus className="w-3.5 h-3.5" />
+                    )}
+                  </GlassButton>
+                </div>
+
+                {/* Selected Stock Info - Inline */}
+                {selectedStock && (
+                  <div className="mt-2 flex items-center justify-between gap-2 px-2 py-1.5 rounded bg-primary/10">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-xs font-semibold text-primary">{selectedStock.symbol}</span>
+                      <span className="text-[10px] text-foreground-muted truncate">{selectedStock.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-xs font-mono">${selectedStock.price?.toFixed(2) || '...'}</span>
+                      {stockShares && parseFloat(stockShares) > 0 && (
+                        <span className="text-xs font-semibold text-success tabular-nums">
+                          = ${(parseFloat(stockShares) * (selectedStock.price || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => {
+                          setSelectedStock(null);
+                          setStockSymbol("");
+                        }}
+                        className="text-foreground-muted hover:text-foreground p-0.5"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Manual Holdings List */}
+              {manualStockHoldings.length === 0 ? (
+                <div className="text-center py-6">
+                  <LineChart className="w-8 h-8 text-foreground-muted mx-auto mb-2 opacity-50" />
+                  <p className="text-xs font-medium text-foreground-muted">No manual stocks added yet</p>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {manualStockHoldings.map((holding) => (
+                    <motion.div
+                      key={holding.id}
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex items-center justify-between p-2.5 rounded-md bg-secondary/30 hover:bg-secondary/50 transition-colors group"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center font-bold text-xs text-primary">
+                          {holding.symbol.slice(0, 2)}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-xs font-semibold">{holding.symbol}</p>
+                            <p className="text-[9px] text-foreground-muted truncate max-w-[140px]">{holding.name}</p>
+                          </div>
+                          <p className="text-[10px] text-foreground-muted tabular-nums">
+                            {holding.shares} × ${holding.currentPrice.toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <p className="text-xs font-semibold tabular-nums">
+                            ${holding.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </p>
+                          <p className={`text-[9px] tabular-nums ${holding.changePercent >= 0 ? 'text-success' : 'text-destructive'}`}>
+                            {holding.changePercent >= 0 ? '+' : ''}{holding.changePercent.toFixed(2)}%
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleRemoveStock(holding.id, holding.symbol)}
+                          className="p-1 rounded hover:bg-destructive/10 text-foreground-muted hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </motion.div>
+                  ))}
+
+                  <div className="flex items-center justify-between pt-2 mt-1 border-t border-border">
+                    <p className="text-xs text-foreground-muted">Manual Total</p>
+                    <p className="text-sm font-bold tabular-nums">
+                      ${totalStockValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </details>
         </GlassCard>
       </div>
     </PageTransition>

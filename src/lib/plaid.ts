@@ -245,14 +245,16 @@ export async function getFinancialSummary(): Promise<FinancialSummary> {
         };
     }
 
-    const [bankAccounts, investmentAccounts, loanAccounts] = await Promise.all([
+    const [bankAccounts, investmentAccounts, loanAccounts, holdings] = await Promise.all([
         getBankAccounts(),
         getInvestmentAccounts(),
         getLoanAccounts(),
+        getInvestmentHoldings(),
     ]);
 
     const totalCash = bankAccounts.reduce((sum, acc) => sum + acc.currentBalance, 0);
-    const totalInvestments = investmentAccounts.reduce((sum, acc) => sum + acc.currentBalance, 0);
+    const holdingsValue = (holdings || []).reduce((sum, h: any) => sum + Number(h.value || 0), 0);
+    const totalInvestments = investmentAccounts.reduce((sum, acc) => sum + acc.currentBalance, 0) + holdingsValue;
     const totalLoans = loanAccounts.reduce((sum, acc) => sum + acc.currentBalance, 0);
 
     return {

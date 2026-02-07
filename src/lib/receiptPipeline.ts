@@ -1,8 +1,10 @@
-import { supabase } from '@repo/core';
+import 'server-only';
+
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export async function createReceiptAndTriggerOcr(imageUrl: string, userId: string) {
     const dbStart = Date.now();
-    const { data: receipt, error: dbError } = await supabase
+    const { data: receipt, error: dbError } = await supabaseAdmin
         .from('receipts')
         .insert({
             user_id: userId,

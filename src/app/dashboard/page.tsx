@@ -37,6 +37,7 @@ import { useInsightsStore } from "@/stores/insights-store";
 import { GlassButton } from "@/components/ui/glass-button";
 import { DogLoadingAnimation } from "@/components/ui/DogLoadingAnimation";
 import { useFinancialData } from "@/hooks/useFinancialData";
+import { useStockHoldingsStore } from "@/stores/stock-holdings-store";
 
 interface DisplayTransaction {
   id: string;
@@ -88,6 +89,7 @@ export default function DashboardPage() {
   const [topMovers, setTopMovers] = useState<TopHolding[]>([]);
   const [holdingsCoverage, setHoldingsCoverage] = useState<HoldingsWidgetResponse['coverage']>(undefined);
   const [topHoldingsLoading, setTopHoldingsLoading] = useState(false);
+  const manualStockValue = useStockHoldingsStore((s) => s.getTotalValue());
   
   // Use the financial data hook for consistent data fetching and caching
   const { summary, loading, refetch } = useFinancialData();
@@ -116,6 +118,10 @@ export default function DashboardPage() {
     Spending: item.spending,
   })) || [];
 
+  // Dashboard net worth is computed server-side in /api/data/summary from:
+  // (depository + investment accounts + holdings) - (credit + loan liabilities).
+  const displayNetWorth = Number(summary?.net_worth || 0) + (manualStockValue || 0);
+
   const netWorthTrendData = useMemo(() => {
     const trend = summary?.monthly_trend || [];
     if (!trend.length) return [];
@@ -124,7 +130,7 @@ export default function DashboardPage() {
     // We don't store historical balance snapshots, so this is a derived series.
     const savings = trend.map((m) => Number(m.income || 0) - Number(m.spending || 0));
     const totalSavings = savings.reduce((sum, v) => sum + v, 0);
-    const currentNetWorth = Number(summary?.net_worth || 0);
+    const currentNetWorth = Number(displayNetWorth || 0);
     const startingNetWorth = currentNetWorth - totalSavings;
 
     let running = startingNetWorth;
@@ -132,7 +138,7 @@ export default function DashboardPage() {
       running += savings[i] || 0;
       return { month: m.month, netWorth: Math.round(running * 100) / 100 };
     });
-  }, [summary?.monthly_trend, summary?.net_worth]);
+  }, [summary?.monthly_trend, displayNetWorth]);
 
   const categoryData = Object.entries(summary?.spending_by_category || {})
     .sort((a, b) => b[1] - a[1])
@@ -276,8 +282,8 @@ export default function DashboardPage() {
             <div className="relative flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-[11px] md:text-xs font-semibold uppercase tracking-wide text-foreground-muted">Net Worth</div>
-                <div className={`mt-0.5 text-2xl md:text-4xl font-bold tracking-tight font-mono ${summary.net_worth >= 0 ? 'text-success' : 'text-destructive'}`}>
-                  ${summary.net_worth.toLocaleString()}
+                <div className={`mt-0.5 text-2xl md:text-4xl font-bold tracking-tight font-mono ${displayNetWorth >= 0 ? 'text-success' : 'text-destructive'}`}>
+                  ${displayNetWorth.toLocaleString()}
                 </div>
                 {netWorthTrendData.length >= 2 ? (
                   (() => {

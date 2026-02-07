@@ -242,7 +242,7 @@ export default function ImportsPage() {
               size="sm"
               onClick={() => router.push("/receipts")}
             >
-              Open Receipts
+              Upload receipt
             </GlassButton>
           </div>
         </GlassCard>

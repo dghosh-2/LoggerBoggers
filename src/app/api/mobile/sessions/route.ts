@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createMobileSession } from '@/lib/mobileReceiptSessions';
+import { createMobileSession, MOBILE_SESSION_EXPIRES_IN_SECONDS } from '@/lib/mobileReceiptSessions';
 import { getUserIdFromRequest } from '@/lib/auth';
 
 export async function POST(req: Request) {
@@ -8,11 +8,11 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const session = createMobileSession(userId);
+    const session = await createMobileSession(userId);
 
     return NextResponse.json({
         sessionId: session.sessionId,
         status: session.status,
-        expiresInSeconds: 900,
+        expiresInSeconds: MOBILE_SESSION_EXPIRES_IN_SECONDS,
     });
 }

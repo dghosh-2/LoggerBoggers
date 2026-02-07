@@ -10,7 +10,7 @@ export async function GET(
     const userId = await getUserIdFromRequest(req);
     if (!userId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
 
-    const session = getMobileSession(sessionId);
+    const session = await getMobileSession(sessionId);
 
     if (!session) {
         return NextResponse.json({ error: 'Session not found or expired' }, { status: 404 });

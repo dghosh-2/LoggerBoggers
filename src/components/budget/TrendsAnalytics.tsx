@@ -27,27 +27,6 @@ import {
     Bar,
 } from 'recharts';
 
-<<<<<<< HEAD
-// ═══════════════════════════════════════════════════════════════════════════
-// COLORS & CONSTANTS
-// ═══════════════════════════════════════════════════════════════════════════
-
-const CATEGORY_COLORS: Record<string, string> = {
-    'Bills & Utilities': '#06b6d4',
-    'Education': '#a855f7',
-    'Entertainment': '#3b82f6',
-    'Food & Drink': '#f97316',
-    'Health & Fitness': '#ec4899',
-    'Personal Care': '#14b8a6',
-    'Shopping': '#a855f7',
-    'Transportation': '#eab308',
-    'Travel': '#fb923c',
-    'Other': '#6b7280',
-};
-
-function getCategoryColor(category: string): string {
-    return CATEGORY_COLORS[normalizeCategory(category)] || '#6b7280';
-=======
 const CHART_COLORS = [
     'var(--chart-1)',
     'var(--chart-2)',
@@ -63,7 +42,6 @@ function getCategoryColor(category: string): string {
         hash = (hash * 31 + key.charCodeAt(i)) % CHART_COLORS.length;
     }
     return CHART_COLORS[hash];
->>>>>>> abhinav-changes
 }
 
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

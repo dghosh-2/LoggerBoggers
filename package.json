@@ -26,6 +26,7 @@
     "next": "16.1.6",
     "openai": "^4.104.0",
     "plaid": "^31.0.0",
+    "qrcode": "^1.5.4",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-globe.gl": "^2.37.0",

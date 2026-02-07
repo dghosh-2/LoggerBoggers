@@ -11,7 +11,6 @@ const ROUTES_TO_PREFETCH = [
   '/budget',
   '/studio',
   '/insights',
-  '/globe',
   '/stocks',
   '/imports',
   '/portfolio',
@@ -78,7 +77,7 @@ export function AppPrefetcher() {
         void refreshGlobalFinancialData();
       }
 
-      // These are used on Dashboard/Globe and benefit from a warmed network+server cache.
+      // These are used on Dashboard and benefit from a warmed network+server cache.
       void fetch('/api/data/top-holdings?movers=4&quoteMax=30').catch(() => {});
       void fetch('/api/data/locations?timeframe=month').catch(() => {});
     });
@@ -88,4 +87,3 @@ export function AppPrefetcher() {
 
   return null;
 }
-

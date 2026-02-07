@@ -165,7 +165,6 @@ export default function GlobePage() {
         {/* Globe - Always show the 3D globe */}
         <div className="rounded-xl bg-card border border-border overflow-hidden relative" style={{ height: '600px' }}>
           <PurchaseGlobe locations={locations} isLoading={loading} />
-<<<<<<< HEAD
           {!loading && cacheTableMissing && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="max-w-md text-center p-6 bg-card/85 backdrop-blur-sm border border-border rounded-xl">
@@ -176,8 +175,6 @@ export default function GlobePage() {
               </div>
             </div>
           )}
-=======
->>>>>>> abhinav-changes
           {!loading && locations.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="max-w-md text-center p-6 bg-card/85 backdrop-blur-sm border border-border rounded-xl">
