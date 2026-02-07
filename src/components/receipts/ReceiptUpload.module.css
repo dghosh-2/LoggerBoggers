@@ -1,0 +1,99 @@
+.hiddenInput {
+    display: none;
+}
+
+.drop {
+    border: 2px dashed rgba(130, 155, 135, 0.65);
+    border-radius: 18px;
+    padding: 2.25rem 1.5rem;
+    background:
+        radial-gradient(circle at 18% 22%, rgba(220, 235, 217, 0.75) 0%, transparent 40%),
+        radial-gradient(circle at 82% 78%, rgba(212, 229, 210, 0.62) 0%, transparent 36%),
+        rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    transition: border-color 160ms ease, transform 160ms ease, background 160ms ease;
+    user-select: none;
+    min-height: 320px;
+    display: grid;
+    place-items: center;
+}
+
+.drop:hover {
+    transform: translateY(-1px);
+    border-color: rgba(70, 125, 86, 0.75);
+}
+
+.dropActive {
+    border-color: rgba(40, 120, 70, 0.85);
+    background:
+        radial-gradient(circle at 18% 22%, rgba(220, 245, 224, 0.9) 0%, transparent 40%),
+        radial-gradient(circle at 82% 78%, rgba(206, 240, 216, 0.7) 0%, transparent 36%),
+        rgba(255, 255, 255, 0.75);
+}
+
+.dropInner {
+    display: grid;
+    gap: 0.4rem;
+    text-align: center;
+}
+
+.dropTitle {
+    font-size: 1.05rem;
+    font-weight: 850;
+    letter-spacing: -0.01em;
+    color: rgba(14, 24, 16, 0.92);
+}
+
+.dropSub {
+    font-size: 0.9rem;
+    font-weight: 650;
+    color: rgba(14, 24, 16, 0.62);
+}
+
+.previewWrap {
+    padding: 1rem;
+    display: grid;
+    gap: 0.9rem;
+}
+
+.previewFrame {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4 / 5;
+    border-radius: 18px;
+    overflow: hidden;
+    border: 1px solid rgba(200, 215, 205, 0.9);
+    background: rgba(255, 255, 255, 0.72);
+    box-shadow: 0 18px 34px rgba(18, 41, 22, 0.12);
+}
+
+.previewImg {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+.actionsRow {
+    display: grid;
+    gap: 0.65rem;
+}
+
+.actionsButtons {
+    display: grid;
+    gap: 0.55rem;
+}
+
+.meta {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: rgba(14, 24, 16, 0.56);
+    text-align: center;
+}
+
+.error {
+    font-size: 0.82rem;
+    font-weight: 750;
+    color: rgb(153, 46, 46);
+    text-align: center;
+}
