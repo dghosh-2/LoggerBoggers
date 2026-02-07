@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getUserIdFromRequest } from '@/lib/auth';
 import { generateFiveYearsOfTransactions, generateFiveYearsOfIncome, generateHoldings } from '@/lib/fake-transaction-generator';
-import { generateAggregatedStatistics } from '@/lib/aggregated-statistics';
+import { runPostConnectBackfillOnce } from '@/lib/post-connect-backfill';
 
 const NESSIE_BASE_URL = 'http://api.nessieisreal.com';
 const API_KEY = process.env.CAPITAL_ONE_API_KEY;
@@ -405,7 +405,7 @@ export async function POST(request: NextRequest) {
 
         // Generate aggregated statistics for chatbot and dashboards
         console.log('=== CAPITAL ONE: GENERATING AGGREGATED STATISTICS ===');
-        await generateAggregatedStatistics(userId);
+        await runPostConnectBackfillOnce(userId);
 
         return NextResponse.json({ 
             success: true,

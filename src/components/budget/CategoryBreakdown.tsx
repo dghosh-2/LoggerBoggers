@@ -135,6 +135,15 @@ interface CategoryRowProps {
 
 function CategoryRow({ category, index, isExpanded, onToggle }: CategoryRowProps) {
     const icon = CATEGORY_ICONS[normalizeCategory(category.category)] || <MoreHorizontal className="w-4 h-4" />;
+<<<<<<< HEAD
+
+    const statusColors = {
+        healthy: 'bg-emerald-500',
+        warning: 'bg-amber-500',
+        danger: 'bg-red-500',
+    };
+=======
+>>>>>>> abhinav-changes
 
     return (
         <div>

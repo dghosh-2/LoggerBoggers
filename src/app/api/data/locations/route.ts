@@ -29,6 +29,12 @@ function toDateString(d: Date): string {
   return d.toISOString().split('T')[0];
 }
 
+<<<<<<< HEAD
+function isMissingTableError(err: any, tableName: string): boolean {
+  const msg = String(err?.message || err?.details || err?.hint || '');
+  const code = String(err?.code || '');
+  return code === '42P01' || msg.toLowerCase().includes(`relation \"${tableName}\" does not exist`);
+=======
 function txKey(input: { date: string; amount: number; merchant: string; address: string }): string {
   const merchant = (input.merchant || '').trim().toLowerCase();
   const address = (input.address || '').trim().toLowerCase();
@@ -67,6 +73,7 @@ function isMissingTableError(err: any, tableName: string): boolean {
   const msg = String(err?.message || err?.details || err?.hint || '');
   const code = String(err?.code || '');
   return code === '42P01' || msg.toLowerCase().includes(`relation "${tableName}" does not exist`);
+>>>>>>> abhinav-changes
 }
 
 export async function GET(request: NextRequest) {
@@ -74,17 +81,21 @@ export async function GET(request: NextRequest) {
     const userId = await getUserIdFromRequest(request);
 
     if (!userId) {
-      return NextResponse.json({ locations: [] });
+      return NextResponse.json({ locations: [], cache_table_missing: false });
     }
 
-    // Get timeframe from query params
     const { searchParams } = new URL(request.url);
     const timeframe = (searchParams.get('timeframe') || '30d') as Timeframe;
+<<<<<<< HEAD
+    const startDateStr = toDateString(timeframeToStartDate(timeframe));
+
+=======
 
     const startDate = timeframeToStartDate(timeframe);
     const startDateStr = toDateString(startDate);
 
     // Fetch purchase locations from database
+>>>>>>> abhinav-changes
     const { data: locations, error } = await supabaseAdmin
       .from('purchase_locations')
       .select('*')
@@ -93,6 +104,18 @@ export async function GET(request: NextRequest) {
       .order('date', { ascending: false });
 
     if (error) {
+<<<<<<< HEAD
+      const missing = isMissingTableError(error, 'purchase_locations');
+      if (!missing) console.error('Error fetching purchase_locations:', error);
+      // If the cache table is missing, treat it as a "soft" error so the UI can show guidance.
+      if (missing) {
+        return NextResponse.json({ locations: [], cache_table_missing: true }, { status: 200 });
+      }
+      return NextResponse.json({ locations: [], cache_table_missing: false }, { status: 500 });
+    }
+
+    const transformedLocations = (locations || []).map((loc: any) => ({
+=======
       // If the cache table doesn't exist yet, fall back to returning geocoded points directly.
       if (isMissingTableError(error, 'purchase_locations')) {
         console.error('purchase_locations table missing; falling back to on-the-fly geocoding.');
@@ -286,6 +309,7 @@ export async function GET(request: NextRequest) {
 
     // Transform data for the globe
     const transformedLocations = (finalLocations || []).map((loc: any) => ({
+>>>>>>> abhinav-changes
       id: loc.id,
       lat: Number(loc.latitude),
       lng: Number(loc.longitude),
@@ -295,9 +319,9 @@ export async function GET(request: NextRequest) {
       category: loc.category || 'Other',
     }));
 
-    return NextResponse.json({ locations: transformedLocations });
+    return NextResponse.json({ locations: transformedLocations, cache_table_missing: false });
   } catch (error) {
     console.error('Error in locations API:', error);
-    return NextResponse.json({ locations: [] }, { status: 500 });
+    return NextResponse.json({ locations: [], cache_table_missing: false }, { status: 500 });
   }
 }

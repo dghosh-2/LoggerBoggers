@@ -3,8 +3,13 @@
 
 CREATE TABLE IF NOT EXISTS purchase_locations (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    transaction_id UUID REFERENCES transactions(id) ON DELETE SET NULL,
+    -- `user_id` should match `auth.uid()` (a UUID). Avoid a hard FK here since
+    -- many Supabase projects don't have a public `users` table.
+    user_id UUID NOT NULL,
+    -- Backwards-compat: older code used `transaction_id`; newer code uses
+    -- `financial_transaction_id`. Both are optional and not enforced via FK.
+    transaction_id UUID,
+    financial_transaction_id UUID,
 
     -- Location data
     address TEXT NOT NULL,
@@ -26,6 +31,10 @@ CREATE TABLE IF NOT EXISTS purchase_locations (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Ensure new columns exist even if the table already existed.
+ALTER TABLE purchase_locations ADD COLUMN IF NOT EXISTS transaction_id UUID;
+ALTER TABLE purchase_locations ADD COLUMN IF NOT EXISTS financial_transaction_id UUID;
 
 -- Index for fast user queries with date filtering
 CREATE INDEX IF NOT EXISTS idx_purchase_locations_user_date

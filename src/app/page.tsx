@@ -8,6 +8,12 @@ import Image from 'next/image';
 import { useUIStore } from '@/stores/ui-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { AuthModal } from '@/components/auth/AuthModal';
+import {
+  IncomeAllocationStep,
+  makeDefaultIncomeAllocation,
+  getIncomeAllocationTotal,
+  type IncomeAllocation,
+} from '@/components/onboarding/IncomeAllocationStep';
 
 const STEPS = [
   { id: 'age', label: 'How old are you?', type: 'number', placeholder: '25' },
@@ -15,6 +21,7 @@ const STEPS = [
   { id: 'riskTolerance', label: 'What\'s your risk tolerance?', type: 'select', options: ['Conservative', 'Moderate', 'Aggressive', 'Very Aggressive'] },
   { id: 'debtProfile', label: 'Tell us about any debt', type: 'textarea', placeholder: 'Student loans, credit cards, mortgage...' },
   { id: 'incomeStatus', label: 'What\'s your income status?', type: 'textarea', placeholder: 'Student, employed, freelancer...' },
+  { id: 'allocation', label: 'How should we allocate your income?', type: 'allocation' },
   { id: 'customRequest', label: 'Any specific financial goals?', type: 'textarea', placeholder: 'Save for a house, pay off debt, invest more...' },
 ];
 
@@ -83,12 +90,13 @@ export default function Home() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
-  const [formData, setFormData] = useState<Record<string, string>>({
+  const [formData, setFormData] = useState<any>({
     age: '',
     location: '',
     riskTolerance: 'Moderate',
     debtProfile: '',
     incomeStatus: '',
+    allocation: makeDefaultIncomeAllocation(20) satisfies IncomeAllocation,
     customRequest: '',
   });
   const [loading, setLoading] = useState(false);
@@ -130,7 +138,7 @@ export default function Home() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev: any) => ({ ...prev, [name]: value }));
   };
 
   const handleNext = () => {
@@ -176,6 +184,10 @@ export default function Home() {
 
   const step = STEPS[currentStep];
   const progress = ((currentStep + 1) / STEPS.length) * 100;
+  const allocationValid =
+    step.id !== 'allocation' ||
+    (formData?.allocation &&
+      Math.abs(getIncomeAllocationTotal(formData.allocation) - 100) < 0.01);
 
   return (
     <div
@@ -343,13 +355,13 @@ export default function Home() {
               <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center">
                 <CreditCard className="w-5 h-5 text-foreground-muted" />
               </div>
-              <div>
-                <p className="text-xs text-foreground-muted">Expenses</p>
-                <p className="text-lg font-semibold">$6,400</p>
-              </div>
-            </div>
-          </div>
-        </FloatingCard>
+	              <div>
+	                <p className="text-xs text-foreground-muted">Expenses</p>
+	                <p className="text-2xl md:text-3xl font-semibold tabular-nums">$6,400</p>
+	              </div>
+	            </div>
+	          </div>
+	        </FloatingCard>
 
       </div>
 
@@ -448,7 +460,7 @@ export default function Home() {
                       {step.type === 'select' && (
                         <div className="grid grid-cols-2 gap-3">
                           {step.options?.map((opt) => (
-                            <button key={opt} type="button" onClick={() => setFormData(prev => ({ ...prev, [step.id]: opt }))}
+                            <button key={opt} type="button" onClick={() => setFormData((prev: any) => ({ ...prev, [step.id]: opt }))}
                               className={`px-4 py-3 rounded-lg border text-sm font-medium transition-all ${formData[step.id] === opt ? 'bg-foreground text-background border-foreground' : 'bg-background border-border hover:border-foreground-muted'}`}>
                               {opt}
                             </button>
@@ -461,6 +473,13 @@ export default function Home() {
                           className="w-full bg-background border border-border rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground transition-all resize-none"
                           placeholder={step.placeholder} />
                       )}
+
+                      {step.type === 'allocation' && (
+                        <IncomeAllocationStep
+                          value={formData.allocation}
+                          onChange={(next) => setFormData((prev: any) => ({ ...prev, allocation: next }))}
+                        />
+                      )}
                     </motion.div>
                   </AnimatePresence>
                 </div>
@@ -472,7 +491,11 @@ export default function Home() {
                     </button>
                   )}
                   {currentStep < STEPS.length - 1 ? (
-                    <button onClick={handleNext} className={`${currentStep > 0 ? 'flex-[2]' : 'w-full'} flex items-center justify-center gap-2 py-3 rounded-lg bg-foreground text-background font-medium text-sm hover:opacity-90 transition-opacity`}>
+                    <button
+                      onClick={handleNext}
+                      disabled={!allocationValid}
+                      className={`${currentStep > 0 ? 'flex-[2]' : 'w-full'} flex items-center justify-center gap-2 py-3 rounded-lg bg-foreground text-background font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
                       Continue <ChevronRight className="w-4 h-4" />
                     </button>
                   ) : (

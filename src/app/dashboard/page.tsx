@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -46,23 +46,48 @@ interface DisplayTransaction {
   date: string;
 }
 
-const CATEGORY_COLORS: Record<string, string> = {
-  'Shopping': '#8B5CF6',
-  'Food & Drink': '#F59E0B',
-  'Bills & Utilities': '#3B82F6',
-  'Transportation': '#10B981',
-  'Health & Fitness': '#EC4899',
-  'Entertainment': '#6366F1',
-  'Personal Care': '#14B8A6',
-  'Travel': '#F97316',
-  'Education': '#A855F7',
-  'Other': '#6B7280',
-};
+interface TopHolding {
+  symbol: string;
+  name: string;
+  value: number;
+  dayChangePercent: number | null;
+  dayPnlApprox: number | null;
+}
+
+interface PortfolioTotals {
+  totalValue: number;
+  dayChangeValue: number | null;
+  dayChangePercent: number | null;
+}
+
+interface HoldingsWidgetResponse {
+  portfolio: PortfolioTotals;
+  movers: TopHolding[];
+  coverage?: {
+    quotedValue: number;
+    totalValue: number;
+    quotedHoldings: number;
+    totalHoldings: number;
+  };
+}
+
+const CATEGORY_PALETTE = [
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--chart-1)",
+  "var(--foreground-secondary)",
+] as const;
 
 export default function DashboardPage() {
   const router = useRouter();
   const { setCurrentView } = useInsightsStore();
   const [selectedTransaction, setSelectedTransaction] = useState<DisplayTransaction | null>(null);
+  const [portfolioTotals, setPortfolioTotals] = useState<PortfolioTotals>({ totalValue: 0, dayChangeValue: null, dayChangePercent: null });
+  const [topMovers, setTopMovers] = useState<TopHolding[]>([]);
+  const [holdingsCoverage, setHoldingsCoverage] = useState<HoldingsWidgetResponse['coverage']>(undefined);
+  const [topHoldingsLoading, setTopHoldingsLoading] = useState(false);
   
   // Use the financial data hook for consistent data fetching and caching
   const { summary, loading, refetch } = useFinancialData();
@@ -91,34 +116,82 @@ export default function DashboardPage() {
     Spending: item.spending,
   })) || [];
 
+  const netWorthTrendData = useMemo(() => {
+    const trend = summary?.monthly_trend || [];
+    if (!trend.length) return [];
+
+    // Approximate net worth over time using monthly savings deltas.
+    // We don't store historical balance snapshots, so this is a derived series.
+    const savings = trend.map((m) => Number(m.income || 0) - Number(m.spending || 0));
+    const totalSavings = savings.reduce((sum, v) => sum + v, 0);
+    const currentNetWorth = Number(summary?.net_worth || 0);
+    const startingNetWorth = currentNetWorth - totalSavings;
+
+    let running = startingNetWorth;
+    return trend.map((m, i) => {
+      running += savings[i] || 0;
+      return { month: m.month, netWorth: Math.round(running * 100) / 100 };
+    });
+  }, [summary?.monthly_trend, summary?.net_worth]);
+
   const categoryData = Object.entries(summary?.spending_by_category || {})
     .sort((a, b) => b[1] - a[1])
     .slice(0, 6)
-    .map(([name, value]) => ({
+    .map(([name, value], idx) => ({
       name,
       value,
-      color: CATEGORY_COLORS[name] || '#6B7280',
+      color: CATEGORY_PALETTE[idx % CATEGORY_PALETTE.length],
     }));
 
-  const savingsData = summary?.monthly_trend?.map(item => ({
-    month: item.month,
-    savings: item.income - item.spending,
-  })) || [];
+  useEffect(() => {
+    if (!summary?.is_connected) return;
+
+    let cancelled = false;
+    const run = async () => {
+      setTopHoldingsLoading(true);
+      try {
+        const res = await fetch('/api/data/top-holdings?movers=4&quoteMax=30');
+        const data = (await res.json()) as HoldingsWidgetResponse;
+        if (cancelled) return;
+        setPortfolioTotals(data?.portfolio ?? { totalValue: 0, dayChangeValue: null, dayChangePercent: null });
+        setTopMovers((data?.movers || []) as TopHolding[]);
+        setHoldingsCoverage(data?.coverage);
+      } catch (e) {
+        if (!cancelled) {
+          setPortfolioTotals({ totalValue: 0, dayChangeValue: null, dayChangePercent: null });
+          setTopMovers([]);
+          setHoldingsCoverage(undefined);
+        }
+      } finally {
+        if (!cancelled) setTopHoldingsLoading(false);
+      }
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [summary?.is_connected]);
 
   // Show loading state
   if (loading) {
     return (
-      <PageTransition>
-        <div className="space-y-8">
+      <PageTransition className="h-full min-h-0">
+        <div className="flex h-full min-h-0 flex-col gap-6">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
               <p className="text-foreground-muted text-sm mt-1">Your financial overview</p>
             </div>
           </div>
-          <GlassCard>
-            <DogLoadingAnimation message="Loading your financial dashboard..." size="lg" />
-          </GlassCard>
+          <div className="flex-1 min-h-0 flex items-center">
+            <DogLoadingAnimation
+              message="Loading your financial dashboard..."
+              size="xl"
+              className="w-screen relative left-1/2 -translate-x-1/2 justify-center"
+              trackClassName="h-56 md:h-64 rounded-none bg-secondary/15 border-y border-border/60"
+            />
+          </div>
         </div>
       </PageTransition>
     );
@@ -127,7 +200,7 @@ export default function DashboardPage() {
   // Not connected state
   if (!summary?.is_connected) {
     return (
-      <PageTransition>
+      <PageTransition className="h-full min-h-0">
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
@@ -171,8 +244,8 @@ export default function DashboardPage() {
   };
 
   return (
-    <PageTransition>
-      <div className="flex flex-col gap-3 md:gap-4 h-full min-h-0">
+    <PageTransition className="h-full min-h-0">
+      <div className="flex flex-col gap-3 md:gap-4 h-full min-h-0 pb-6 md:pb-10">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -196,167 +269,209 @@ export default function DashboardPage() {
         </div>
 
         {/* Main Charts Grid - 2x2 - Single-screen (no page scroll) */}
-        <div className="grid flex-1 min-h-0 grid-cols-2 grid-rows-2 gap-3 md:gap-5">
+        <div className="grid flex-1 min-h-0 grid-cols-2 grid-rows-2 gap-3 md:gap-4">
           
-          {/* Income vs Spending Line Chart */}
-          <GlassCard delay={100} className="p-3 md:p-6 h-full flex flex-col min-h-0">
-            <div className="flex items-center justify-between mb-2 md:mb-3">
-              <div>
-                <h2 className="text-sm md:text-base font-semibold">Income vs Spending</h2>
-                <p className="text-[10px] md:text-xs text-foreground-muted mt-0.5">12-month trend</p>
-              </div>
-              <div className="hidden md:flex items-center gap-3 text-xs">
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 rounded-full bg-success" />
-                  <span className="text-foreground-muted">Income</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 rounded-full bg-destructive" />
-                  <span className="text-foreground-muted">Spending</span>
-                </div>
-              </div>
-            </div>
-            <div className="flex-1 min-h-0">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={incomeVsSpendingData} margin={{ top: 5, right: 5, left: -15, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                  <XAxis 
-                    dataKey="month" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fill: 'var(--foreground-muted)', fontSize: 9 }} 
-                  />
-                  <YAxis 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fill: 'var(--foreground-muted)', fontSize: 9 }}
-                    tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`}
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Line 
-                    type="monotone" 
-                    dataKey="Income" 
-                    stroke="var(--success)" 
-                    strokeWidth={1.5} 
-                    dot={false}
-                    activeDot={{ r: 3, strokeWidth: 0 }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="Spending" 
-                    stroke="var(--destructive)" 
-                    strokeWidth={1.5} 
-                    dot={false}
-                    activeDot={{ r: 3, strokeWidth: 0 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex gap-2 md:gap-3 mt-2 md:mt-4 pt-2 md:pt-4 border-t border-border">
-              <div className="flex items-center gap-2 px-2.5 py-2 rounded-md bg-secondary/50 flex-1">
-                <div className="w-2 h-2 rounded-full bg-success" />
-                <div>
-                  <p className="text-[10px] md:text-xs text-foreground-muted">Income</p>
-                  <p className="text-xs md:text-sm font-semibold font-mono text-success">
-                    ${summary.monthly_income.toLocaleString()}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 px-2.5 py-2 rounded-md bg-secondary/50 flex-1">
-                <div className="w-2 h-2 rounded-full bg-destructive" />
-                <div>
-                  <p className="text-[10px] md:text-xs text-foreground-muted">Spending</p>
-                  <p className="text-xs md:text-sm font-semibold font-mono text-destructive">
-                    ${summary.monthly_spending.toLocaleString()}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </GlassCard>
-
-          {/* Savings Trend Area Chart */}
-          <GlassCard delay={150} className="p-3 md:p-6 h-full flex flex-col min-h-0">
-            <div className="flex items-center justify-between mb-2 md:mb-3">
-              <div>
-                <h2 className="text-sm md:text-base font-semibold">Monthly Savings</h2>
-                <p className="text-[10px] md:text-xs text-foreground-muted mt-0.5">Net savings over time</p>
-              </div>
-              <div className="text-right">
-                <p className="text-[10px] md:text-xs text-foreground-muted">Net Worth</p>
-                <p className={`text-sm md:text-base font-bold font-mono ${summary.net_worth >= 0 ? 'text-success' : 'text-destructive'}`}>
+          {/* Net Worth (12-month trend) */}
+          <GlassCard delay={100} className="relative overflow-hidden p-3 md:p-6 h-full flex flex-col min-h-0">
+            <div className="relative flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[11px] md:text-xs font-semibold uppercase tracking-wide text-foreground-muted">Net Worth</div>
+                <div className={`mt-0.5 text-2xl md:text-4xl font-bold tracking-tight font-mono ${summary.net_worth >= 0 ? 'text-success' : 'text-destructive'}`}>
                   ${summary.net_worth.toLocaleString()}
-                </p>
+                </div>
+                {netWorthTrendData.length >= 2 ? (
+                  (() => {
+                    const first = Number(netWorthTrendData[0].netWorth || 0);
+                    const last = Number(netWorthTrendData[netWorthTrendData.length - 1].netWorth || 0);
+                    const delta = last - first;
+                    const pct = first !== 0 ? (delta / Math.abs(first)) * 100 : null;
+                    const up = delta >= 0;
+                    return (
+                      <div className="mt-1 flex items-center gap-2">
+                        <span className={up ? "text-success text-[10px] md:text-xs font-mono" : "text-destructive text-[10px] md:text-xs font-mono"}>
+                          {up ? "+" : "-"}${Math.abs(delta).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                        </span>
+                        {typeof pct === 'number' ? (
+                          <span className="text-[10px] md:text-xs text-foreground-muted font-mono">
+                            ({pct >= 0 ? "+" : ""}{pct.toFixed(1)}% / 12mo)
+                          </span>
+                        ) : null}
+                      </div>
+                    );
+                  })()
+                ) : (
+                  <div className="mt-1 text-[10px] md:text-xs text-foreground-muted">Past 12 months</div>
+                )}
+              </div>
+
+              <div className="hidden md:flex items-center gap-2 pt-1">
+                <div className="h-2 w-2 rounded-full bg-primary" />
+                <div className="text-xs text-foreground-muted">12 month trend</div>
               </div>
             </div>
-            <div className="flex-1 min-h-0">
+
+            <div className="relative mt-2 md:mt-3 flex-1 min-h-0">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={savingsData} margin={{ top: 5, right: 5, left: -15, bottom: 0 }}>
+                <AreaChart data={netWorthTrendData} margin={{ top: 6, right: 8, left: -18, bottom: 0 }}>
                   <defs>
-                    <linearGradient id="savingsGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
+                    <linearGradient id="nwGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.32} />
+                      <stop offset="85%" stopColor="var(--primary)" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                  <XAxis 
-                    dataKey="month" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fill: 'var(--foreground-muted)', fontSize: 9 }} 
-                  />
-                  <YAxis 
-                    axisLine={false} 
-                    tickLine={false} 
+                  <XAxis
+                    dataKey="month"
+                    axisLine={false}
+                    tickLine={false}
                     tick={{ fill: 'var(--foreground-muted)', fontSize: 9 }}
-                    tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`}
+                  />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: 'var(--foreground-muted)', fontSize: 9 }}
+                    tickFormatter={(v) => `$${(Number(v) / 1000).toFixed(0)}k`}
                   />
                   <Tooltip content={<CustomTooltip />} />
-                  <Area 
-                    type="monotone" 
-                    dataKey="savings" 
-                    name="Savings"
-                    stroke="var(--primary)" 
-                    strokeWidth={1.5}
-                    fill="url(#savingsGradient)"
+                  <Area
+                    type="monotone"
+                    dataKey="netWorth"
+                    name="Net Worth"
+                    stroke="var(--primary)"
+                    strokeWidth={1.75}
+                    fill="url(#nwGradient)"
+                    dot={false}
+                    activeDot={{ r: 3, strokeWidth: 0 }}
                   />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-            <div className="mt-2 md:mt-4 pt-2 md:pt-4 border-t border-border">
-              <div className="flex items-center justify-between mb-1.5 md:mb-2">
-                <span className="text-[10px] md:text-xs text-foreground-muted">Savings Rate</span>
-                <span className="text-[10px] md:text-xs font-semibold">
-                  {summary.monthly_income > 0 
-                    ? Math.round(((summary.monthly_income - summary.monthly_spending) / summary.monthly_income) * 100)
-                    : 0}%
-                </span>
+          </GlassCard>
+
+          {/* Top Holdings (Daily Performance) */}
+          <GlassCard delay={150} className="p-3 md:p-6 h-full flex flex-col min-h-0">
+            <div className="flex items-start justify-between gap-3 mb-2 md:mb-3">
+              <div>
+                <div className="text-[11px] md:text-xs font-semibold uppercase tracking-wide text-foreground-muted">Top Holdings</div>
+                <div className="text-[10px] md:text-xs text-foreground-muted mt-0.5">Today&apos;s move</div>
               </div>
-              <div className="h-1.5 md:h-2 bg-secondary rounded-full overflow-hidden">
-                <motion.div
-                  className="h-full bg-primary rounded-full"
-                  initial={{ width: 0 }}
-                  animate={{ 
-                    width: `${Math.min(100, Math.max(0, summary.monthly_income > 0 
-                      ? ((summary.monthly_income - summary.monthly_spending) / summary.monthly_income) * 100 
-                      : 0))}%` 
-                  }}
-                  transition={{ duration: 0.8, delay: 0.3 }}
-                />
+
+              <div className="text-right">
+                <button
+                  className="text-[11px] md:text-xs font-medium text-foreground-muted hover:text-foreground transition-colors cursor-pointer inline-flex items-center gap-1"
+                  onClick={() => router.push('/portfolio')}
+                >
+                  Portfolio
+                  <ArrowUpRight className="w-3 h-3" />
+                </button>
               </div>
             </div>
+
+            <div className="rounded-md bg-secondary/20 border border-border/60 p-3">
+              <div className="text-[10px] md:text-xs text-foreground-muted">Stock Portfolio</div>
+              <div className="mt-0.5 flex items-end justify-between gap-3">
+                <div className="text-lg md:text-2xl font-semibold font-mono">
+                  ${Number(portfolioTotals.totalValue || 0).toLocaleString()}
+                </div>
+                <div className="text-right">
+                  {typeof portfolioTotals.dayChangePercent === 'number' && typeof portfolioTotals.dayChangeValue === 'number' ? (
+                    (() => {
+                      const pct = portfolioTotals.dayChangePercent;
+                      const chg = portfolioTotals.dayChangeValue;
+                      const isUp = pct >= 0;
+                      return (
+                        <>
+                          <div className={`text-sm md:text-base font-semibold font-mono ${isUp ? 'text-success' : 'text-destructive'}`}>
+                            {pct >= 0 ? '+' : ''}{pct.toFixed(2)}%
+                          </div>
+                          <div className={`text-[10px] md:text-xs font-mono ${isUp ? 'text-success' : 'text-destructive'}`}>
+                            {chg >= 0 ? '+' : '-'}${Math.abs(chg).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                          </div>
+                        </>
+                      );
+                    })()
+                  ) : (
+                    <div className="text-[10px] md:text-xs text-foreground-muted">--</div>
+                  )}
+                </div>
+              </div>
+              {holdingsCoverage && holdingsCoverage.totalValue > 0 && holdingsCoverage.quotedValue > 0 && holdingsCoverage.quotedValue < holdingsCoverage.totalValue ? (
+                <div className="mt-1 text-[10px] text-foreground-muted">
+                  Based on quotes for ~{Math.round((holdingsCoverage.quotedValue / holdingsCoverage.totalValue) * 100)}% of portfolio value
+                </div>
+              ) : null}
+            </div>
+
+            <div className="mt-2 md:mt-3 flex-1 min-h-0 overflow-hidden">
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="text-[10px] md:text-xs font-medium text-foreground-muted">Top Movers (Today)</div>
+              </div>
+              <div className="space-y-1.5">
+                {topHoldingsLoading ? (
+                  <div className="text-xs text-foreground-muted">Loading holdings...</div>
+                ) : topMovers.length === 0 ? (
+                  <div className="text-xs text-foreground-muted">No movers available.</div>
+                ) : (
+                  topMovers.slice(0, 4).map((h, idx) => {
+                    const pct = h.dayChangePercent;
+                    const pnl = h.dayPnlApprox;
+                    const isUp = typeof pct === 'number' ? pct >= 0 : null;
+                    return (
+                      <motion.div
+                        key={`${h.symbol}-${idx}`}
+                        initial={{ opacity: 0, x: 8 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.25 + idx * 0.05 }}
+                        className="flex items-center justify-between gap-3 p-2 rounded-md bg-secondary/30 hover:bg-secondary/50 transition-colors"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs md:text-sm font-semibold font-mono">{h.symbol}</span>
+                            <span className="text-[10px] md:text-xs text-foreground-muted truncate">
+                              {h.name || h.symbol}
+                            </span>
+                          </div>
+                          <div className="text-[10px] md:text-xs text-foreground-muted font-mono">
+                            ${Number(h.value || 0).toLocaleString()}
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          {typeof pct === 'number' ? (
+                            <>
+                              <div className={`text-xs md:text-sm font-semibold font-mono ${isUp ? 'text-success' : 'text-destructive'}`}>
+                                {pct >= 0 ? '+' : ''}{pct.toFixed(2)}%
+                              </div>
+                              <div className={`text-[10px] md:text-xs font-mono ${isUp ? 'text-success' : 'text-destructive'}`}>
+                                {typeof pnl === 'number' ? `${pnl >= 0 ? '+' : '-'}$${Math.abs(pnl).toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '--'}
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-[10px] md:text-xs text-foreground-muted">--</div>
+                          )}
+                        </div>
+                      </motion.div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
           </GlassCard>
 
           {/* Category Breakdown */}
           <GlassCard delay={200} className="p-3 md:p-6 h-full flex flex-col min-h-0">
             <div className="flex items-center justify-between mb-2 md:mb-3">
               <div>
-                <h2 className="text-sm md:text-base font-semibold">Spending by Category</h2>
+                <div className="text-[11px] md:text-xs font-semibold uppercase tracking-wide text-foreground-muted">Spending by Category</div>
                 <p className="text-[10px] md:text-xs text-foreground-muted mt-0.5">This month</p>
               </div>
-              <span className="text-xs md:text-sm font-bold font-mono">${summary.monthly_spending.toLocaleString()}</span>
+              <span className="text-lg md:text-2xl font-bold font-mono tabular-nums">
+                ${summary.monthly_spending.toLocaleString()}
+              </span>
             </div>
             <div className="flex-1 min-h-0 flex items-center gap-3 md:gap-6">
-              <div className="w-[170px] h-[170px] md:w-[280px] md:h-[280px] flex-shrink-0">
+              <div className="w-[200px] h-[200px] md:w-[340px] md:h-[340px] flex-shrink-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -392,16 +507,20 @@ export default function DashboardPage() {
                 {categoryData.map((cat, index) => (
                   <motion.div
                     key={cat.name}
-                    className="flex items-center justify-between"
+                    className="flex items-center justify-between gap-3"
                     initial={{ opacity: 0, x: 10 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.3 + index * 0.03 }}
                   >
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
                       <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: cat.color }} />
-                      <span className="text-[10px] md:text-xs text-foreground-muted truncate max-w-[140px] md:max-w-[180px]">{cat.name}</span>
+                      <span className="text-[10px] md:text-sm text-foreground-muted truncate">
+                        {cat.name}
+                      </span>
                     </div>
-                    <span className="text-[10px] md:text-xs font-mono font-medium">${cat.value.toLocaleString()}</span>
+                    <span className="text-[10px] md:text-sm font-mono font-medium tabular-nums shrink-0">
+                      ${cat.value.toLocaleString()}
+                    </span>
                   </motion.div>
                 ))}
                 </div>
@@ -413,12 +532,12 @@ export default function DashboardPage() {
           <GlassCard delay={250} className="p-3 md:p-6 h-full flex flex-col min-h-0">
             <div className="flex items-center justify-between mb-2 md:mb-3">
               <div>
-                <h2 className="text-sm md:text-base font-semibold">Recent Transactions</h2>
+                <div className="text-[11px] md:text-xs font-semibold uppercase tracking-wide text-foreground-muted">Recent Transactions</div>
                 <p className="text-[10px] md:text-xs text-foreground-muted mt-0.5">{transactions.length} transactions</p>
               </div>
               <button
-                className="text-[10px] md:text-xs font-medium text-primary hover:text-primary/80 transition-colors cursor-pointer flex items-center gap-1"
-                onClick={() => router.push('/receipts')}
+                className="text-[11px] md:text-xs font-medium text-foreground-muted hover:text-foreground transition-colors cursor-pointer flex items-center gap-1"
+                onClick={handleCalendar}
               >
                 View all
                 <ArrowUpRight className="w-3 h-3" />

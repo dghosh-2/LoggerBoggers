@@ -2,6 +2,12 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import {
+    IncomeAllocationStep,
+    makeDefaultIncomeAllocation,
+    getIncomeAllocationTotal,
+    type IncomeAllocation,
+} from '@/components/onboarding/IncomeAllocationStep';
 
 const STEPS = [
     { id: 'age', label: 'What is your age?', type: 'number', placeholder: 'e.g., 21' },
@@ -9,6 +15,7 @@ const STEPS = [
     { id: 'riskTolerance', label: 'What is your risk tolerance?', type: 'select', options: ['Low', 'Medium', 'High', 'Aggressive'] },
     { id: 'debtProfile', label: 'Tell us about your debt profile.', type: 'textarea', placeholder: 'e.g., Student loans, Credit card debt, None...' },
     { id: 'incomeStatus', label: 'What is your current income status?', type: 'textarea', placeholder: 'e.g., Student, Full-time, Self-employed...' },
+    { id: 'allocation', label: 'How should we allocate your income?', type: 'allocation' },
     { id: 'customRequest', label: 'Any additional requests or custom needs?', type: 'textarea', placeholder: 'How can we help you win Tartanhacks? (Natural language input)' },
 ];
 
@@ -21,6 +28,7 @@ export default function OnboardingPage() {
         riskTolerance: 'Medium',
         debtProfile: '',
         incomeStatus: '',
+        allocation: makeDefaultIncomeAllocation(20) satisfies IncomeAllocation,
         customRequest: '',
     });
     const [loading, setLoading] = useState(false);
@@ -68,6 +76,10 @@ export default function OnboardingPage() {
 
     const step = STEPS[currentStep];
     const isFirstStep = currentStep === 0;
+    const allocationValid =
+        step.id !== 'allocation' ||
+        (formData?.allocation &&
+            Math.abs(getIncomeAllocationTotal(formData.allocation) - 100) < 0.01);
 
     return (
         <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 font-sans">
@@ -138,6 +150,20 @@ export default function OnboardingPage() {
                                 placeholder={step.placeholder}
                             ></textarea>
                         )}
+
+                        {step.type === 'allocation' && (
+                            <div className="rounded-xl border-2 border-gray-200 p-5">
+                                <IncomeAllocationStep
+                                    value={formData.allocation}
+                                    onChange={(next) =>
+                                        setFormData((prev: any) => ({
+                                            ...prev,
+                                            allocation: next,
+                                        }))
+                                    }
+                                />
+                            </div>
+                        )}
                     </div>
 
                     {/* Navigation buttons - show on ALL steps */}
@@ -156,7 +182,8 @@ export default function OnboardingPage() {
                             <button
                                 type="button"
                                 onClick={handleNext}
-                                className={`${currentStep > 0 ? 'flex-[2]' : 'w-full'} py-4 bg-gradient-to-r from-blue-600 to-emerald-600 text-white rounded-xl font-semibold text-lg hover:from-blue-700 hover:to-emerald-700 transition-all shadow-lg active:scale-[0.98]`}
+                                disabled={!allocationValid}
+                                className={`${currentStep > 0 ? 'flex-[2]' : 'w-full'} py-4 bg-gradient-to-r from-blue-600 to-emerald-600 text-white rounded-xl font-semibold text-lg hover:from-blue-700 hover:to-emerald-700 transition-all shadow-lg active:scale-[0.98] ${!allocationValid ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                                 Continue
                             </button>

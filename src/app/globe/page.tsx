@@ -32,6 +32,7 @@ export default function GlobePage() {
   const [loading, setLoading] = useState(true);
   const [timeFrame, setTimeFrame] = useState<TimeFrame>('30d');
   const [stats, setStats] = useState({ totalSpent: 0, uniqueLocations: 0, topCategory: '' });
+  const [cacheTableMissing, setCacheTableMissing] = useState(false);
 
   useEffect(() => {
     fetchLocations();
@@ -41,10 +42,18 @@ export default function GlobePage() {
     setLoading(true);
     try {
       const response = await fetch(`/api/data/locations?timeframe=${timeFrame}`);
-      const data = await response.json();
+      const data = await response.json().catch(() => ({} as any));
+
+      if (!response.ok) {
+        console.error('Locations API returned non-OK:', response.status, data);
+        setLocations([]);
+        setCacheTableMissing(data?.cache_table_missing === true);
+        return;
+      }
 
       if (data.locations) {
         setLocations(data.locations);
+        setCacheTableMissing(data.cache_table_missing === true);
 
         // Calculate stats
         const totalSpent = data.locations.reduce((sum: number, loc: PurchaseLocation) => sum + loc.amount, 0);
@@ -156,6 +165,19 @@ export default function GlobePage() {
         {/* Globe - Always show the 3D globe */}
         <div className="rounded-xl bg-card border border-border overflow-hidden relative" style={{ height: '600px' }}>
           <PurchaseGlobe locations={locations} isLoading={loading} />
+<<<<<<< HEAD
+          {!loading && cacheTableMissing && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="max-w-md text-center p-6 bg-card/85 backdrop-blur-sm border border-border rounded-xl">
+                <p className="text-sm font-semibold">Missing Supabase table: purchase_locations</p>
+                <p className="text-xs text-foreground-muted mt-2">
+                  Create it by running `supabase/purchase_locations_schema.sql` in your Supabase SQL editor, then reload.
+                </p>
+              </div>
+            </div>
+          )}
+=======
+>>>>>>> abhinav-changes
           {!loading && locations.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="max-w-md text-center p-6 bg-card/85 backdrop-blur-sm border border-border rounded-xl">

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { generateFiveYearsOfTransactions, generateFiveYearsOfIncome } from '@/lib/fake-transaction-generator';
 import { getUserIdFromRequest } from '@/lib/auth';
+import { fakeGeocodeAddress } from '@/lib/fake-geocode';
+import { insertPurchaseLocations } from '@/lib/purchase-locations';
 
 export async function POST(request: NextRequest) {
     try {
@@ -39,6 +41,7 @@ export async function POST(request: NextRequest) {
         // Clear existing data for this user
         await supabaseAdmin.from('financial_transactions').delete().eq('uuid_user_id', userId);
         await supabaseAdmin.from('income').delete().eq('uuid_user_id', userId);
+        await supabaseAdmin.from('purchase_locations').delete().eq('user_id', userId);
 
         // Transform transactions to match actual database schema
         // Schema: user_id, uuid_user_id, date, category, name, merchant_name, amount, tip, tax, location, source, pending
@@ -101,12 +104,46 @@ export async function POST(request: NextRequest) {
             .update({ last_sync_at: new Date().toISOString() })
             .eq('uuid_user_id', userId);
 
+        // Seed purchase_locations from generated transaction addresses (fake geocode).
+        const purchaseLocations = fakeTransactions
+            .map(tx => {
+                const address = (tx.location || '').trim();
+                if (!address) return null;
+                const geo = fakeGeocodeAddress(address);
+                if (!geo) return null;
+                return {
+                    user_id: userId,
+                    financial_transaction_id: null,
+                    address,
+                    merchant_name: tx.merchant_name || tx.name || null,
+                    latitude: geo.lat,
+                    longitude: geo.lng,
+                    amount: tx.amount,
+                    category: tx.category || 'Other',
+                    date: tx.date,
+                    source: 'regenerated',
+                };
+            })
+            .filter(Boolean) as any[];
+
+        let insertedLocations = 0;
+        for (let i = 0; i < purchaseLocations.length; i += BATCH_SIZE) {
+            const batch = purchaseLocations.slice(i, i + BATCH_SIZE);
+            const res = await insertPurchaseLocations(batch);
+            if (!res.ok) {
+                console.error('Error inserting purchase_locations batch:', res.error);
+            } else {
+                insertedLocations += batch.length;
+            }
+        }
+
         console.log(`Regenerated data for user ${userId}: ${insertedTransactions} transactions, ${insertedIncome} income records`);
 
         return NextResponse.json({
             success: true,
             transactions: insertedTransactions,
             income: insertedIncome,
+            locations: insertedLocations,
             dateRange: {
                 earliest: fakeTransactions[0]?.date,
                 latest: fakeTransactions[fakeTransactions.length - 1]?.date,
