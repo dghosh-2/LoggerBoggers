@@ -100,6 +100,11 @@ function PlaidLinkButtonInner({
                     }
                     console.error('Token exchange failed:', { status: response.status, errorData, attempt });
                     
+                    // Handle auth errors specifically
+                    if (response.status === 401) {
+                        throw new Error('Please log in first to connect your accounts');
+                    }
+                    
                     // Retry on 5xx errors
                     if (response.status >= 500 && attempt < MAX_EXCHANGE_RETRIES) {
                         await new Promise(resolve => setTimeout(resolve, 2000));
@@ -217,7 +222,22 @@ export function PlaidLinkButton({
     const [tokenLoading, setTokenLoading] = useState(true);
     const [tokenError, setTokenError] = useState<string | null>(null);
     const [retryCount, setRetryCount] = useState(0);
+    const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
     const MAX_RETRIES = 3;
+
+    // Check if user is authenticated
+    useEffect(() => {
+        const checkAuth = async () => {
+            try {
+                const response = await fetch('/api/auth/session');
+                const data = await response.json();
+                setIsAuthenticated(!!data.user);
+            } catch {
+                setIsAuthenticated(false);
+            }
+        };
+        checkAuth();
+    }, []);
 
     // Fetch link token with retry logic
     const fetchLinkToken = useCallback(async (attempt: number = 0): Promise<void> => {
@@ -318,8 +338,8 @@ export function PlaidLinkButton({
         fetchLinkToken(0);
     }, [fetchLinkToken]);
 
-    // Show loading state while fetching token
-    if (tokenLoading) {
+    // Show loading state while checking auth or fetching token
+    if (isAuthenticated === null || tokenLoading) {
         return (
             <GlassButton
                 variant={buttonVariant}
@@ -328,6 +348,22 @@ export function PlaidLinkButton({
                 className={className}
             >
                 Loading...
+            </GlassButton>
+        );
+    }
+
+    // If not authenticated, show login prompt
+    if (!isAuthenticated) {
+        return (
+            <GlassButton
+                variant={buttonVariant}
+                size={buttonSize}
+                onClick={() => {
+                    toast.error('Please log in first to connect your accounts');
+                }}
+                className={className}
+            >
+                {buttonText}
             </GlassButton>
         );
     }

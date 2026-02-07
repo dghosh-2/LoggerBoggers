@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import crypto from 'crypto';
 
 function hashPassword(password: string): string {
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Find user
-        const { data: user, error: userError } = await supabase
+        const { data: user, error: userError } = await supabaseAdmin
             .from('users')
             .select('id, username, display_name, password_hash')
             .eq('username', username.toLowerCase())
@@ -45,13 +45,13 @@ export async function POST(request: NextRequest) {
         }
 
         // Update last login
-        await supabase
+        await supabaseAdmin
             .from('users')
             .update({ last_login_at: new Date().toISOString() })
             .eq('id', user.id);
 
         // Delete old sessions for this user (optional: keep multiple sessions)
-        await supabase
+        await supabaseAdmin
             .from('sessions')
             .delete()
             .eq('user_id', user.id);
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + 30);
 
-        const { error: sessionError } = await supabase
+        const { error: sessionError } = await supabaseAdmin
             .from('sessions')
             .insert({
                 user_id: user.id,
