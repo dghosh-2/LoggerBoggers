@@ -1,0 +1,192 @@
+.root {
+    width: 100%;
+}
+
+.dropzone {
+    border-radius: 16px;
+    border: 1px dashed #b8cbb7;
+    background:
+        radial-gradient(circle at 18% 22%, #e8f4e7 0%, transparent 36%),
+        #f8fcf7;
+    transition: transform 0.16s ease, border-color 0.16s ease;
+}
+
+.dropzone:hover {
+    transform: translateY(-1px);
+    border-color: #7aa57a;
+}
+
+.dropzoneInner {
+    min-height: 220px;
+    display: grid;
+    place-items: center;
+    text-align: center;
+    gap: 0.7rem;
+}
+
+.previewLayout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+    gap: 1rem;
+}
+
+.previewCard {
+    min-height: 420px;
+}
+
+.previewContent {
+    height: 100%;
+}
+
+.previewFrame {
+    position: relative;
+    height: 100%;
+    min-height: 390px;
+    display: grid;
+    place-items: center;
+    border-radius: 14px;
+    border: 1px solid #cfdbce;
+    background: linear-gradient(180deg, #f7fbf6 0%, #eef5ed 100%);
+    overflow: hidden;
+}
+
+.previewFrame img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.cornerOverlay {
+    position: absolute;
+    z-index: 3;
+}
+
+.cornerSvg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.cornerPolygon {
+    fill: rgba(55, 140, 78, 0.16);
+}
+
+.cornerLine {
+    fill: none;
+    stroke: rgba(43, 112, 62, 0.9);
+    stroke-width: 4;
+    stroke-linejoin: round;
+}
+
+.cornerHandle {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    border: 2px solid #1f5e34;
+    background: #f4fff5;
+    box-shadow: 0 4px 10px rgba(20, 65, 35, 0.25);
+    transform: translate(-50%, -50%);
+    cursor: grab;
+    z-index: 4;
+}
+
+.cornerHandle:active {
+    cursor: grabbing;
+}
+
+.cornerHandle:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.scanOverlay {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 5;
+    background:
+        linear-gradient(to right, rgba(26, 65, 30, 0.09) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(26, 65, 30, 0.08) 1px, transparent 1px);
+    background-size: 28px 28px;
+}
+
+.scanBeam {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 4px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, transparent 0%, #3a9050 20%, #5fbf78 50%, #3a9050 80%, transparent 100%);
+    box-shadow: 0 0 18px rgba(58, 144, 80, 0.52);
+}
+
+.tokenCloud {
+    position: absolute;
+    inset: 0;
+}
+
+.scanToken {
+    position: absolute;
+    bottom: 10%;
+    padding: 0.2rem 0.45rem;
+    border-radius: 999px;
+    border: 1px solid rgba(31, 89, 43, 0.25);
+    background: rgba(255, 255, 255, 0.9);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: #214c2b;
+}
+
+.controls {
+    display: grid;
+    gap: 0.9rem;
+}
+
+.meta {
+    margin: 0;
+    padding: 0.6rem;
+    border-radius: 10px;
+    border: 1px solid #d3dfd1;
+    background: #f7fbf7;
+    color: #486048;
+    font-size: 0.74rem;
+}
+
+.loadingState {
+    display: grid;
+    gap: 0.6rem;
+    padding: 0.85rem;
+    border-radius: 12px;
+    border: 1px solid #d2e0d2;
+    background: #f4faf4;
+}
+
+.actions {
+    display: grid;
+    gap: 0.55rem;
+}
+
+.error {
+    margin: 0;
+    color: #992e2e;
+    font-size: 0.82rem;
+}
+
+@media (max-width: 980px) {
+    .previewLayout {
+        grid-template-columns: 1fr;
+    }
+
+    .previewCard {
+        min-height: 350px;
+    }
+
+    .previewFrame {
+        min-height: 320px;
+    }
+}

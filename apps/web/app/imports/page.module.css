@@ -1,0 +1,138 @@
+.container {
+    --bg-layer: #f4f8f3;
+    --line: #d1ddd0;
+    --text: #142113;
+    --text-muted: #5d6f5c;
+    max-width: 1140px;
+    margin: 0 auto;
+    padding: clamp(1rem, 2vw, 2.2rem) clamp(0.9rem, 2vw, 1.5rem) 2.5rem;
+    color: var(--text);
+}
+
+.header {
+    margin-bottom: 1.1rem;
+}
+
+.headerTop {
+    background:
+        radial-gradient(circle at 8% 20%, #dcebd9 0%, transparent 38%),
+        radial-gradient(circle at 88% 84%, #d5e8d4 0%, transparent 32%),
+        var(--bg-layer);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 1.3rem;
+}
+
+.headerBadge {
+    margin-bottom: 0.55rem;
+}
+
+.header h1 {
+    margin: 0;
+    font-size: clamp(1.45rem, 2.2vw, 2rem);
+    letter-spacing: -0.02em;
+}
+
+.header p {
+    margin: 0.4rem 0 0;
+    color: var(--text-muted);
+    max-width: 64ch;
+    font-size: 0.92rem;
+}
+
+.kpis {
+    display: flex;
+    gap: 0.65rem;
+}
+
+.kpiCard {
+    min-width: 120px;
+    display: grid;
+    place-items: center;
+    text-align: center;
+    gap: 0.1rem;
+    padding: 0.75rem 0.8rem;
+}
+
+.kpiCard span {
+    font-size: 0.68rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.kpiCard strong {
+    font-size: 1rem;
+}
+
+.panelCard {
+    border-radius: 22px;
+    overflow: hidden;
+}
+
+.panelContent {
+    display: grid;
+    gap: 1.35rem;
+}
+
+.cardTitleRow {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+}
+
+.placeholder {
+    border-radius: 14px;
+    border: 1px dashed #c8d6c7;
+    padding: 3rem 1rem;
+    background: #f8fbf7;
+    text-align: center;
+    display: grid;
+    justify-items: center;
+    gap: 0.6rem;
+}
+
+.placeholder h3 {
+    margin: 0;
+    font-size: 1.02rem;
+}
+
+.placeholder p {
+    margin: 0;
+    color: var(--text-muted);
+    max-width: 48ch;
+    font-size: 0.9rem;
+}
+
+@media (max-width: 900px) {
+    .headerTop {
+        padding: 1rem;
+    }
+
+    .kpis {
+        width: 100%;
+        justify-content: stretch;
+    }
+
+    .kpis > * {
+        flex: 1;
+    }
+}
+
+@media (max-width: 640px) {
+    .container {
+        padding-top: 0.8rem;
+    }
+
+    .header p {
+        font-size: 0.84rem;
+    }
+
+    .cardTitleRow {
+        align-items: center;
+    }
+
+    .placeholder {
+        padding: 2rem 0.85rem;
+    }
+}
